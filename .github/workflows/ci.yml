@@ -1,78 +1,99 @@
-name: Godot Unit Tests
+name: CI
+
+# Real CI. Every step fails the build on error.
+# (The previous ci.yml only `cat`-ed test files and wrote a hard-coded
+#  <testsuite failures='0'/> XML. That is gone.)
 
 on:
   push:
-    branches: [main]
+    branches: [main, rebuild/**]
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
+  verify:
+    name: Import + automated checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
-      - name: Setup Godot 4.x
+      - uses: actions/checkout@v4
+
+      - name: Install Godot 4.4.1
         uses: chickensoft-games/setup-godot@v2
         with:
           version: 4.4.1-stable
           use-dotnet: false
           include-templates: false
-        continue-on-error: true
-        id: setup-godot
-      
-      - name: Fallback - Install Godot manually
-        if: steps.setup-godot.outcome == 'failure'
-        run: |
-          echo "Setup-godot failed, trying manual install..."
-          wget -q https://github.com/godotengine/godot/releases/download/4.4.1-stable/Godot_v4.4.1-stable_linux.x86_64.zip -O godot.zip || wget -q https://github.com/godotengine/godot/releases/download/4.4-stable/Godot_v4.4-stable_linux.x86_64.zip -O godot.zip
-          unzip -q godot.zip
-          sudo mv Godot_v4.4*.x86_64 /usr/local/bin/godot
-          sudo chmod +x /usr/local/bin/godot
-          godot --version
-          mkdir -p ~/.local/share/godot/export_templates/4.4.1.stable || true
-      
-      - name: Verify project
-        run: |
-          godot --version || /usr/local/bin/godot --version || echo "godot not found but continuing"
-          echo "Project structure:"
-          ls -la project/project.godot || ls -la project.godot || echo "checking..."
-          ls -la project/src/ | head -n 20
-          echo "✓ Project structure OK"
-      
-      - name: Run GDScript validation
-        run: |
-          echo "Validating GDScript files..."
-          # Count files
-          echo "Polish files: $(find project/src -name '*.gd' | wc -l)"
-          # Try syntax check if godot available
-          if command -v godot &> /dev/null; then
-            godot --headless --check-only --path project 2>&1 | head -n 100 || echo "Validation note: check-only not critical"
-          fi
-          echo "✓ Validation complete"
-      
-      - name: Run tests (headless)
-        run: |
-          echo "Running Phase 11 polish tests..."
-          if [ -f "project/tests/test_polish.gd" ]; then echo "✓ test_polish.gd found"; cat project/tests/test_polish.gd | head -n 20; fi
-          if [ -f "project/src/test_item_generator.gd" ]; then echo "✓ test_item_generator.gd found"; fi
-          if [ -f "project/docs/POLISH.md" ]; then echo "✓ POLISH.md found"; fi
-          echo "=== Offline compliance ==="
-          grep -q 'internet=false' project/export_presets.cfg && echo "✓ No internet permission" || echo "✗ internet permission check"
-          echo "✓ All checks passed (offline-only verified, hardcore polish)"
-          # Create dummy test results for artifact
-          mkdir -p project/test-results
-          echo "<testsuite name='polish' tests='8' failures='0'><testcase name='PolishManager'/><testcase name='JuiceController'/><testcase name='PerformanceOptimizer'/><testcase name='AudioManager'/><testcase name='SaveManager'/><testcase name='Localization'/><testcase name='TouchControls'/><testcase name='VisualEffects'/></testsuite>" > project/test-results/polish.xml
-          cat project/test-results/polish.xml
 
-      - name: Upload test results
+      - name: Import project (must be clean)
+        run: |
+          godot --headless --path . --import 2>&1 | tee import.log
+          if grep -qE "SCRIPT ERROR|Parse Error|Compile Error" import.log; then
+            echo "::error::GDScript parse/compile errors found"
+            exit 1
+          fi
+          if grep -qE "^ERROR:" import.log; then
+            echo "::error::engine errors during import"
+            exit 1
+          fi
+
+      - name: Second import pass (cache warm, must also be clean)
+        run: |
+          godot --headless --path . --import 2>&1 | tee import2.log
+          if grep -qE "SCRIPT ERROR|^ERROR:" import2.log; then
+            echo "::error::errors on second import pass"
+            exit 1
+          fi
+
+      - name: Run automated checks (exits non-zero on failure)
+        run: godot --headless --path . res://tests/verify.tscn
+
+      - name: Asset freshness (committed PNGs must match generator)
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 tools/gen_assets.py
+          if ! git diff --exit-code -- assets src/data/art_index.gd; then
+            echo "::error::committed art is stale; run tools/gen_assets.py and commit"
+            exit 1
+          fi
+
+  screenshots:
+    name: Rendered screenshots
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    needs: verify
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Godot 4.4.1
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.4.1-stable
+          use-dotnet: false
+          include-templates: false
+
+      - name: Install virtual display + GL deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1 libglx-mesa0 libgl1-mesa-dri \
+            libx11-6 libxcursor1 libxinerama1 libxrandr2 libxi6 libxext6 \
+            libxfixes3 libxkbcommon0 libasound2t64 libfontconfig1 libfreetype6
+
+      - name: Import, then capture real renders
+        run: |
+          godot --headless --path . --import >/dev/null 2>&1
+          godot --headless --path . --import >/dev/null 2>&1
+          xvfb-run -a -s "-screen 0 1440x810x24" \
+            godot --path . res://tools/screenshot.tscn
+
+      - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: project/test-results/**
-          if-no-files-found: warn
+          name: screenshots
+          path: /tmp/shots/*.png
+          if-no-files-found: error

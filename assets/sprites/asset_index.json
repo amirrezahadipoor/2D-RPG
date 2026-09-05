@@ -1,0 +1,172 @@
+{
+  "hero_cell": [
+    24,
+    32
+  ],
+  "hero_grid": [
+    8,
+    4
+  ],
+  "hero_dirs": [
+    "down",
+    "up",
+    "left",
+    "right"
+  ],
+  "frame_map": {
+    "idle": [
+      0,
+      1
+    ],
+    "walk": [
+      2,
+      3,
+      4,
+      5
+    ],
+    "attack": [
+      6,
+      7
+    ]
+  },
+  "equipment": {
+    "chest": [
+      "tunic_cloth",
+      "leather_vest",
+      "iron_plate",
+      "royal_plate",
+      "mage_robe"
+    ],
+    "helmet": [
+      "leather_cap",
+      "iron_helm",
+      "golden_crown",
+      "wizard_hat",
+      "shadow_hood"
+    ],
+    "legs": [
+      "cloth_pants",
+      "leather_pants",
+      "iron_greaves"
+    ],
+    "boots": [
+      "cloth_shoes",
+      "leather_boots",
+      "iron_boots"
+    ],
+    "weapon": [
+      "iron_sword",
+      "steel_blade",
+      "golden_sword",
+      "rusty_dagger",
+      "battle_axe",
+      "oak_staff",
+      "hunter_bow"
+    ],
+    "accessory": [
+      "red_cloak",
+      "royal_cloak",
+      "forest_cloak"
+    ]
+  },
+  "terrain": [
+    "grass",
+    "grass2",
+    "sand",
+    "sand2",
+    "snow",
+    "swamp",
+    "stone",
+    "water",
+    "dirt",
+    "cobble",
+    "wood",
+    "cave"
+  ],
+  "props": [
+    "tree",
+    "rock",
+    "bush",
+    "flower",
+    "chest",
+    "stairs",
+    "sign",
+    "torch"
+  ],
+  "enemies": {
+    "slime": {
+      "w": 24,
+      "h": 24,
+      "frames": 4,
+      "cols": 4
+    },
+    "bat": {
+      "w": 24,
+      "h": 24,
+      "frames": 4,
+      "cols": 4
+    },
+    "goblin": {
+      "w": 24,
+      "h": 24,
+      "frames": 4,
+      "cols": 4
+    },
+    "skeleton": {
+      "w": 24,
+      "h": 24,
+      "frames": 4,
+      "cols": 4
+    },
+    "orc": {
+      "w": 24,
+      "h": 24,
+      "frames": 4,
+      "cols": 4
+    },
+    "demon": {
+      "w": 24,
+      "h": 24,
+      "frames": 4,
+      "cols": 4
+    },
+    "dragon": {
+      "w": 32,
+      "h": 32,
+      "frames": 4,
+      "cols": 4
+    }
+  },
+  "icons": [
+    "iron_sword",
+    "steel_blade",
+    "golden_sword",
+    "rusty_dagger",
+    "battle_axe",
+    "oak_staff",
+    "hunter_bow",
+    "tunic_cloth",
+    "leather_vest",
+    "iron_plate",
+    "royal_plate",
+    "mage_robe",
+    "leather_cap",
+    "iron_helm",
+    "golden_crown",
+    "wizard_hat",
+    "shadow_hood",
+    "cloth_pants",
+    "leather_pants",
+    "iron_greaves",
+    "cloth_shoes",
+    "leather_boots",
+    "iron_boots",
+    "red_cloak",
+    "royal_cloak",
+    "forest_cloak"
+  ],
+  "icon_grid": [
+    8,
+    16
+  ]
+}

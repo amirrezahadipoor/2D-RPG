@@ -1,6 +1,0 @@
-[gd_scene load_steps=1 format=3 uid="uid://c0cam00000001"]
-
-[node name="Camera2D" type="Camera2D"]
-current = true
-zoom = Vector2(2, 2)
-

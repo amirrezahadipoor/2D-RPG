@@ -1,38 +1,24 @@
-# Godot
-.import/
-export_*
+# Godot 4 cache (NEVER commit). Note: *.import sidecar files ARE committed on
+# purpose - without them a fresh clone cannot preload imported resources.
 .godot/
-.mono/
-data_*/
-mono_crash.*.json
 
-# Build
-/build/
-/dist/
-/coverage/
+# Builds / exports
+build/
+export/
 *.apk
 *.aab
+*.exe
+*.x86_64
+*.pck
 
-# User settings
-user.cfg
-*.tmp
-
-# Env
+# Keystores / secrets
+*.keystore
+*.jks
+*.p12
 .env
 **/.env
 
-# OS
+# Editor / OS cruft
+*.tmp
 .DS_Store
 Thumbs.db
-
-# Secrets
-*.keystore
-*.jks
-
-# Godot cache
-.project.godot.tmp
-
-# Allow export_presets.cfg for Android build
-!export_presets.cfg
-!assets/icon.png
-!project/assets/icon.png
