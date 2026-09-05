@@ -6,6 +6,11 @@ extends CanvasLayer
 
 const STAR_COUNT := 90
 
+# Pointer rows live at fixed canvas Ys: first row top and row height.
+# Kept next to _build() so mouse and touch hit-test the same pixels.
+const ROW_FIRST_Y := 104.0
+const ROW_STEP_Y := 18.0
+
 var _sel := 0
 var _items: Array = []          # Array of {label: Label, action: Callable, enabled: bool, key: String}
 var _root: Control
@@ -14,6 +19,7 @@ var _title: Label
 var _version: Label
 var _hint: Label
 var settings_ui: SettingsUI
+var _handled_touch_frame := -1
 
 func _ready() -> void:
 	layer = 50
@@ -64,6 +70,7 @@ func _mk_label(pos: Vector2, size: int, col: Color, width: int) -> Label:
 	l.add_theme_constant_override("outline_size", 3)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	I18N.tag(l)
 	_root.add_child(l)
 	return l
 
@@ -84,8 +91,65 @@ func _refresh_selection() -> void:
 		var l: Label = item["label"]
 		if not item["enabled"]:
 			l.text = _tr(item["key"])
+			I18N.tag(l)
 			continue
-		l.text = ("> " + _tr(item["key"]) + " <") if i == _sel else _tr(item["key"])
+		var text := _tr(item["key"])
+		if i == _sel:
+			# guillemets are symmetric under RTL; ASCII arrows would render as
+			# "< text >" once the line is laid out right-to-left
+			text = ("« " + text + " »") if I18N.is_rtl() else ("> " + text + " <")
+		l.text = text
+		I18N.tag(l)
+
+# ------------------------------------------------------------ pointer -------
+## Mouse and touch input for the title screen. Every row is a Label with
+## mouse_filter IGNORE, so taps/clicks never reached anything and the menu
+## was dead on phones (no keyboard, and TouchUI only exists in-game). Row Ys
+## come from the same constants _build() used, so hit-tests match the art.
+func _input(event: InputEvent) -> void:
+	if settings_ui != null and settings_ui.visible:
+		return
+	if event is InputEventScreenTouch and event.pressed:
+		_handled_touch_frame = Engine.get_process_frames()
+		_pointer_press(event.position)
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		# a synthetic mouse click can follow the touch we already consumed
+		if Engine.get_process_frames() == _handled_touch_frame:
+			return
+		_pointer_press(event.position)
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseMotion:
+		_pointer_hover(event.position)
+
+func _canvas_y(event_pos: Vector2) -> float:
+	var inv := _root.get_canvas_transform().affine_inverse()
+	return (inv * event_pos).y
+
+func _row_at(canvas_y: float) -> int:
+	var idx := int(floor((canvas_y - ROW_FIRST_Y) / ROW_STEP_Y))
+	return clampi(idx, 0, _items.size() - 1)
+
+func _pointer_hover(event_pos: Vector2) -> void:
+	var cy := _canvas_y(event_pos)
+	if cy < ROW_FIRST_Y - 4.0 or cy > ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 2.0:
+		return
+	var idx := _row_at(cy)
+	if idx != _sel:
+		_sel = idx
+		_refresh_selection()
+
+func _pointer_press(event_pos: Vector2) -> void:
+	var cy := _canvas_y(event_pos)
+	if cy < ROW_FIRST_Y - 4.0 or cy > ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 2.0:
+		return
+	var idx := _row_at(cy)
+	_sel = idx
+	_refresh_selection()
+	var item: Dictionary = _items[idx]
+	if item["enabled"]:
+		Sfx.play("click")
+		(item["action"] as Callable).call()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if settings_ui != null and settings_ui.visible:

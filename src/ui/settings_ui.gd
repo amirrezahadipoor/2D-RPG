@@ -11,6 +11,7 @@ var _sel: int = Row.MASTER
 var _root: Control
 var _rows: Dictionary = {}      # Row -> {label: Label, value: Label}
 var _panel: ColorRect
+var _handled_touch_frame := -1
 
 func _ready() -> void:
 	layer = 40
@@ -18,6 +19,9 @@ func _ready() -> void:
 	add_to_group("modal_ui")
 	_build()
 	visible = false
+	# re-translate the rows currently on screen (the panel used to stay in the
+	# old language until reopened)
+	I18N.locale_changed.connect(func(_l): if visible: _refresh())
 
 func _build() -> void:
 	_root = Control.new()
@@ -54,6 +58,7 @@ func _mk_label(pos: Vector2, size: int, col: Color) -> Label:
 	l.add_theme_constant_override("outline_size", 2)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	I18N.tag(l)
 	_root.add_child(l)
 	return l
 
@@ -67,11 +72,12 @@ func _add_row(row: Row, key: String, y: float) -> void:
 	left.add_theme_constant_override("outline_size", 2)
 	left.text = I18N.tr_str(key)
 	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	I18N.tag(left)
 	_root.add_child(left)
 	var right := _mk_label(Vector2(0, y), 9, Color(1, 0.95, 0.7))
 	right.position = Vector2(262, y)
 	right.size = Vector2(96, 14)
-	_rows[row] = {"name": key, "left": left, "value": right}
+	_rows[row] = {"name": key, "left": left, "value": right, "y": y}
 
 func open() -> void:
 	visible = true
@@ -101,15 +107,79 @@ func _refresh() -> void:
 			Row.DONE:
 				value.text = ""
 		var is_sel := int(row) == _sel
-		left.text = I18N.tr_str(r["name"])
-		if is_sel:
-			left.text = "> " + left.text
+		var name_text: String = I18N.tr_str(r["name"])
+		left.text = ("« " + name_text + " »") if is_sel and I18N.is_rtl() \
+			else ("> " + name_text if is_sel else name_text)
+		I18N.tag(left)
+		I18N.tag(value)
 		var col: Color = Color(1, 0.95, 0.7) if is_sel else Color(0.75, 0.78, 0.9)
 		value.add_theme_color_override("font_color", col)
 
 func _bar(v: float) -> String:
 	var filled := int(round(v * 10.0))
 	return "[" + "|".repeat(filled) + ".".repeat(10 - filled) + "] %d%%" % int(v * 100.0)
+
+# ------------------------------------------------------------ pointer -------
+## Touch/mouse control for the rows: tap a row to select it; tapping the value
+## column scrubs volumes directly, and LANGUAGE / QUALITY / DONE act on tap.
+## (Keyboard arrows keep working for the desktop/gamepad path.)
+func _input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if event is InputEventScreenTouch and event.pressed:
+		_handled_touch_frame = Engine.get_process_frames()
+		_pointer_press(event.position)
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		if Engine.get_process_frames() == _handled_touch_frame:
+			return
+		_pointer_press(event.position)
+		get_viewport().set_input_as_handled()
+
+func _canvas_point(event_pos: Vector2) -> Vector2:
+	return _root.get_canvas_transform().affine_inverse() * event_pos
+
+func _row_at(canvas_y: float) -> int:
+	var best := int(Row.MASTER)
+	var best_d := 1e9
+	for row in _rows:
+		var r: Dictionary = _rows[row]
+		var d := absf(float(r["y"]) + 7.0 - canvas_y)
+		if d < best_d:
+			best_d = d
+			best = int(row)
+	# only when the tap actually lands on the panel body
+	if canvas_y < 70.0 or canvas_y > 196.0:
+		return -1
+	return best
+
+func _pointer_press(event_pos: Vector2) -> void:
+	var p := _canvas_point(event_pos)
+	var row := _row_at(p.y)
+	if row < 0:
+		return
+	_sel = row
+	_refresh()
+	# volume rows scrub on the value column; everything else acts on tap
+	if row == Row.DONE or row == Row.LANGUAGE or row == Row.QUALITY:
+		Sfx.play("click")
+		_activate()
+	elif p.x >= 258.0:
+		Sfx.play("click", -12.0, 0.02)
+		_scrub_value(p.x)
+	else:
+		Sfx.play("click", -14.0, 0.02)
+
+func _scrub_value(x: float) -> void:
+	var target := clampf((x - 258.0) / 100.0, 0.0, 1.0)
+	match _sel:
+		Row.MASTER:
+			Settings.set_master(target)
+		Row.MUSIC:
+			Settings.set_music(target)
+		Row.SFX:
+			Settings.set_sfx(target)
+	_refresh()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:

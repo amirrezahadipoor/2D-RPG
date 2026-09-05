@@ -59,18 +59,34 @@ func _load_all() -> void:
 func _load_setting() -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load("user://settings.cfg") == OK:
-		var saved: String = cfg.get_value("locale", "current", "en")
+		var saved: String = cfg.get_value("locale", "current", "")
 		if saved in LOCALES:
 			locale = saved
+			return
+	# First launch with no saved choice: follow the device language so a
+	# Persian phone boots straight into Persian instead of defaulting to EN.
+	var detected := _detect_system_locale()
+	if detected in LOCALES:
+		locale = detected
+		_save_locale(locale)
+
+## Best guess at the player's language from the OS locale (e.g. "fa_IR").
+func _detect_system_locale() -> String:
+	var raw := OS.get_locale()
+	var lang := String(raw).split("_")[0].split("-")[0].to_lower()
+	return "fa" if lang == "fa" else "en"
+
+func _save_locale(code: String) -> void:
+	var cfg := ConfigFile.new()
+	cfg.load("user://settings.cfg")
+	cfg.set_value("locale", "current", code)
+	cfg.save("user://settings.cfg")
 
 func set_locale(code: String) -> void:
 	if code not in LOCALES or code == locale:
 		return
 	locale = code
-	var cfg := ConfigFile.new()
-	cfg.load("user://settings.cfg")
-	cfg.set_value("locale", "current", code)
-	cfg.save("user://settings.cfg")
+	_save_locale(code)
 	apply_theme_defaults()
 	locale_changed.emit(locale)
 

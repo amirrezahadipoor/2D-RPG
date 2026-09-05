@@ -3,11 +3,15 @@
 class_name PauseMenu
 extends CanvasLayer
 
+const ROW_FIRST_Y := 116.0
+const ROW_STEP_Y := 18.0
+
 var _sel := 0
 var _root: Control
 var _items: Array = []
 var _clock: Label
 var settings_ui: SettingsUI
+var _handled_touch_frame := -1
 
 func _ready() -> void:
 	layer = 30
@@ -63,6 +67,7 @@ func _mk_label(pos: Vector2, size: int, col: Color) -> Label:
 	l.add_theme_constant_override("outline_size", 2)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	I18N.tag(l)
 	_root.add_child(l)
 	return l
 
@@ -76,7 +81,58 @@ func _refresh() -> void:
 		var item: Dictionary = _items[i]
 		var l: Label = item["label"]
 		var text: String = I18N.tr_str(item["key"])
-		l.text = ("> " + text + " <") if i == _sel else text
+		if i == _sel:
+			text = ("« " + text + " »") if I18N.is_rtl() else ("> " + text + " <")
+		l.text = text
+		I18N.tag(l)
+
+# ------------------------------------------------------------ pointer -------
+## Same touch/mouse treatment as the title screen: taps select + activate a
+## row directly, hover follows the mouse. Previously the pause menu only read
+## keyboard actions, so it was unreachable on Android.
+func _input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if settings_ui != null and settings_ui.visible:
+		return
+	if event is InputEventScreenTouch and event.pressed:
+		_handled_touch_frame = Engine.get_process_frames()
+		_pointer_press(event.position)
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		if Engine.get_process_frames() == _handled_touch_frame:
+			return
+		_pointer_press(event.position)
+		get_viewport().set_input_as_handled()
+	elif event is InputEventMouseMotion:
+		_pointer_hover(event.position)
+
+func _canvas_y(event_pos: Vector2) -> float:
+	var inv := _root.get_canvas_transform().affine_inverse()
+	return (inv * event_pos).y
+
+func _row_at(canvas_y: float) -> int:
+	var idx := int(floor((canvas_y - ROW_FIRST_Y) / ROW_STEP_Y))
+	return clampi(idx, 0, _items.size() - 1)
+
+func _pointer_hover(event_pos: Vector2) -> void:
+	var cy := _canvas_y(event_pos)
+	if cy < ROW_FIRST_Y - 4.0 or cy > ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 2.0:
+		return
+	var idx := _row_at(cy)
+	if idx != _sel:
+		_sel = idx
+		_refresh()
+
+func _pointer_press(event_pos: Vector2) -> void:
+	var cy := _canvas_y(event_pos)
+	if cy < ROW_FIRST_Y - 4.0 or cy > ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 2.0:
+		return
+	var idx := _row_at(cy)
+	_sel = idx
+	_refresh()
+	Sfx.play("click")
+	(_items[idx]["action"] as Callable).call()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
