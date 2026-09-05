@@ -47,8 +47,10 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 
 - ✅ Phase 7: Dungeons implemented with procedural room-and-corridor layouts (up to 15 rooms per dungeon), 5 room types (start, normal, treasure, boss, checkpoint), randomized corridor styles (straight, L-shape, T-shape, random walk), depth-scaled enemy stats per DUNGEON_DIFFICULTY_SCALING table (1-10 floors with exponential difficulty increase), checkpoint rooms for hardcore saving, boss rooms with min-clear-enemy requirements, and entity placement (enemies, treasure chests, elite monsters). All dungeon data programmatic - no pre-made maps or assets.
 
+- ✅ Phase 8: Quests/story/localization implemented with complete quest journal system (main story line of 12 quests + 21 side quests across 7 biomes), quest types (kill, collect, deliver, explore, talk, boss, escort), bilingual localization (English + Persian with RTL support and Persian numeral display option), quest tracking and progression, trader interactions, and quest journal UI. All quest data programmatic with externalized locale files.
+
 ### Next Phase Start
-Proceed to Phase 8: Quests/story/localization
+Proceed to Phase 9: Bosses/hardcore balance
 
 ---
 
