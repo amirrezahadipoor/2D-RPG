@@ -108,7 +108,7 @@ Evidence: `tests/verify.tscn` (125 checks), `docs/screenshots/10_story_intro.png
 - [x] Cracked walls → sealed hidden chambers with secret relic chests
 - [x] Three unique relics (Amulet of Depths, Idol of Embers, Dragonfang
       Talisman) with their own icons and attack power
-- [ ] Smarter monsters: pack alerts, tactics per species, telegraphs, boss phases
+- [x] Smarter monsters: pack alerts, tactics per species, telegraphs, boss phases
 - [ ] Non-repetitive hero combat: combos, heavy swings, parry, perfect dodge
 - [ ] Deep balance pass: economy, drops, XP and quest curves (docs/BALANCE.md)
 

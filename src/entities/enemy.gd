@@ -4,7 +4,24 @@ extends CharacterBody2D
 
 signal died(enemy: Enemy)
 
-enum State { WANDER, CHASE, WINDUP, DEAD }
+enum State { WANDER, CHASE, WINDUP, RETREAT, FLEE, DEAD }
+
+## Species doctrine: how each monster fights.
+##  hit_run   : strike then bounce away (goblins, bats)
+##  flee_hp   : run for it below this health fraction (goblins)
+##  berserk_hp: rage below this fraction - faster, harder hits (orcs)
+##  skirmish  : circle-strafe while the claw cools (skeletons)
+##  ranged    : hurl fireballs outside melee reach (demons, the dragon)
+##  boss      : second phase below half health (the dragon)
+const TACTICS := {
+	"slime": {},
+	"bat": {"hit_run": true},
+	"goblin": {"hit_run": true, "flee_hp": 0.2},
+	"skeleton": {"skirmish": true},
+	"orc": {"berserk_hp": 0.35},
+	"demon": {"ranged": true},
+	"dragon": {"ranged": true, "boss": true},
+}
 
 var enemy_type := "slime"
 var level := 1
@@ -32,6 +49,13 @@ var _attack_timer := 0.0
 var _windup_timer := 0.0
 var _flash_timer := 0.0
 var _hero: Node2D = null
+var _retreat_timer := 0.0
+var _flee_timer := 0.0
+var _strafe_dir := 1.0
+var _phase := 1
+var _breath_timer := 4.0
+var _summon_timer := 6.0
+var _tele: Label = null
 
 func setup(type: String, lvl: int) -> void:
 	enemy_type = type
@@ -74,8 +98,45 @@ func setup(type: String, lvl: int) -> void:
 	_hp_fill.position = Vector2(0, 0)
 	_hp_bg.add_child(_hp_fill)
 
+	_tele = Label.new()
+	_tele.text = "!"
+	_tele.add_theme_font_size_override("font_size", 10)
+	_tele.add_theme_color_override("font_color", Color(1.0, 0.35, 0.25))
+	_tele.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	_tele.add_theme_constant_override("outline_size", 3)
+	_tele.position = Vector2(-2, -_frame_h * s["scale"] - 14)
+	_tele.visible = false
+	_tele.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_tele)
+
 	add_to_group("enemy")
 	_set_frame(0)
+
+func _tactic(key: String) -> bool:
+	return bool(TACTICS.get(enemy_type, {}).get(key, false))
+
+func _speed_mult() -> float:
+	var m := 1.0
+	if _tactic("berserk_hp") and hp < max_hp * float(TACTICS[enemy_type]["berserk_hp"]):
+		m *= 1.35
+	if _phase == 2:
+		m *= 1.3
+	return m
+
+func _damage_mult() -> float:
+	var m := 1.0
+	if _tactic("berserk_hp") and hp < max_hp * float(TACTICS[enemy_type]["berserk_hp"]):
+		m *= 1.25
+	return m
+
+## One monster spotting you is every monster nearby spotting you.
+func _alert_pack() -> void:
+	for node in get_tree().get_nodes_in_group("enemy"):
+		var other := node as Enemy
+		if other == null or other == self or other.state != State.WANDER:
+			continue
+		if other.global_position.distance_to(global_position) < 110.0:
+			other.state = State.CHASE
 
 func _physics_process(delta: float) -> void:
 	if state == State.DEAD or Game.state != Game.State.PLAYING:
@@ -92,6 +153,12 @@ func _physics_process(delta: float) -> void:
 	var to_hero: Vector2 = _hero.global_position - global_position
 	var dist := to_hero.length()
 
+	var fleeing := float(TACTICS.get(enemy_type, {}).get("flee_hp", 0.0))
+	if fleeing > 0.0 and hp < max_hp * fleeing and state != State.FLEE and state != State.DEAD:
+		state = State.FLEE
+		_flee_timer = 2.0
+		_alert_pack()
+
 	match state:
 		State.WANDER:
 			_wander_timer -= delta
@@ -101,8 +168,19 @@ func _physics_process(delta: float) -> void:
 			velocity = velocity.move_toward(_wander_dir * speed, 200 * delta)
 			if dist < detect:
 				state = State.CHASE
+				_alert_pack()
 		State.CHASE:
-			velocity = velocity.move_toward(to_hero.normalized() * speed, 300 * delta)
+			var sp := speed * _speed_mult()
+			if _tactic("skirmish") and dist <= attack_range and _attack_timer > 0.0:
+				# circle the hero while the claw cools
+				velocity = velocity.move_toward(to_hero.normalized().orthogonal()
+					* _strafe_dir * sp, 300 * delta)
+			elif _tactic("ranged") and dist > attack_range * 1.2 and _attack_timer <= 0.0:
+				state = State.WINDUP
+				_windup_timer = 0.45
+				velocity = Vector2.ZERO
+			else:
+				velocity = velocity.move_toward(to_hero.normalized() * sp, 300 * delta)
 			if dist > detect * 2.2:
 				state = State.WANDER
 			elif dist <= attack_range and _attack_timer <= 0.0:
@@ -112,22 +190,91 @@ func _physics_process(delta: float) -> void:
 		State.WINDUP:
 			_windup_timer -= delta
 			_spr.modulate = Color(1.4, 1.1, 1.1)
+			_tele.visible = true
 			if _windup_timer <= 0.0:
 				_spr.modulate = Color.WHITE
-				_attack_timer = attack_cd
-				if dist <= attack_range * 1.6:
-					var landed := 0
-					if _hero.has_method("hurt"):
-						landed = int(_hero.hurt(damage))
-					else:
-						landed = Stats.damage(damage)
-					if landed > 0:
-						Juice.hurt()
-						Juice.shake(3.0)
+				_tele.visible = false
+				_attack_timer = attack_cd * (0.6 if _phase == 2 else 1.0)
+				_resolve_attack(dist, to_hero)
+				if _tactic("hit_run"):
+					state = State.RETREAT
+					_retreat_timer = 0.7
+				else:
+					state = State.CHASE
+		State.RETREAT:
+			_retreat_timer -= delta
+			velocity = velocity.move_toward(-to_hero.normalized() * speed * 1.2, 400 * delta)
+			if _retreat_timer <= 0.0:
 				state = State.CHASE
+		State.FLEE:
+			_flee_timer -= delta
+			velocity = velocity.move_toward(-to_hero.normalized() * speed * 1.4, 400 * delta)
+			if _flee_timer <= 0.0:
+				state = State.WANDER if dist > detect else State.CHASE
 
 	move_and_slide()
 	_animate(delta)
+	_boss_brain(delta, dist, to_hero)
+
+## Melee claw, or a hurled fireball when the species fights at range.
+func _resolve_attack(dist: float, to_hero: Vector2) -> void:
+	var ranged := _tactic("ranged") and dist > attack_range
+	if ranged:
+		_cast_fireball(to_hero.normalized())
+		if _tactic("boss"):
+			_cast_fireball(to_hero.normalized().rotated(0.28))
+			_cast_fireball(to_hero.normalized().rotated(-0.28))
+		return
+	if dist <= attack_range * 1.6:
+		var amount := int(roundf(float(damage) * _damage_mult()))
+		var landed := 0
+		if _hero.has_method("hurt"):
+			landed = int(_hero.hurt(amount))
+		else:
+			landed = Stats.damage(amount)
+		if landed > 0:
+			Juice.hurt()
+			Juice.shake(3.0)
+
+func _cast_fireball(dir: Vector2) -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var ball := Projectile.new()
+	parent.add_child(ball)
+	ball.setup(dir, int(roundf(float(damage) * _damage_mult())))
+	ball.global_position = global_position + Vector2(0, -10)
+	Juice.puff(global_position + Vector2(0, -10))
+
+## The dragon wakes up below half health: faster, breath volleys, calls bones.
+func _boss_brain(delta: float, dist: float, to_hero: Vector2) -> void:
+	if not _tactic("boss") or state == State.DEAD:
+		return
+	if _phase == 1 and hp < max_hp * 0.5:
+		_phase = 2
+		Juice.shake(4.0)
+		Juice.world_text(global_position + Vector2(0, -40), "!!", Color(1.0, 0.3, 0.2), 12)
+		return
+	if _phase != 2:
+		return
+	_breath_timer -= delta
+	if _breath_timer <= 0.0 and dist > 30.0:
+		_breath_timer = 6.0
+		for ang in [-0.22, 0.0, 0.22]:
+			_cast_fireball(to_hero.normalized().rotated(ang))
+	_summon_timer -= delta
+	if _summon_timer <= 0.0:
+		_summon_timer = 8.0
+		var parent := get_parent()
+		if parent == null:
+			return
+		for i in 2:
+			var bone := Enemy.new()
+			parent.add_child(bone)
+			bone.setup("skeleton", maxi(1, level - 1))
+			bone.global_position = global_position + Vector2(
+				randf_range(-30, 30), randf_range(-20, 20))
+			bone.state = State.CHASE
 
 func _animate(delta: float) -> void:
 	var moving := velocity.length() > 4.0
@@ -149,6 +296,9 @@ func take_damage(amount: int, knock_dir: Vector2 = Vector2.ZERO, crit: bool = fa
 	var taken := mini(amount, hp)
 	hp -= taken
 	_flash_timer = 0.12
+	if state == State.WANDER:
+		state = State.CHASE
+	_alert_pack()
 	_hp_bg.visible = true
 	_hp_fill.size.x = 14.0 * clampf(float(hp) / float(max_hp), 0.0, 1.0)
 	if knock_dir.length() > 0.1:
@@ -188,6 +338,7 @@ func _apply_flash() -> void:
 		_spr.modulate = Color(3.0, 2.2, 2.2)
 	elif state != State.WINDUP:
 		_spr.modulate = Color.WHITE
+		_tele.visible = false
 
 func _die() -> void:
 	state = State.DEAD

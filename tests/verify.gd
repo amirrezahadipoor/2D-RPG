@@ -31,6 +31,7 @@ func run() -> void:
 	_check_i18n()
 	await _check_m4()
 	_check_secrets()
+	await _check_ai()
 
 	print("")
 	if _failures.is_empty():
@@ -854,3 +855,82 @@ func _check_secrets() -> void:
 	_ok(ItemDB.attack_power(gear) == ItemDB.attack_power(plain) + 3 - 0
 		or ItemDB.attack_power(gear) > ItemDB.attack_power(plain), "relics carry attack power")
 	Inventory.reset_run()
+
+# ------------------------------------------------------------ monster AI ----
+var _ai_made: Array = []
+
+func _ai_spawn(type: String, off: Vector2) -> Enemy:
+	var e := Enemy.new()
+	world.actors.add_child(e)
+	e.setup(type, 2)
+	e.global_position = world.hero.global_position + off
+	_ai_made.append(e)
+	return e
+
+
+func _check_ai() -> void:
+	print("== monster ai ==")
+	var prev_state := Game.state
+	Game.state = Game.State.PLAYING
+	var hero := world.hero
+	hero.global_position = Vector2(2000, 2000)
+	await get_tree().physics_frame
+
+	_ai_made = []
+
+	# pack alert: one goblin spots you, its friend 90px away joins
+	var a := _ai_spawn("goblin", Vector2(40, 0))
+	var b := _ai_spawn("goblin", Vector2(130, 0))
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_ok(a.state == Enemy.State.CHASE, "goblin in detect range chases")
+	_ok(b.state == Enemy.State.CHASE, "pack alert drags the friend into the chase")
+
+	# flee: a hurt goblin runs
+	a.hp = 1
+	await get_tree().physics_frame
+	_ok(a.state == Enemy.State.FLEE, "wounded goblin flees")
+
+	# hit & run: after the claw lands, goblins bounce off
+	a.hp = a.max_hp
+	a.state = Enemy.State.WINDUP
+	a._windup_timer = 0.0
+	a.global_position = hero.global_position + Vector2(10, 0)
+	await get_tree().physics_frame
+	_ok(a.state == Enemy.State.RETREAT, "goblin retreats after its strike")
+
+	# berserk: a wounded orc speeds up
+	var o := _ai_spawn("orc", Vector2(200, 200))
+	o.hp = int(o.max_hp * 0.3)
+	_ok(o._speed_mult() > 1.3, "wounded orc goes berserk (x%0.2f)" % o._speed_mult())
+
+	# telegraph: windup raises the ! marker
+	o.state = Enemy.State.WINDUP
+	o._windup_timer = 0.5
+	await get_tree().physics_frame
+	_ok(o._tele.visible, "windup shows a telegraph marker")
+	o.state = Enemy.State.CHASE
+
+	# ranged: a demon at distance winds up and hurls fire
+	var d := _ai_spawn("demon", Vector2(60, 0))
+	d._attack_timer = 0.0
+	await get_tree().physics_frame   # wander -> chase
+	await get_tree().physics_frame   # chase  -> ranged windup
+	_ok(d.state == Enemy.State.WINDUP, "demon winds up a ranged cast")
+	d._windup_timer = 0.0
+	await get_tree().physics_frame
+	_ok(get_tree().get_nodes_in_group("projectile").size() > 0, "fireball spawned")
+
+	# boss phases: the dragon enrages below half health
+	var dr := _ai_spawn("dragon", Vector2(300, 300))
+	dr.hp = int(dr.max_hp * 0.4)
+	await get_tree().physics_frame
+	_ok(dr._phase == 2, "dragon enters phase 2 below half health")
+
+	for e in _ai_made:
+		if is_instance_valid(e):
+			e.queue_free()
+	for pr in get_tree().get_nodes_in_group("projectile"):
+		pr.queue_free()
+	await get_tree().physics_frame
+	Game.state = prev_state
