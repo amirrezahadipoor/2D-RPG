@@ -67,7 +67,7 @@ func _ready() -> void:
 	QuestLog.toast.connect(func(key): hud.show_toast(I18N.tr_str(key)))
 
 	world.biome_changed.connect(hud.set_biome)
-	world.biome_changed.connect(func(b): print("[Main] biome -> ", b))
+	world.biome_changed.connect(func(b): Sfx.set_biome(b))
 
 	# push initial gear to the HUD once the hero exists
 	await get_tree().process_frame
@@ -129,6 +129,7 @@ func enter_dungeon(raw_depth: int) -> void:
 	dungeon.secret_opened.connect(_on_secret)
 	hud.set_biome_text("%s %s" % [I18N.tr_str("biome.dungeon"), I18N.num(depth_value)])
 	hud.show_toast(I18N.tr_str("toast.depth") % I18N.num(depth_value))
+	Sfx.set_biome("dungeon")
 
 func exit_dungeon() -> void:
 	if dungeon == null:
@@ -144,12 +145,14 @@ func exit_dungeon() -> void:
 	world.spawner.spawn_enabled = true
 	world.ambient.set_process(true)
 	hud.set_biome(world.biome_at(hero.global_position))
+	Sfx.set_biome(world.biome_at(hero.global_position))
 
 func _on_secret() -> void:
 	hud.show_toast(I18N.tr_str("toast.secret"))
 
 func _on_stairs(direction: int) -> void:
 	Game.save_checkpoint()
+	Sfx.play("stairs")
 	if direction > 0:
 		enter_dungeon(dungeon.depth + 1)
 	else:

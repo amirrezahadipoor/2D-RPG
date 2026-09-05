@@ -37,12 +37,14 @@ func _process(delta: float) -> void:
 
 # ----------------------------------------------------------------- hurt -----
 func hurt() -> void:
+	Sfx.play("hurt")
 	hurt_taken.emit()
 
 # -------------------------------------------------------- damage numbers ----
 func damage_number(world_pos: Vector2, amount: int, crit: bool) -> void:
 	if _world == null:
 		return
+	Sfx.play("crit" if crit else "hit", -5.0)
 	var node := Node2D.new()
 	node.global_position = world_pos + Vector2(randf_range(-3, 3), 0)
 	_world.add_child(node)
@@ -113,6 +115,7 @@ func world_text(world_pos: Vector2, text: String, color: Color, size: int = 8) -
 func slash(world_pos: Vector2, rot_deg: float, tint: Color, scale: float) -> void:
 	if _world == null:
 		return
+	Sfx.play("swing", -3.0)
 	var spr := Sprite2D.new()
 	spr.texture = load("res://assets/sprites/fx/slash.png")
 	spr.hframes = 4
@@ -151,6 +154,7 @@ func streak(world_pos: Vector2, dir: Vector2) -> void:
 func puff(world_pos: Vector2) -> void:
 	if _world == null:
 		return
+	Sfx.play("puff", -10.0)
 	var node := Node2D.new()
 	node.global_position = world_pos
 	_world.add_child(node)

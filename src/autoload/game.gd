@@ -89,6 +89,7 @@ func die() -> void:
 	if state == State.DEAD:
 		return
 	last_death_was_hardcore = is_hardcore
+	Sfx.play("death", -2.0)
 	if is_hardcore:
 		wipe_save()
 	change_state(State.DEAD)

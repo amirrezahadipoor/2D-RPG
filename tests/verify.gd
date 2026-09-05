@@ -37,6 +37,7 @@ func run() -> void:
 	await _check_graphics()
 	await _check_anim()
 	await _check_bestiary()
+	await _check_audio()
 
 	print("")
 	if _failures.is_empty():
@@ -1287,3 +1288,59 @@ func _check_bestiary() -> void:
 		if is_instance_valid(en):
 			en.queue_free()
 	await get_tree().physics_frame
+
+# ------------------------------------------------------------------ audio ----
+func _check_audio() -> void:
+	print("== audio & settings ==")
+	# every SFX synthesizes into a non-trivial 16-bit stream
+	var all_ok := true
+	var shortest := 1e9
+	for n in Sfx.SFX_NAMES:
+		var wav: AudioStreamWAV = Sfx._sfx(n)
+		if wav == null or wav.data.size() < 400:
+			all_ok = false
+		shortest = minf(shortest, float(wav.data.size()) / 2.0 / Sfx.SR)
+	_ok(all_ok, "all %d SFX synthesize to real audio data" % Sfx.SFX_NAMES.size())
+	_ok(shortest > 0.02, "no SFX is shorter than 20ms (%0.3fs)" % shortest)
+	# music loops exist for every biome key and are loop-tagged
+	var music_ok := true
+	for key in Sfx.MUSIC_KEYS:
+		var m: AudioStreamWAV = Sfx._music(key)
+		var secs := float(m.data.size()) / 2.0 / Sfx.SR
+		if m == null or secs < 3.0 or m.loop_mode != AudioStreamWAV.LOOP_FORWARD:
+			music_ok = false
+	_ok(music_ok, "every biome has a >3s looping music bed")
+	# crossfade plumbing: set_biome picks a stream and starts a player
+	Sfx.set_biome("forest")
+	await get_tree().process_frame
+	_ok(Sfx._active_music.stream != null, "set_biome loads a music stream")
+	Sfx.set_biome("forest")   # no-op second call must not swap players
+	var same := Sfx._active_music
+	Sfx.set_biome("village")
+	await get_tree().process_frame
+	_ok(Sfx._active_music != same, "biome change crossfades to the other player")
+	Sfx.stop_music()
+	# playing a sound arms one of the voice pool players
+	Sfx.play("coin")
+	var armed := false
+	for pl in Sfx._players:
+		if pl.stream != null:
+			armed = true
+	_ok(armed, "play() routes a stream into the SFX voice pool")
+	# settings persist and drive the audio buses
+	Settings.set_master(0.5)
+	Settings.set_music(0.25)
+	var db := AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Master"))
+	_ok(absf(db - linear_to_db(0.5)) < 0.01, "master volume reaches the Master bus")
+	var mdb := AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Music"))
+	_ok(absf(mdb - linear_to_db(0.25 * 0.9)) < 0.01, "music volume reaches the Music bus")
+	Settings.load_settings()
+	_ok(absf(Settings.master - 0.5) < 0.001 and absf(Settings.music - 0.25) < 0.001,
+		"settings survive a reload from disk")
+	Settings.set_quality("low")
+	_ok(not Settings.quality_at_least("medium"), "quality tier compares correctly")
+	Settings.set_quality("high")
+	Settings.set_master(1.0)
+	Settings.set_music(0.8)
+	Settings.load_settings()
+	_ok(I18N.locale in ["en", "fa"], "locale setting still loads alongside audio settings")

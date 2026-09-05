@@ -26,6 +26,8 @@ Stats="*res://src/autoload/stats.gd"
 Juice="*res://src/autoload/juice.gd"
 Inventory="*res://src/autoload/inventory.gd"
 QuestLog="*res://src/autoload/questlog.gd"
+Settings="*res://src/autoload/settings.gd"
+Sfx="*res://src/autoload/sfx.gd"
 
 [audio]
 

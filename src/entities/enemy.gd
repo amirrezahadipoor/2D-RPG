@@ -320,6 +320,7 @@ func _cast_fireball(dir: Vector2) -> void:
 	var ball := Projectile.new()
 	parent.add_child(ball)
 	ball.setup(dir, int(roundf(float(damage) * _damage_mult())))
+	Sfx.play("fireball", -6.0)
 	ball.global_position = global_position + Vector2(0, -10)
 	Juice.puff(global_position + Vector2(0, -10))
 

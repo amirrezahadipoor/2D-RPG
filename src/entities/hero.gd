@@ -205,6 +205,7 @@ func _handle_actions(delta: float) -> void:
 
 	if Input.is_action_just_pressed("use_potion"):
 		if Inventory.drink_health():
+			Sfx.play("potion")
 			Juice.world_text(global_position + Vector2(0, -30),
 				I18N.tr_str("consumable.drink") + "!", Color(0.9, 0.3, 0.35), 8)
 

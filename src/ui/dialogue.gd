@@ -239,11 +239,13 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.is_action_pressed("move_up"):
 			_shop_sel = (_shop_sel + _shop_offers.size() - 1) % _shop_offers.size()
 			_text.text = _shop_text()
+			Sfx.play("click", -14.0, 0.02)
 			get_viewport().set_input_as_handled()
 			return
 		if event.is_action_pressed("move_down"):
 			_shop_sel = (_shop_sel + 1) % _shop_offers.size()
 			_text.text = _shop_text()
+			Sfx.play("click", -14.0, 0.02)
 			get_viewport().set_input_as_handled()
 			return
 		if event.is_action_pressed("interact"):
@@ -251,6 +253,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if not o["sold"] and Stats.gold >= int(o["price"]):
 				Stats.add_gold(-int(o["price"]))
 				Inventory.add(o["entry"].duplicate())
+				Sfx.play("buy")
 				o["sold"] = not Consumables.is_consumable(o["entry"]["id"])
 				_text.text = _shop_text()
 			else:
@@ -267,6 +270,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 
 	if event.is_action_pressed("interact") or event.is_action_pressed("attack"):
+		Sfx.play("click", -10.0, 0.02)
 		if _reveal < len(str(page["text"])):
 			_reveal = 400.0
 			get_viewport().set_input_as_handled()
