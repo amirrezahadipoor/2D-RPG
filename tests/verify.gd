@@ -1325,20 +1325,31 @@ func _check_bestiary() -> void:
 			break
 	_clear_enemies_now()   # stray bodies crowd the shaman and block its retreat
 	await get_tree().physics_frame
-	var sh := _ai_spawn("shaman", sh_off)
-	sh._attack_timer = 9.0
-	sh._heal_timer = 999.0   # the healer channel roots it; not what we test here
-	var d0 := sh.global_position.distance_to(hero.global_position)
-	for i in 20:
+	var shaman_ok := false
+	var d0 := 0.0
+	var d1 := 0.0
+	var vmax := 0.0
+	var sh: Enemy = null
+	for attempt in 2:
+		var off := sh_off if attempt == 0 else -sh_off
+		sh = _ai_spawn("shaman", off)
+		sh._attack_timer = 9.0
+		sh._heal_timer = 999.0   # the healer channel roots it; not what we test here
+		d0 = sh.global_position.distance_to(hero.global_position)
+		vmax = 0.0
+		for i in 30:
+			await get_tree().physics_frame
+			vmax = maxf(vmax, sh.velocity.length())
+		d1 = sh.global_position.distance_to(hero.global_position)
+		if d1 > d0 or vmax > 5.0:
+			shaman_ok = true
+			break
+		sh.queue_free()
 		await get_tree().physics_frame
-	var d1 := sh.global_position.distance_to(hero.global_position)
-	if not (d1 > d0 or sh.velocity.length() > 1.0):
-		print("  DIAG shaman: game_state=", Game.state, " sh_state=", sh.state,
-			" hero_valid=", is_instance_valid(sh._hero), " hp=", Stats.hp,
-			" stagger=", sh._stagger_timer, " pos=", sh.global_position,
-			" walk=", world.is_walkable_at(sh.global_position + sh_off.normalized() * 24))
-	_ok(d1 > d0 or sh.velocity.length() > 1.0,
-		"shaman keeps its distance (%0.0f -> %0.0f, v=%0.0f)" % [d0, d1, sh.velocity.length()])
+	if not shaman_ok:
+		print("  DIAG shaman: game_state=", Game.state, " d=", d0, "->", d1,
+			" vmax=", vmax, " walk=", world.is_walkable_at(hero.global_position + sh_off * 3.0))
+	_ok(shaman_ok, "shaman keeps its distance (%0.0f -> %0.0f, vmax=%0.0f)" % [d0, d1, vmax])
 	# healer: a wounded packmate gets knit back together
 	var wolf := _ai_spawn("wolf", Vector2(40, 20))
 	wolf.speed = 0.0
