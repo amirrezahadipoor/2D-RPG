@@ -143,6 +143,73 @@ func run() -> void:
 			await get_tree().process_frame
 		await _grab("10_loot")
 
+	# ---- story intro slide (pixel cutscene) ----
+	var main_node := get_tree().root.get_node_or_null("Main")
+	var cs: Cutscene = main_node.get_node_or_null("Cutscene") if main_node else null
+	if cs:
+		cs.play()
+		cs._slide = 3
+		cs._apply_slide()
+		cs._reveal = 300.0
+		for i in 6:
+			await get_tree().process_frame
+		await _grab("11_story")
+		cs._end()
+
+	# ---- village at noon with people on their schedule ----
+	if hero and world and not world.settlements.is_empty():
+		var plaza: Vector2i = world.settlements[0]["plaza"]
+		hero.global_position = Vector2(plaza.x * 16 + 8, (plaza.y + 2) * 16)
+		for e in get_tree().get_nodes_in_group("enemy"):
+			e.queue_free()   # stragglers from the combat phase would follow us in
+		Game.game_minutes = float(Game.day()) * 1440.0 + 12.0 * 60.0
+		for i in 90:
+			await get_tree().physics_frame
+		await _grab("12_village")
+
+		# ---- dialogue with the first NPC ----
+		var dlg: DialogueUI = main_node.get_node_or_null("DialogueUI") if main_node else null
+		if dlg and not world.npcs.is_empty():
+			var npc: NPC = world.npcs[0]
+			npc.global_position = hero.global_position + Vector2(10, 0)
+			for i in 4:
+				await get_tree().physics_frame
+			dlg.open_with(npc)
+			dlg._reveal = 400.0
+			for i in 4:
+				await get_tree().process_frame
+			await _grab("13_dialogue")
+			dlg.close()
+
+	# ---- journal with live quests ----
+	QuestLog.start_side(0)
+	QuestLog.start_side(4)
+	QuestLog.start_side(8)
+	var journal: JournalUI = main_node.get_node_or_null("JournalUI") if main_node else null
+	if journal:
+		journal.toggle()
+		for i in 4:
+			await get_tree().process_frame
+		await _grab("14_journal")
+		journal.toggle()
+
+	# ---- graveyard at night ----
+	if world:
+		var grave := Vector2(-1, -1)
+		for y in range(0, Overworld.WORLD_H, 2):
+			for x in range(0, Overworld.WORLD_W, 2):
+				if world.biome_at(Vector2(x * 16 + 8, y * 16 + 8)) == "graveyard":
+					grave = Vector2(x * 16 + 8, y * 16 + 8)
+					break
+			if grave.x >= 0:
+				break
+		if grave.x >= 0:
+			hero.global_position = grave
+			Game.game_minutes = float(Game.day()) * 1440.0 + 23.0 * 60.0
+			for i in 40:
+				await get_tree().physics_frame
+			await _grab("15_night_grave")
+
 	print("[screenshot] done")
 	get_tree().quit(0)
 

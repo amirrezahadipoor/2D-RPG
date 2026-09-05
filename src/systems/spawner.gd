@@ -62,6 +62,9 @@ func _try_spawn() -> bool:
 		if not world.is_walkable_at(pos):
 			continue
 		var biome := world.biome_at(pos)
+		# towns and villages are safe ground: no ambushes between the houses
+		if biome in ["village", "town"]:
+			continue
 		var type := pick_type(biome)
 		if type == "":
 			continue

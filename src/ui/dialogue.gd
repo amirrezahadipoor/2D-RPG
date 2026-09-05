@@ -106,8 +106,8 @@ func close() -> void:
 
 func _compose_pages() -> Array:
 	var pages := []
-	pages.append({"text": "%s - %s\n%s" % [
-		npc.display_name, I18N.tr_str("npc.role." + npc.role_name),
+	pages.append({"text": "%s\n%s" % [
+		I18N.tr_str("npc.role." + npc.role_name),
 		I18N.tr_str("npc.hello." + npc.role_name)], "mode": "talk"})
 	var turn_in = QuestLog.turn_in_at(npc.sett_index, npc.role_name)
 	if turn_in != null:

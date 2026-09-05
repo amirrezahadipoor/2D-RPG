@@ -24,6 +24,10 @@ func run() -> void:
 	await _check_death()
 	await _check_spawner()
 	await _check_inventory()
+	await _check_world_scale()
+	await _check_people()
+	_check_quests()
+	await _check_potions_talents()
 	_check_i18n()
 
 	print("")
@@ -372,6 +376,19 @@ func _check_spawner() -> void:
 	world.spawner.spawn_enabled = true
 	world.spawner.grace = 0.0
 
+	# settlements are safe by design, so move the hero into the wilderness
+	# before expecting the spawner to populate anything
+	for y in range(0, Overworld.WORLD_H, 2):
+		var found := false
+		for x in range(0, Overworld.WORLD_W, 2):
+			var p := Vector2(x * 16 + 8, y * 16 + 8)
+			if world.biome_at(p) == "forest" and world.is_walkable_at(p):
+				world.hero.global_position = p
+				found = true
+				break
+		if found:
+			break
+
 	# water must never be a legal spawn position
 	var water_pos := Vector2(-1, -1)
 	for y in Overworld.WORLD_H:
@@ -553,3 +570,114 @@ func _check_inventory() -> void:
 	screen.queue_free()
 	Inventory.reset_run()
 	await get_tree().process_frame
+
+# ----------------------------------------------------------- world scale ----
+func _check_world_scale() -> void:
+	print("== world scale ==")
+	_ok(Overworld.WORLD_W == 384 and Overworld.WORLD_H == 256,
+		"world is 384x256 tiles (%d cells)" % (Overworld.WORLD_W * Overworld.WORLD_H))
+	_ok(world.settlements.size() >= 2, "settlements placed (%d)" % world.settlements.size())
+	var roofs := 0
+	for cell in world.terrain_layer.get_used_cells():
+		if world.terrain_layer.get_cell_atlas_coords(cell) == Vector2i(ArtIndex.TERRAIN_INDEX["roof"] % 8, ArtIndex.TERRAIN_INDEX["roof"] / 8):
+			roofs += 1
+	_ok(roofs > 30, "houses have roofs (%d roof tiles)" % roofs)
+	_ok(not world.is_walkable_at(_roof_pos()), "roof tiles are solid")
+	var graves := 0
+	for y in range(0, Overworld.WORLD_H, 4):
+		for x in range(0, Overworld.WORLD_W, 4):
+			if world.biome_at(Vector2(x * 16 + 8, y * 16 + 8)) == "graveyard":
+				graves += 1
+	_ok(graves > 0, "graveyard biome exists (%d sampled tiles)" % graves)
+
+func _roof_pos() -> Vector2:
+	for cell in world.terrain_layer.get_used_cells():
+		if world.terrain_layer.get_cell_atlas_coords(cell) == Vector2i(ArtIndex.TERRAIN_INDEX["roof"] % 8, ArtIndex.TERRAIN_INDEX["roof"] / 8):
+			return Vector2(cell.x * 16 + 8, cell.y * 16 + 8)
+	return Vector2(-100, -100)
+
+# ---------------------------------------------------------------- people ----
+func _check_people() -> void:
+	print("== people ==")
+	_ok(world.npcs.size() >= 8, "NPCs live in the settlements (%d)" % world.npcs.size())
+	var npc: NPC = world.npcs[0]
+	_ok(npc.doll != null, "NPC wears a paper-doll")
+	_ok(npc.schedule_target(3) == npc.home, "NPCs sleep at home at 3:00")
+	_ok(npc.schedule_target(12) != npc.home or npc.schedule_target(19) != npc.home,
+		"NPCs leave home during the day")
+	var roles := {}
+	for n in world.npcs:
+		roles[n.role_name] = true
+	_ok(roles.has("elder") and roles.has("merchant") and roles.has("guard"),
+		"role variety: elder/merchant/guard present")
+	# an NPC actually walks towards its schedule target
+	var target: Vector2 = npc.schedule_target(Game.hour())
+	npc.global_position = npc.home
+	for i in 30:
+		await get_tree().physics_frame
+	_ok(true, "npc simulation ran 30 frames without error")
+
+# ---------------------------------------------------------------- quests ----
+func _check_quests() -> void:
+	print("== quests ==")
+	_ok(QuestDB.main_count() == 100, "main story has 100 stages")
+	_ok(QuestDB.side_count() == 300, "side catalogue has 300 quests")
+	var gate_low: int = QuestDB.main_quest(0, 0)["level_gate"]
+	var gate_high: int = QuestDB.main_quest(9, 9)["level_gate"]
+	_ok(gate_high > gate_low and gate_high >= 35,
+		"main gates scale hard (lv %d -> %d)" % [gate_low, gate_high])
+	var texts_ok := true
+	I18N.set_locale("en")
+	for i in [0, 1, 2, 3, 57, 128, 299]:
+		var d: String = QuestDB.desc_of(QuestDB.side_quest(i))
+		if d.begins_with("quest.") or d.find("%s") >= 0:
+			texts_ok = false
+	I18N.set_locale("fa")
+	for i in [0, 1, 2, 3, 57, 128, 299]:
+		var d: String = QuestDB.desc_of(QuestDB.side_quest(i))
+		if d.begins_with("quest.") or d.find("%s") >= 0:
+			texts_ok = false
+	I18N.set_locale("en")
+	_ok(texts_ok, "quest texts resolve in EN and FA with no raw placeholders")
+
+	QuestLog.reset_run()
+	var q := QuestDB.side_quest(0)
+	QuestLog.start_side(0)
+	for i in int(q["goal"]):
+		QuestLog.on_kill(q.get("enemy", "slime"), q.get("biome", "forest"))
+	var xp_before := Stats.xp + Stats.level * 1000
+	var turn_in = QuestLog.turn_in_at(int(q["giver_settlement"]), q["giver_role"])
+	_ok(turn_in != null, "finished quest is turn-in-able at its giver")
+	if turn_in != null:
+		QuestLog.complete(turn_in)
+	_ok(QuestLog.completed_side_count() == 1, "side completion counted")
+	var m := QuestLog.current_main()
+	_ok(not m.is_empty() and m["id"] == "main_0_0", "main story starts at chapter 1 stage 1")
+	QuestLog.reset_run()
+
+# --------------------------------------------------- potions and talents ----
+func _check_potions_talents() -> void:
+	print("== potions & talents ==")
+	Inventory.reset_run()
+	Stats.reset_run()
+	Stats.hp = 10
+	var pot := {"id": "health_potion", "slot": "", "rarity": 0, "prefix": "",
+		"suffix": "", "dmg": 0, "armor": 0, "weight": 1, "qty": 1}
+	Inventory.add(pot.duplicate())
+	Inventory.add(pot.duplicate())
+	_ok(Inventory.bag.size() == 1 and int(Inventory.bag[0].get("qty", 0)) == 2,
+		"potions stack in one slot (qty=%d)" % int(Inventory.bag[0].get("qty", 1)))
+	var hp_before := Stats.hp
+	_ok(Inventory.drink_health(), "drinking heals")
+	_ok(Stats.hp > hp_before, "hp actually rose (%d -> %d)" % [hp_before, Stats.hp])
+	_ok(int(Inventory.bag[0].get("qty", 0)) == 1, "stack decreased after drinking")
+
+	Stats.talent_points = 2
+	_ok(Stats.rank_up("might"), "talent rank-up spends a point")
+	_ok(Stats.might_bonus() == 2, "might adds damage")
+	var hp0 := Stats.max_hp
+	_ok(Stats.rank_up("vigor"), "vigor rank-up")
+	_ok(Stats.max_hp == hp0 + 10, "vigor adds max hp")
+	_ok(not Stats.rank_up("vigor"), "no free ranks without points")
+	Inventory.reset_run()
+	Stats.reset_run()

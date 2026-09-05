@@ -166,5 +166,6 @@
   "hud.prompt.inv": "Bag",
   "hud.prompt.journal": "Journal",
   "hud.prompt.talents": "Talents",
-  "hud.prompt.potion": "Potion"
+  "hud.prompt.potion": "Potion",
+  "biome.graveyard": "Graveyard"
 }

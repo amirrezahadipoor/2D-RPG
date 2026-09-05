@@ -65,20 +65,24 @@ func setup(role_str: String, settlement: Dictionary, index: int) -> void:
 
 # ------------------------------------------------------------- schedule -----
 ## Where this person wants to be at a given hour of the day.
+## Small personal offset so crowds do not stack on a single pixel.
+func _personal_offset() -> Vector2:
+	return Vector2(float(npc_index % 5) * 7.0 - 14.0, float(npc_index / 5) * 6.0 - 9.0)
+
 func schedule_target(hour: int) -> Vector2:
 	match hour:
 		0, 1, 2, 3, 4, 5:
 			return home                      # asleep at home
 		6, 7:
-			return plaza                     # morning gathering
+			return plaza + _personal_offset()
 		8, 9, 10, 11:
 			return field if role == Role.VILLAGER else plaza
 		12, 13:
-			return plaza + Vector2(32, 0)    # lunch by the well
+			return plaza + Vector2(32, 0) + _personal_offset()
 		14, 15, 16, 17:
 			return field if role == Role.VILLAGER else home
 		18, 19, 20:
-			return plaza + Vector2(-24, 8)   # market evening
+			return plaza + Vector2(-24, 8) + _personal_offset()
 		_:
 			return home
 	match role:

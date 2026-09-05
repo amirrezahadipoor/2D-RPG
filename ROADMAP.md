@@ -70,12 +70,26 @@ Evidence: `tests/verify.tscn` (98 checks), `docs/screenshots/08_inventory.png`,
       («Sharp Cloth Tunic of the Bear» / «شمشیر آهنیِ تیزِ خرس»)
 - [x] 10% crits (double damage, gold number) for combat feel
 
-## M3 — NPCs, dialogue & quests
+## M3 — NPCs, dialogue & quests  ✅ DONE
 
-- [ ] Village/town placement with trader + quest-giver NPCs
-- [ ] Dialogue UI (RTL-aware)
-- [ ] Quest journal UI; kill/collect/talk quest types
-- [ ] Quest rewards wired to Stats
+Evidence: `tests/verify.tscn` (125 checks), `docs/screenshots/10_story_intro.png`,
+`11_village.png`, `12_dialogue.png`, `13_journal.png`, `14_night_graveyard.png`.
+
+- [x] 16x world (384x256): graveyard biome, 3 villages + 1 town with roofed
+      houses, plazas, wells, ring roads + cobble roads between settlements
+- [x] NPCs with roles (elder/merchant/guard/villager), paper-doll looks, and a
+      24h schedule: home at night, fields at work, well at noon, market evening
+- [x] Dialogue UI (RTL-aware): portrait from the real doll head, typewriter
+      text, quest offer (accept/decline) and turn-in choices
+- [x] Quest journal UI (U): main story track + active sides + lifetime counts
+- [x] Quest rewards wired to Stats; side rewards can include potions
+- [x] **100 main stages** (10 chapters, level gates 1→41) + **300 side quests**
+      (kill/collect/clear/deliver, 5 tiers), all deterministic and bilingual
+- [x] Story intro: 5 letterboxed pixel cutscene slides, skippable, saved flag
+- [x] Potions (health/greater/stamina, stacking, H hotkey) and the talent
+      screen (T: might/vigor/swift) pulled forward from M5 for balance
+- [x] Living world events: day/night tint + clock, blood moons, midnight
+      graveyard surges, wandering merchant; towns are safe ground
 
 ## M4 — Dungeons
 
@@ -85,6 +99,8 @@ Evidence: `tests/verify.tscn` (98 checks), `docs/screenshots/08_inventory.png`,
 
 ## M5 — Progression, talents & save
 
+- [x] Talent tracks (might/vigor/swift) + point economy from levels/chapters
+      (pulled into M3 for balance; deeper tree still open)
 - [ ] Talent tree UI + real point economy
 - [ ] Single save system (one code path), JSON-safe serialization
       (no raw Vector2/Color in JSON — the old save crashed on load)
