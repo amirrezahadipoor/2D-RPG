@@ -29,6 +29,7 @@ func run() -> void:
 	_check_quests()
 	await _check_potions_talents()
 	_check_i18n()
+	await _check_m4()
 
 	print("")
 	if _failures.is_empty():
@@ -679,5 +680,112 @@ func _check_potions_talents() -> void:
 	_ok(Stats.rank_up("vigor"), "vigor rank-up")
 	_ok(Stats.max_hp == hp0 + 10, "vigor adds max hp")
 	_ok(not Stats.rank_up("vigor"), "no free ranks without points")
+	Inventory.reset_run()
+	Stats.reset_run()
+
+# ---------------------------------------------------- m4: dungeons & shop ----
+func _check_m4() -> void:
+	print("== m4 dungeons & shop ==")
+	# --- structure of a mid-depth dungeon ---
+	var d := Dungeon.new()
+	add_child(d)
+	d.build(2, 20260905)
+	_ok(d.rooms.size() >= 8, "depth 2 carves >= 8 rooms (%d)" % d.rooms.size())
+	_ok(d.stairs_up != Vector2.ZERO and d.stairs_down != Vector2.ZERO, "depth 2 has both stairs")
+	_ok(d.is_walkable_at(d.stairs_up) and d.is_walkable_at(d.stairs_down), "stairs stand on walkable floor")
+	_ok(d._grid[0] == 0, "map border is solid rock")
+	_ok(d.ambient_light_need() > 0.85, "dungeon is dark (light need %0.2f)" % d.ambient_light_need())
+	# BFS: up-stairs must reach down-stairs and every room center
+	var start := d.tile_at(d.stairs_up)
+	var goal := d.tile_at(d.stairs_down)
+	var seen := {}
+	var queue: Array = [start]
+	seen[start] = true
+	while not queue.is_empty():
+		var t: Vector2i = queue.pop_front()
+		for nb in [t + Vector2i.UP, t + Vector2i.DOWN, t + Vector2i.LEFT, t + Vector2i.RIGHT]:
+			if nb.x >= 0 and nb.y >= 0 and nb.x < Dungeon.W and nb.y < Dungeon.H \
+					and not seen.has(nb) and d._grid[nb.y * Dungeon.W + nb.x] == 1:
+				seen[nb] = true
+				queue.append(nb)
+	_ok(seen.has(goal), "corridors connect the two staircases (%d tiles reachable)" % seen.size())
+	var reached := 0
+	for r in d.rooms:
+		if seen.has(r.position + r.size / 2):
+			reached += 1
+	_ok(reached == d.rooms.size(), "all %d rooms reachable from the entrance" % d.rooms.size())
+	var torches := 0
+	var stair_nodes := 0
+	for c in d.get_children():
+		if c is PointLight2D:
+			torches += 1
+	for c in d.actors.get_children():
+		if c is Stairs:
+			stair_nodes += 1
+	_ok(torches >= 6, "wall torches light the rooms (%d)" % torches)
+	_ok(stair_nodes == 2, "up + down stair entities exist")
+	d.queue_free()
+
+	# --- depth 3 ends in the dragon boss ---
+	var d3 := Dungeon.new()
+	add_child(d3)
+	d3.build(3, 20260905)
+	_ok(d3.boss != null and d3.boss.enemy_type == "dragon", "depth 3 boss is a dragon")
+	_ok(d3.stairs_down == Vector2.ZERO, "no stairs below the last depth")
+	d3.queue_free()
+
+	# --- merchant shop ---
+	var dlg := DialogueUI.new()
+	add_child(dlg)
+	await get_tree().process_frame
+	var merchant := NPC.new()
+	merchant.npc_index = 7
+	merchant.role_name = "merchant"
+	merchant.display_name = "Verify Merchant"
+	dlg.npc = merchant
+	dlg._make_shop()
+	dlg._pages = [{"text": "", "mode": "shop"}]
+	dlg._page = 0
+	dlg._apply_page()
+	dlg.visible = true
+	_ok(dlg._shop_offers.size() == 3, "shop stocks 3 offers")
+	_ok(str(dlg._shop_offers[0]["entry"]["id"]) == "health_potion" and int(dlg._shop_offers[0]["price"]) == 25,
+		"health potion on the shelf for 25 G")
+	_ok(str(dlg._shop_offers[1]["entry"]["id"]) == "greater_health_potion" and int(dlg._shop_offers[1]["price"]) == 60,
+		"greater potion for 60 G")
+	_ok(int(dlg._shop_offers[2]["price"]) == 40 * (int(dlg._shop_offers[2]["entry"]["rarity"]) + 1),
+		"equipment priced by rarity")
+	Inventory.reset_run()
+	Stats.reset_run()
+	Stats.add_gold(100)
+	var ev := InputEventAction.new()
+	ev.action = "interact"
+	ev.pressed = true
+	var gold_before := Stats.gold
+	dlg._unhandled_input(ev)
+	_ok(Stats.gold == gold_before - 25, "buying a potion deducts 25 G (%d -> %d)" % [gold_before, Stats.gold])
+	var got_potion := false
+	for e in Inventory.bag:
+		if str(e["id"]) == "health_potion":
+			got_potion = true
+	_ok(got_potion, "purchased potion lands in the bag")
+	var down := InputEventAction.new()
+	down.action = "move_down"
+	down.pressed = true
+	dlg._unhandled_input(down)
+	dlg._unhandled_input(down)
+	_ok(dlg._shop_sel == 2, "W/S moves the shop cursor (sel=%d)" % dlg._shop_sel)
+	Stats.add_gold(1000)
+	var price := int(dlg._shop_offers[2]["price"])
+	var gold_equip := Stats.gold
+	dlg._unhandled_input(ev)
+	_ok(bool(dlg._shop_offers[2]["sold"]), "unique equipment is marked sold")
+	_ok(Stats.gold == gold_equip - price, "equipment price deducted (%d -> %d, price %d)" % [gold_equip, Stats.gold, price])
+	Stats.gold = 0
+	dlg._shop_sel = 0
+	dlg._unhandled_input(ev)
+	_ok(Stats.gold == 0 and int(Inventory.bag[0].get("qty", 1)) == 1, "broke hero cannot buy (stack stays 1)")
+	dlg.close()
+	merchant.free()
 	Inventory.reset_run()
 	Stats.reset_run()

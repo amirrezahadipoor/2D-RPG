@@ -167,5 +167,11 @@
   "hud.prompt.journal": "کارنامه",
   "hud.prompt.talents": "استعداد",
   "hud.prompt.potion": "معجون",
-  "biome.graveyard": "گورستان"
+  "biome.graveyard": "گورستان",
+  "biome.dungeon": "سیاهچال",
+  "shop.select": "گزینش",
+  "shop.buy": "خرید",
+  "shop.leave": "رفتن",
+  "shop.no_gold": "سکهٔ کافی نداری.",
+  "toast.depth": "ژرفای %s"
 }

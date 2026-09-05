@@ -129,11 +129,10 @@ func _update_lantern(delta: float) -> void:
 		target = 0.7
 	elif Game.is_night():
 		target = 0.6
-	var biome := ""
-	var world_node := get_parent()
-	while world_node != null and not (world_node is Overworld) and not (world_node.has_method("is_dungeon") if world_node.has_method("has_method") else false):
+	var world_node: Node = get_parent()
+	while world_node != null and not world_node.has_method("ambient_light_need"):
 		world_node = world_node.get_parent()
-	if world_node != null and world_node.has_method("ambient_light_need"):
+	if world_node != null:
 		target = maxf(target, world_node.ambient_light_need())
 	lantern.energy = lerpf(lantern.energy, target, 6.0 * delta)
 

@@ -8,9 +8,12 @@ var _pages: Array = []       # {text, mode}
 var _page := 0
 var _reveal := 0.0
 var _offer_index := -1
+var _shop_offers: Array = []  # {entry, price, sold}
+var _shop_sel := 0
 
 var _root: Control
 var _box: ColorRect
+var _edge: ColorRect
 var _portrait_bg: ColorRect
 var _portrait_body: TextureRect
 var _portrait_hat: TextureRect
@@ -41,12 +44,12 @@ func _build() -> void:
 	_box.position = Vector2(16, 190)
 	_box.size = Vector2(448, 66)
 	_root.add_child(_box)
-	var edge := ColorRect.new()
-	edge.color = Color(0.5, 0.42, 0.28)
-	edge.position = Vector2(15, 189)
-	edge.size = Vector2(450, 68)
-	_root.add_child(edge)
-	_root.move_child(edge, _root.get_children().find(_box) - 1)
+	_edge = ColorRect.new()
+	_edge.color = Color(0.5, 0.42, 0.28)
+	_edge.position = Vector2(15, 189)
+	_edge.size = Vector2(450, 68)
+	_root.add_child(_edge)
+	_root.move_child(_edge, _root.get_children().find(_box) - 1)
 
 	_portrait_bg = ColorRect.new()
 	_portrait_bg.color = Color(0.15, 0.13, 0.2)
@@ -89,6 +92,10 @@ func _process(delta: float) -> void:
 		return
 	_reveal = minf(_reveal + delta * 60.0, 400.0)
 	var page: Dictionary = _pages[_page]
+	if page["mode"] == "shop":
+		_text.text = _shop_text()
+		_hint.text = _shop_hint()
+		return
 	_text.text = str(page["text"]).substr(0, int(_reveal))
 
 func open_with(target: NPC) -> void:
@@ -121,6 +128,9 @@ func _compose_pages() -> Array:
 			pages.append({"text": QuestDB.desc_of(q) + "\n%s: %s XP, %s G" % [
 				I18N.tr_str("quest.reward"), I18N.num(int(q["xp"])), I18N.num(int(q["gold"]))],
 				"mode": "offer"})
+		elif npc.role_name == "merchant":
+			_make_shop()
+			pages.append({"text": "", "mode": "shop"})
 		elif npc.role_name == "elder":
 			var m := QuestLog.current_main()
 			if not m.is_empty():
@@ -134,9 +144,60 @@ func _compose_pages() -> Array:
 	pages.append({"text": "...", "mode": "bye"})
 	return pages
 
+func _make_shop() -> void:
+	_shop_offers = []
+	_shop_sel = 0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = npc.npc_index * 131 + Game.day() * 17
+	_shop_offers.append({"entry": {"id": "health_potion", "slot": "", "rarity": 0,
+		"prefix": "", "suffix": "", "dmg": 0, "armor": 0, "weight": 1, "qty": 1},
+		"price": 25, "sold": false})
+	_shop_offers.append({"entry": {"id": "greater_health_potion", "slot": "", "rarity": 0,
+		"prefix": "", "suffix": "", "dmg": 0, "armor": 0, "weight": 1, "qty": 1},
+		"price": 60, "sold": false})
+	var entry: Dictionary = Inventory.roll_entry(ItemGen.random_id(rng), 0.25)
+	_shop_offers.append({"entry": entry, "price": 40 * (int(entry["rarity"]) + 1), "sold": false})
+
+func _shop_text() -> String:
+	var lines := []
+	for i in _shop_offers.size():
+		var o: Dictionary = _shop_offers[i]
+		var mark := "> " if i == _shop_sel else "  "
+		if o["sold"]:
+			lines.append("%s%s  -" % [mark, ItemGen.name_of(o["entry"])])
+		else:
+			lines.append("%s%s  %s G" % [mark, ItemGen.name_of(o["entry"]), I18N.num(int(o["price"]))])
+	return "\n".join(lines)
+
+func _shop_hint() -> String:
+	return "%s: %s G   [W/S] %s  [E] %s  [K] %s" % [
+		I18N.tr_str("hud.gold"), I18N.num(Stats.gold), I18N.tr_str("shop.select"),
+		I18N.tr_str("shop.buy"), I18N.tr_str("shop.leave")]
+
+func _toast(key: String) -> void:
+	for child in get_tree().root.get_children():
+		var hud = child.get_node_or_null("Hud")
+		if hud != null and hud.has_method("show_toast"):
+			hud.show_toast(I18N.tr_str(key))
+			return
+
 func _apply_page() -> void:
 	var page: Dictionary = _pages[_page]
 	_reveal = 0.0
+	if page["mode"] == "shop":
+		_box.size = Vector2(448, 74)
+		_edge.size = Vector2(450, 76)
+		_hint.position = Vector2(84, 248)
+		_text.text = _shop_text()
+		_hint.text = _shop_hint()
+		I18N.tag(_hint)
+		_name.text = npc.display_name
+		I18N.tag(_name)
+		_reveal = 400.0
+		return
+	_box.size = Vector2(448, 66)
+	_edge.size = Vector2(450, 68)
+	_hint.position = Vector2(84, 242)
 	_text.text = ""
 	_name.text = npc.display_name
 	if npc and npc.doll:
@@ -171,8 +232,39 @@ func _unhandled_input(event: InputEvent) -> void:
 		close()
 		get_viewport().set_input_as_handled()
 		return
+	var page: Dictionary = _pages[_page]
+	if page["mode"] == "shop":
+		if event.is_action_pressed("move_up"):
+			_shop_sel = (_shop_sel + _shop_offers.size() - 1) % _shop_offers.size()
+			_text.text = _shop_text()
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("move_down"):
+			_shop_sel = (_shop_sel + 1) % _shop_offers.size()
+			_text.text = _shop_text()
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("interact"):
+			var o: Dictionary = _shop_offers[_shop_sel]
+			if not o["sold"] and Stats.gold >= int(o["price"]):
+				Stats.add_gold(-int(o["price"]))
+				Inventory.add(o["entry"].duplicate())
+				o["sold"] = not Consumables.is_consumable(o["entry"]["id"])
+				_text.text = _shop_text()
+			else:
+				_toast("shop.no_gold")
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("dodge"):
+			_page += 1
+			if _page >= _pages.size():
+				close()
+			else:
+				_apply_page()
+			get_viewport().set_input_as_handled()
+			return
+
 	if event.is_action_pressed("interact") or event.is_action_pressed("attack"):
-		var page: Dictionary = _pages[_page]
 		if _reveal < len(str(page["text"])):
 			_reveal = 400.0
 			get_viewport().set_input_as_handled()
@@ -194,7 +286,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_apply_page()
 		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("dodge"):
-		var page: Dictionary = _pages[_page]
 		if page["mode"] == "offer":
 			QuestLog.decline_side(_offer_index)
 			_pages = _compose_pages()

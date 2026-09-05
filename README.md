@@ -99,3 +99,10 @@ docs/                    audit of the previous build, screenshots
 
 - Code: MIT (see `LICENSE`).
 - Vazirmatn font: SIL Open Font License 1.1 (see `assets/fonts/OFL-Vazirmatn.txt`).
+
+### M4 addendum — dungeons & shops
+Press [E] on cave stairs to descend. Each depth is a fresh seeded layout of
+rooms and corridors, lit only by torches and your lantern; depth 3 ends in a
+dragon. Merchants now open a shop page in dialogue (W/S to select, E to buy,
+K to leave): health potions 25 G, greater potions 60 G, and one seeded
+equipment piece priced by rarity.

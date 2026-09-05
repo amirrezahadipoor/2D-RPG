@@ -167,5 +167,11 @@
   "hud.prompt.journal": "Journal",
   "hud.prompt.talents": "Talents",
   "hud.prompt.potion": "Potion",
-  "biome.graveyard": "Graveyard"
+  "biome.graveyard": "Graveyard",
+  "biome.dungeon": "Dungeon",
+  "shop.select": "Select",
+  "shop.buy": "Buy",
+  "shop.leave": "Leave",
+  "shop.no_gold": "Not enough gold.",
+  "toast.depth": "Depth %s"
 }

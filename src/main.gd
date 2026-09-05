@@ -10,6 +10,8 @@ var talents: TalentsUI
 var dialogue: DialogueUI
 var cutscene: Cutscene
 var events: WorldEvents
+var dungeon: Dungeon = null
+var _overworld_hero_pos := Vector2.ZERO
 
 func _ready() -> void:
 	world = Overworld.new()
@@ -86,6 +88,56 @@ func _unhandled_input(event: InputEvent) -> void:
 		talents.toggle()
 	elif event.is_action_pressed("locale"):
 		I18N.toggle_locale()
+
+# -------------------------------------------------------------- dungeons ----
+func enter_dungeon(depth_value: int) -> void:
+	if dungeon == null:
+		_overworld_hero_pos = world.hero.global_position
+		world.spawner.spawn_enabled = false
+		world.ambient.set_process(false)
+	var hero := world.hero if dungeon == null else dungeon.hero
+	if dungeon != null:
+		dungeon.actors.remove_child(hero)
+		dungeon.queue_free()
+	else:
+		world.actors.remove_child(hero)
+	dungeon = Dungeon.new()
+	dungeon.name = "Dungeon"
+	add_child(dungeon)
+	dungeon.build(depth_value, world.world_seed)
+	dungeon.actors.add_child(hero)
+	dungeon.hero = hero
+	hero.global_position = dungeon.stairs_up + Vector2(0, 10)
+	hero.cam.limit_left = 0
+	hero.cam.limit_top = 0
+	hero.cam.limit_right = Dungeon.W * Dungeon.TILE
+	hero.cam.limit_bottom = Dungeon.H * Dungeon.TILE
+	for node in dungeon.actors.get_children():
+		if node is Stairs:
+			node.used.connect(_on_stairs)
+	hud.set_biome("dungeon")
+	hud.show_toast(I18N.tr_str("toast.depth") % I18N.num(depth_value))
+
+func exit_dungeon() -> void:
+	if dungeon == null:
+		return
+	var hero := dungeon.hero
+	dungeon.actors.remove_child(hero)
+	dungeon.queue_free()
+	dungeon = null
+	world.actors.add_child(hero)
+	hero.global_position = _overworld_hero_pos
+	hero.cam.limit_right = Overworld.WORLD_W * Overworld.TILE
+	hero.cam.limit_bottom = Overworld.WORLD_H * Overworld.TILE
+	world.spawner.spawn_enabled = true
+	world.ambient.set_process(true)
+	hud.set_biome(world.biome_at(hero.global_position))
+
+func _on_stairs(direction: int) -> void:
+	if direction > 0:
+		enter_dungeon(dungeon.depth + 1)
+	else:
+		exit_dungeon()
 
 # ----------------------------------------------------------------- death ----
 func _on_player_died() -> void:

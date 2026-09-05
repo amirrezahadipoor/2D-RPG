@@ -1,0 +1,47 @@
+# Dungeon stairs. direction = +1 leads deeper, -1 leads back to the overworld.
+class_name Stairs
+extends Node2D
+
+signal used(direction: int)
+
+var direction := 1
+
+var _spr: Sprite2D
+var _prompt: Label
+var _hero: Node2D = null
+
+func _ready() -> void:
+	_spr = Sprite2D.new()
+	_spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_spr.centered = false
+	_spr.position = Vector2(-8, -16)
+	var at := AtlasTexture.new()
+	at.atlas = load("res://assets/sprites/tiles/props.png")
+	at.region = Rect2(Vector2(ArtIndex.PROP_INDEX["stairs"] % 8, ArtIndex.PROP_INDEX["stairs"] / 8) * 16.0, Vector2(16, 16))
+	_spr.texture = at
+	add_child(_spr)
+	_prompt = Label.new()
+	_prompt.add_theme_font_size_override("font_size", 8)
+	_prompt.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
+	_prompt.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	_prompt.add_theme_constant_override("outline_size", 3)
+	_prompt.position = Vector2(-6, -26)
+	_prompt.text = "[E]"
+	_prompt.visible = false
+	_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_prompt)
+
+func _process(_delta: float) -> void:
+	if _hero == null or not is_instance_valid(_hero):
+		_hero = get_tree().get_first_node_in_group("player") as Node2D
+		return
+	var near := global_position.distance_to(_hero.global_position) < 18.0
+	var modal := false
+	for ui in get_tree().get_nodes_in_group("modal_ui"):
+		if ui.visible:
+			modal = true
+	_prompt.visible = near and not modal and Game.state == Game.State.PLAYING
+	if near and not modal and Game.state == Game.State.PLAYING:
+		if Input.is_action_just_pressed("interact"):
+			_prompt.visible = false
+			used.emit(direction)

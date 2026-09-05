@@ -215,6 +215,53 @@ func run() -> void:
 				await get_tree().physics_frame
 			await _grab("15_night_grave")
 
+	# ---- dungeon depth 2: torches, rock, monsters ----
+	if main_node and main_node.has_method("enter_dungeon") and hero:
+		Game.game_minutes = float(Game.day()) * 1440.0 + 12.0 * 60.0
+		main_node.enter_dungeon(2)
+		for i in 150:
+			await get_tree().physics_frame
+		if main_node.dungeon != null:
+			var dh: Hero = main_node.dungeon.hero
+			if dh:
+				dh.global_position = main_node.dungeon.stairs_up + Vector2(0, 12)
+				var skel := Enemy.new()
+				main_node.dungeon.actors.add_child(skel)
+				skel.setup("skeleton", 3)
+				skel.global_position = main_node.dungeon.stairs_up + Vector2(38, 14)
+				skel.speed = 0.0
+				skel.detect = 0.0
+			for i in 6:
+				await get_tree().process_frame
+			await _grab("16_dungeon")
+		main_node.exit_dungeon()
+		for i in 6:
+			await get_tree().physics_frame
+
+	# ---- merchant shop page ----
+	if main_node and world:
+		var merchant: NPC = null
+		for n in world.npcs:
+			if n.role_name == "merchant":
+				merchant = n
+				break
+		if merchant:
+			hero.global_position = merchant.global_position + Vector2(22, 6)
+			for i in 8:
+				await get_tree().physics_frame
+			var dlg2: DialogueUI = main_node.dialogue
+			Stats.add_gold(300)
+			dlg2.npc = merchant
+			dlg2._make_shop()
+			dlg2._pages = [{"text": "", "mode": "shop"}]
+			dlg2._page = 0
+			dlg2._apply_page()
+			dlg2.visible = true
+			for i in 6:
+				await get_tree().process_frame
+			await _grab("17_shop")
+			dlg2.close()
+
 	print("[screenshot] done")
 	get_tree().quit(0)
 

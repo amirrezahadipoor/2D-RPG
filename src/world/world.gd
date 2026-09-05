@@ -480,8 +480,8 @@ func _process(delta: float) -> void:
 			light.energy = 0.9 + 0.12 * sin(entry["phase"] * 9.0) if Game.is_night() else 0.0
 		else:
 			light.energy = (0.3 + 0.2 * sin(entry["phase"] * 2.2)) if Game.is_night() else 0.12
-	if hero == null:
-		return
+	if hero == null or hero.get_parent() != actors:
+		return   # hero is elsewhere (a dungeon): keep its biome label
 	var b := biome_at(hero.global_position)
 	if b != _current_biome:
 		_current_biome = b

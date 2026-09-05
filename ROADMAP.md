@@ -91,11 +91,16 @@ Evidence: `tests/verify.tscn` (125 checks), `docs/screenshots/10_story_intro.png
 - [x] Living world events: day/night tint + clock, blood moons, midnight
       graveyard surges, wandering merchant; towns are safe ground
 
-## M4 — Dungeons
+## M4 — Dungeons & economy
 
-- [ ] Entrance interaction → dungeon scene
-- [ ] Room-and-corridor generation with **rendered corridors**
-- [ ] Boss rooms, checkpoints, depth-scaled difficulty
+- [x] Dungeon depths 1-3: seeded rooms + carved L-corridors, solid cave
+      walls, canvas darkness lit only by wall torches and the hero's lantern
+- [x] Stairs up/down entities with [E] prompt; overworld hero position is
+      saved and restored on exit; overworld spawner/ambient pause inside
+- [x] Depth-scaled spawns (skeleton/orc/demon), chests, and a dragon boss
+      guarding the last depth; kills feed the quest log
+- [x] Merchant shop page inside dialogue: potions + rarity-priced seeded
+      equipment, W/S select, E buy (gold-checked), K leave
 
 ## M5 — Progression, talents & save
 
