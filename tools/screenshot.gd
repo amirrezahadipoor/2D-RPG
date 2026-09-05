@@ -92,6 +92,57 @@ func run() -> void:
 	await _grab("08_death_fa")
 	I18N.set_locale("en")
 
+	# ---- inventory with big icons + rarity, and chest loot on the ground ----
+	I18N.set_locale("en")
+	Game.start_new_run(true)   # leave the DEAD state so the screens are clean
+	# no scene reload here, so re-sync the worn entries with the doll by hand
+	if hero:
+		Inventory.on_hero_gear(hero.doll.get_gear())
+	for node in get_tree().get_nodes_in_group("pickup"):
+		node.queue_free()
+	for i in 4:
+		await get_tree().process_frame
+	# fill the bag directly (not via add()) so no "bag full" toast fires here
+	for i in 7:
+		var demo_entry: Dictionary = Inventory.roll_entry(ItemGen.random_id(Inventory.rng), 0.45)
+		demo_entry["weight"] = 1
+		Inventory.bag.append(demo_entry)
+	Inventory.changed.emit()
+	var inv: InventoryScreen = null
+	for child in get_tree().root.get_children():
+		var node := child.get_node_or_null("InventoryScreen")
+		if node is InventoryScreen:
+			inv = node
+	if inv:
+		inv.selected = 2
+		inv.open()
+		for i in 6:
+			await get_tree().process_frame
+		await _grab("09_inventory")
+		inv.close()
+		Inventory.bag.clear()
+		Inventory.changed.emit()
+
+	if hero and world:
+		var chest := Chest.new()
+		world.actors.add_child(chest)
+		chest.global_position = hero.global_position + Vector2(58, 16)
+		for i in 4:
+			await get_tree().physics_frame
+		# open it by hand so the hero stays put, then freeze the drops in place
+		chest.open()
+		for i in 10:
+			await get_tree().physics_frame
+		var offs := [Vector2(-18, -8), Vector2(16, -12), Vector2(-4, 12)]
+		var ps := get_tree().get_nodes_in_group("pickup")
+		for i in ps.size():
+			ps[i].freeze = true
+			if i < offs.size():
+				ps[i].global_position = chest.global_position + offs[i]
+		for i in 6:
+			await get_tree().process_frame
+		await _grab("10_loot")
+
 	print("[screenshot] done")
 	get_tree().quit(0)
 

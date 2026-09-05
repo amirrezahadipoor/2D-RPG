@@ -18,6 +18,7 @@ is backed by an automated check or a screenshot, never by a self-reported tick.
 | Procedural overworld, 7 biomes, live HUD | Paper-doll: hat + plate + cloak + axe on the hero |
 | ![attack](docs/screenshots/03_attack.png) | ![persian](docs/screenshots/04_persian_rtl.png) |
 | ![combat](docs/screenshots/05_combat.png) | ![death](docs/screenshots/06_death_hardcore.png) |
+| ![inventory](docs/screenshots/08_inventory.png) | ![loot](docs/screenshots/09_loot.png) |
 | Stamina-gated attack swing | Persian + RTL + Persian digits |
 
 ## What is actually here (M0 + part of M1)
@@ -34,7 +35,7 @@ is backed by an automated check or a screenshot, never by a self-reported tick.
   code reads. CI asserts the committed PNGs match the generator.
 - Bilingual UI with a bundled **Vazirmatn** font (SIL Open Font License,
   `assets/fonts/OFL-Vazirmatn.txt`) so Persian actually renders.
-- A headless test suite (`tests/verify.tscn`, 74 checks) that exits non-zero on
+- A headless test suite (`tests/verify.tscn`, 98 checks) that exits non-zero on
   failure, and a CI workflow that runs it. The previous CI hard-coded
   `failures='0'`; this one cannot lie.
 

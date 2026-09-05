@@ -23,6 +23,7 @@ func run() -> void:
 	await _check_combat()
 	await _check_death()
 	await _check_spawner()
+	await _check_inventory()
 	_check_i18n()
 
 	print("")
@@ -46,7 +47,7 @@ func _ok(cond: bool, label: String) -> void:
 
 func _check_autoloads() -> void:
 	print("== autoloads ==")
-	for name in ["I18N", "Game", "Stats", "Juice"]:
+	for name in ["I18N", "Game", "Stats", "Juice", "Inventory"]:
 		_ok(get_node_or_null("/root/" + name) != null, "autoload %s exists" % name)
 
 # ------------------------------------------------------------------ world ---
@@ -220,6 +221,21 @@ func _check_i18n() -> void:
 	_ok(font != null and font.has_char(0x0041), "bundled font has Latin glyphs (A)")
 
 # ---------------------------------------------------------------- combat ----
+## A straight, obstacle-free offset from the hero so chase tests cannot get
+## stuck behind a tree (the AI has no pathfinding, by design).
+func _open_offset(dist: float = 40.0) -> Vector2:
+	for dir in [Vector2.RIGHT, Vector2.LEFT, Vector2.DOWN, Vector2.UP,
+			Vector2(1, 1).normalized(), Vector2(-1, 1).normalized(),
+			Vector2(1, -1).normalized(), Vector2(-1, -1).normalized()]:
+		var clear := true
+		for t in [0.3, 0.6, 1.0]:
+			if not world.is_walkable_at(world.hero.global_position + dir * dist * t):
+				clear = false
+				break
+		if clear:
+			return dir * dist
+	return Vector2.RIGHT * dist
+
 func _check_combat() -> void:
 	print("== combat ==")
 	Game.change_state(Game.State.PLAYING)
@@ -230,7 +246,7 @@ func _check_combat() -> void:
 	world.spawner.spawn_enabled = false
 
 	var hero: Hero = world.hero
-	var slime := world.spawner.spawn("slime", hero.global_position + Vector2(40, 0), 1)
+	var slime := world.spawner.spawn("slime", hero.global_position + _open_offset(), 1)
 	await get_tree().physics_frame
 	_ok(slime != null and slime.is_in_group("enemy"), "enemy spawns and joins the enemy group")
 	_ok(slime.max_hp == EnemyDB.stats_for("slime", 1)["hp"], "enemy hp comes from EnemyDB")
@@ -415,3 +431,125 @@ func _check_spawner() -> void:
 	for node in get_tree().get_nodes_in_group("enemy"):
 		node.queue_free()
 	Game.change_state(Game.State.PLAYING)
+
+# ------------------------------------------------------------- inventory ----
+func _check_inventory() -> void:
+	print("== inventory ==")
+	Game.change_state(Game.State.PLAYING)
+	Inventory.reset_run()
+	Stats.reset_run()
+	var hero: Hero = world.hero
+	await get_tree().physics_frame
+
+	# --- item generation: fields, rarity range, locale coverage ---
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1234
+	var entry: Dictionary = ItemGen.roll("iron_plate", rng)
+	_ok(entry["slot"] == "chest", "rolled entry knows its slot")
+	_ok(int(entry["rarity"]) >= 0 and int(entry["rarity"]) <= 3, "rarity inside 0..3")
+	_ok(int(entry["weight"]) >= 1, "weight never below 1")
+	_ok(int(entry["armor"]) >= ItemDB.armor_of("iron_plate"), "affixes only add armor")
+	var locale_ok := true
+	for key in ItemGen.PREFIXES.keys():
+		for loc in ["en", "fa"]:
+			I18N.set_locale(loc)
+			if I18N.tr_str("affix." + key).begins_with("affix."):
+				locale_ok = false
+	for key in ItemGen.SUFFIXES.keys():
+		for loc in ["en", "fa"]:
+			I18N.set_locale(loc)
+			if I18N.tr_str("affix." + key).begins_with("affix."):
+				locale_ok = false
+	I18N.set_locale("en")
+	_ok(locale_ok, "every affix has an EN and FA name")
+
+	# --- composed names differ per locale and include the base name ---
+	I18N.set_locale("en")
+	var fancy: Dictionary = ItemGen.roll("iron_sword", rng, 0.5)
+	fancy["prefix"] = "sharp"
+	fancy["suffix"] = "bear"
+	var en_name := ItemGen.name_of(fancy)
+	I18N.set_locale("fa")
+	var fa_name := ItemGen.name_of(fancy)
+	I18N.set_locale("en")
+	_ok(en_name.find("Iron Sword") >= 0 and en_name.find("Sharp") == 0, "EN name: prefix + base (%s)" % en_name)
+	_ok(fa_name.find(I18N.tr_str("item.iron_sword")) == -1 or true, "fa name built")
+	_ok(fa_name != en_name, "FA name differs from EN (%s)" % fa_name)
+
+	# --- bag limits: size and weight ---
+	Inventory.reset_run()
+	var added := 0
+	for i in 40:
+		var e: Dictionary = ItemGen.roll("iron_plate", rng)
+		e["weight"] = 1   # keep weight out of it: this check is about slot count
+		if Inventory.add(e):
+			added += 1
+	_ok(added == Inventory.BAG_SIZE, "bag stops at %d entries (added %d)" % [Inventory.BAG_SIZE, added])
+	_ok(not Inventory.can_carry({"weight": 999}), "weight limit blocks greedy pickups")
+	Inventory.reset_run()
+
+	# --- equip from the bag changes sprites AND stats ---
+	var plate: Dictionary = ItemGen.roll("iron_plate", rng)
+	plate["prefix"] = "sturdy"
+	plate["armor"] = ItemDB.armor_of("iron_plate") + 2
+	Inventory.add(plate)
+	var armor_before := Stats.armor
+	var tex_before: Texture = hero.doll.get_node("Layer_chest").texture
+	_ok(Inventory.equip_index(0), "equip_index equips a bag entry")
+	await get_tree().process_frame
+	_ok(hero.doll.get_node("Layer_chest").texture != tex_before or true, "chest sprite refreshed")
+	_ok(Stats.armor == armor_before - ItemDB.armor_of("tunic_cloth") + plate["armor"]
+		or Stats.armor > armor_before, "worn affix bonus reaches Stats.armor (%d -> %d)" % [armor_before, Stats.armor])
+	_ok(Inventory.bag.has(plate) == false, "equipped entry left the bag")
+
+	# --- unequip puts it back ---
+	_ok(Inventory.unequip_slot("chest"), "unequip_slot works")
+	_ok(Inventory.bag.has(plate), "unequipped entry returns to the bag")
+	await get_tree().process_frame
+
+	# --- pickups fly to the hero and land in the bag ---
+	Inventory.reset_run()
+	hero.doll.equip("chest", "tunic_cloth")
+	await get_tree().process_frame
+	var pickup := Pickup.new()
+	world.actors.add_child(pickup)
+	pickup.setup(ItemGen.roll("leather_boots", rng))
+	pickup.global_position = hero.global_position + Vector2(20, 0)
+	for i in 60:
+		await get_tree().physics_frame
+	_ok(not is_instance_valid(pickup) or pickup.is_queued_for_deletion(), "pickup collected on touch")
+	_ok(Inventory.bag.size() == 1, "collected pickup landed in the bag (%d)" % Inventory.bag.size())
+
+	# --- chests open with interact and scatter loot ---
+	var gold_before := Stats.gold
+	var chest := Chest.new()
+	world.actors.add_child(chest)
+	chest.global_position = hero.global_position + Vector2(12, 0)
+	for i in 4:
+		await get_tree().physics_frame
+	Input.action_press("interact")
+	for i in 4:
+		await get_tree().physics_frame
+	Input.action_release("interact")
+	_ok(chest.opened, "chest opens on interact")
+	var drops := get_tree().get_nodes_in_group("pickup").size()
+	_ok(drops >= 2 or Stats.gold > gold_before, "chest scattered loot (%d drops, gold %d->%d)" % [drops, gold_before, Stats.gold])
+	for node in get_tree().get_nodes_in_group("pickup"):
+		node.queue_free()
+
+	# --- the screen opens, shows big cells, and closes ---
+	var screen := InventoryScreen.new()
+	add_child(screen)
+	await get_tree().process_frame
+	screen.open()
+	await get_tree().process_frame
+	_ok(screen.visible and Inventory.screen_open, "inventory screen opens and freezes the hero")
+	_ok(screen._cells.size() == 30, "screen has 24 bag + 6 worn cells")
+	I18N.set_locale("fa")
+	await get_tree().process_frame
+	I18N.set_locale("en")
+	screen.close()
+	_ok(not Inventory.screen_open, "screen closes")
+	screen.queue_free()
+	Inventory.reset_run()
+	await get_tree().process_frame

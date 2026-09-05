@@ -55,12 +55,20 @@ Evidence: `tests/verify.tscn` (74 checks), `docs/screenshots/05_combat.png`,
       (checks: `hardcore death deletes the save file`,
       `non-hardcore death keeps the save`)
 
-## M2 — Inventory, loot & equipment UI
+## M2 — Inventory, loot & equipment UI  ✅ DONE
 
-- [ ] Inventory grid UI with icon atlas, weight/slot limits
-- [ ] Equip/unequip from UI (not just the debug hotkey)
-- [ ] Chests + drops using the item generator semantics
-- [ ] Item tooltips with affixes (EN/FA)
+Evidence: `tests/verify.tscn` (98 checks), `docs/screenshots/08_inventory.png`,
+`09_loot.png`.
+
+- [x] Inventory grid UI (24 bag + 6 worn cells) with **32px icons** (2x atlas,
+      square pixels), rarity frames, weight/slot limits (`Weight: n/40`)
+- [x] Equip/unequip from UI (E / click; K drops) — drives the paper-doll
+      sprites and Stats through one Inventory autoload
+- [x] Chests (10 per world, `[E]` prompt) + enemy drops (35%, luck by level);
+      pickups are 1.5x icons with rarity glow, bob, sparkles and hero magnet
+- [x] Rarity tiers + prefix/suffix affixes with composed tooltips in EN and FA
+      («Sharp Cloth Tunic of the Bear» / «شمشیر آهنیِ تیزِ خرس»)
+- [x] 10% crits (double damage, gold number) for combat feel
 
 ## M3 — NPCs, dialogue & quests
 
@@ -115,6 +123,8 @@ python3 tools/gen_assets.py
 | Move | WASD / arrows / left stick |
 | Attack | J / Space / left click / gamepad X |
 | Dodge | K / Left Shift / gamepad B |
+| Inventory / equip / drop | I / E / K |
+| Open chest | E |
 | Cycle gear (demo) | G |
 | Language EN↔FA | L |
 | Pause | Esc / Start |

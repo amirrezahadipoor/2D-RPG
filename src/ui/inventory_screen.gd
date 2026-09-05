@@ -215,7 +215,7 @@ func _refresh_cells() -> void:
 			frame.color = ItemGen.rarity_color(entry)
 		else:
 			icon.texture = null
-			frame.color = Color(0.22, 0.22, 0.27)
+			frame.color = Color(0.15, 0.15, 0.19)
 		if index == selected:
 			frame.color = Color(1, 0.9, 0.3)
 

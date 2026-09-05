@@ -37,8 +37,13 @@ static func slot_of(item_id: String) -> String:
 			return slot
 	return ""
 
+## `luck` (0..1) is the chance to re-roll the rarity upwards once, so stronger
+## enemies and chests produce visibly better gear without breaking the base
+## distribution at luck = 0.
 static func roll_rarity(rng: RandomNumberGenerator, luck: float = 0.0) -> int:
-	var r := rng.randf() - luck
+	var r := rng.randf()
+	if rng.randf() < luck:
+		r = maxf(r, rng.randf_range(0.55, 1.0))
 	for i in RARITY_CHANCES.size():
 		if r < RARITY_CHANCES[i]:
 			return i
@@ -112,7 +117,7 @@ static func rarity_color(entry: Dictionary) -> Color:
 	return RARITY_COLORS[clampi(int(entry.get("rarity", 0)), 0, 3)]
 
 static func rarity_name(entry: Dictionary) -> String:
-	return I18N.tr_str("rarity." + str(clampi(int(entry.get("rarity", 0)), 0, 3)))
+	return I18N.tr_str("rarity." + RARITY_NAMES[clampi(int(entry.get("rarity", 0)), 0, 3)])
 
 ## A random equipment id, optionally biased towards a slot.
 static func random_id(rng: RandomNumberGenerator, slot: String = "") -> String:
