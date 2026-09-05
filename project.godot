@@ -40,12 +40,15 @@ buses/default_bus_layout="res://assets/audio/bus_layout.tres"
 ; Authored space stays 480x270, but the game now RENDERS at up to 4x with
 ; stretch mode canvas_items: UI text is rasterized at the final resolution
 ; (crisp instead of blocky) while sprites keep nearest-neighbour pixel purity.
+; aspect "keep" letterboxes the 480x270 stage to the centre of ANY phone
+; screen (18.5:9, 20:9, tablets...), so every pixel-art panel stays exactly
+; where it was authored instead of drifting off-centre on ultra-wide devices.
 window/size/viewport_width=480
 window/size/viewport_height=270
 window/size/window_width_override=1920
 window/size/window_height_override=1080
 window/stretch/mode="canvas_items"
-window/stretch/aspect="expand"
+window/stretch/aspect="keep"
 window/stretch/scale_mode="integer"
 window/handheld/orientation="sensor_landscape"
 
