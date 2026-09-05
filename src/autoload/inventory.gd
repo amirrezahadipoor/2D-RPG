@@ -68,7 +68,7 @@ func attack_bonus() -> int:
 func total_weight() -> int:
 	var w := 0
 	for e in bag:
-		w += int(e["weight"])
+		w += int(e["weight"]) * int(e.get("qty", 1))
 	for slot: String in equipped:
 		var e = equipped[slot]
 		if e is Dictionary:
@@ -80,12 +80,43 @@ func can_carry(entry: Dictionary) -> bool:
 
 # ------------------------------------------------------------------ bag -----
 func add(entry: Dictionary) -> bool:
+	if Consumables.is_consumable(entry["id"]):
+		for e in bag:
+			if e["id"] == entry["id"]:
+				e["qty"] = int(e.get("qty", 1)) + 1
+				changed.emit()
+				return true
 	if not can_carry(entry):
 		denied.emit("inv.bag_full")
 		return false
+	if Consumables.is_consumable(entry["id"]):
+		entry["qty"] = int(entry.get("qty", 1))
 	bag.append(entry)
 	changed.emit()
 	return true
+
+## Drink a stacked consumable from the bag. Returns true on success.
+func drink_index(index: int) -> bool:
+	if index < 0 or index >= bag.size():
+		return false
+	var entry: Dictionary = bag[index]
+	if not Consumables.is_consumable(entry["id"]):
+		return false
+	if not Consumables.drink(entry["id"]):
+		return false
+	entry["qty"] = int(entry.get("qty", 1)) - 1
+	if entry["qty"] <= 0:
+		bag.remove_at(index)
+	changed.emit()
+	return true
+
+## Quick-heal: best health potion in the bag (greater first).
+func drink_health() -> bool:
+	for pref in ["greater_health_potion", "health_potion"]:
+		for i in bag.size():
+			if bag[i]["id"] == pref:
+				return drink_index(i)
+	return false
 
 func drop_index(index: int) -> void:
 	if index < 0 or index >= bag.size():

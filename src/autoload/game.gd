@@ -10,6 +10,10 @@ enum State { BOOT, MENU, PLAYING, PAUSED, DEAD, VICTORY }
 
 signal state_changed(new_state: State, old_state: State)
 signal playtime_ticked(seconds: int)
+signal hour_changed(hour: int, day: int)
+
+# 10 in-game minutes per real second: a full day lasts 2.4 minutes
+const MINUTES_PER_SECOND := 10.0
 
 const SAVE_PATH := "user://savegame.save"
 const SAVE_FILE := "savegame.save"
@@ -19,6 +23,20 @@ var state: State = State.BOOT
 var is_hardcore: bool = true
 var playtime: float = 0.0
 var last_death_was_hardcore: bool = false
+var game_minutes: float = 8.0 * 60.0
+var seen_intro: bool = false
+
+func hour() -> int:
+	return int(game_minutes / 60.0) % 24
+
+func day() -> int:
+	return int(game_minutes / 1440.0) + 1
+
+func is_night() -> bool:
+	return hour() >= 21 or hour() < 6
+
+func is_blood_moon() -> bool:
+	return is_night() and day() % 7 == 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -28,6 +46,10 @@ func _process(delta: float) -> void:
 	if state != State.PLAYING:
 		return
 	playtime += delta
+	var prev_hour := hour()
+	game_minutes += delta * MINUTES_PER_SECOND
+	if hour() != prev_hour:
+		hour_changed.emit(hour(), day())
 	var whole := int(playtime)
 	if whole != int(playtime - delta):
 		playtime_ticked.emit(whole)
@@ -73,6 +95,7 @@ func start_new_run(hardcore: bool = true) -> void:
 	playtime = 0.0
 	Stats.reset_run()
 	Inventory.reset_run()
+	QuestLog.reset_run()
 	change_state(State.PLAYING)
 
 # ----------------------------------------------------------------- save -----
@@ -86,6 +109,8 @@ func save_run() -> bool:
 		"version": SAVE_VERSION,
 		"hardcore": is_hardcore,
 		"playtime": playtime,
+		"game_minutes": game_minutes,
+		"seen_intro": seen_intro,
 		"stats": Stats.serialize(),
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
@@ -110,6 +135,8 @@ func load_run() -> bool:
 		return false
 	is_hardcore = bool(parsed.get("hardcore", true))
 	playtime = float(parsed.get("playtime", 0.0))
+	game_minutes = float(parsed.get("game_minutes", 8.0 * 60.0))
+	seen_intro = bool(parsed.get("seen_intro", false))
 	Stats.deserialize(parsed.get("stats", {}))
 	return true
 

@@ -1,18 +1,20 @@
-# Procedural overworld.
+# Procedural overworld — a whole country, not a garden.
 #
-# Renders an actual tilemap (the previous revision generated biome data into
-# arrays and never drew a single pixel). Biomes come from coherent
-# FastNoiseLite fields -- not per-tile randf(), which produced TV static.
+# 384x256 tiles (16x the M0 map): 8 biomes incl. graveyards, 4 settlements
+# (3 villages + 1 town) with roofed houses, plazas, wells and ring roads,
+# cobble roads connecting them, and NPCs that live there on a day schedule.
 class_name Overworld
 extends Node2D
 
 signal biome_changed(biome: String)
 
 const TILE := 16
-const WORLD_W := 96
-const WORLD_H := 64
+const WORLD_W := 384
+const WORLD_H := 256
 
-const SOLID_PROPS := {"tree": Rect2(0, 10, 16, 6), "rock": Rect2(0, 6, 16, 10)}
+const SOLID_PROPS := {"tree": Rect2(0, 10, 16, 6), "rock": Rect2(0, 6, 16, 10),
+	"tomb": Rect2(0, 10, 16, 6), "well": Rect2(0, 9, 16, 7),
+	"fence": Rect2(0, 12, 16, 4)}
 
 var terrain_layer: TileMapLayer
 var props_layer: TileMapLayer
@@ -20,7 +22,11 @@ var actors: Node2D
 var hero: Hero
 var spawner: Spawner
 
+var settlements: Array = []   # {type, rect: Rect2i, plaza: Vector2i, index}
+var npcs: Array = []
+
 var _biome_grid: PackedStringArray = PackedStringArray()
+var _road_grid: PackedByteArray = PackedByteArray()
 var _current_biome := ""
 var world_seed: int = 0
 
@@ -31,91 +37,127 @@ func _ready() -> void:
 func build(seed_value: int) -> void:
 	world_seed = seed_value
 	_generate_biomes()
+	_place_settlements()
+	_carve_roads()
 	_build_tileset_and_layers()
 	_paint()
 	_spawn_actors_root()
 	_spawn_hero()
 	_spawn_spawner()
+	_spawn_npcs()
 	_place_chests()
 	Juice.register_camera(hero.cam)
 	Juice.register_world(actors)
-	print("[World] seed=%d size=%dx%d" % [world_seed, WORLD_W, WORLD_H])
+	print("[World] seed=%d size=%dx%d settlements=%d" % [world_seed, WORLD_W, WORLD_H, settlements.size()])
 
 func _generate_biomes() -> void:
 	var elev := FastNoiseLite.new()
 	elev.seed = world_seed
 	elev.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	elev.frequency = 0.022
-
+	elev.frequency = 0.012
 	var temp := FastNoiseLite.new()
-	temp.seed = world_seed + 101
+	temp.seed = world_seed + 31
 	temp.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	temp.frequency = 0.016
-
+	temp.frequency = 0.008
 	var moist := FastNoiseLite.new()
-	moist.seed = world_seed + 202
+	moist.seed = world_seed + 77
 	moist.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	moist.frequency = 0.03
+	moist.frequency = 0.015
+	# graveyards: rare, small, cursed clearings
+	var grav := FastNoiseLite.new()
+	grav.seed = world_seed + 913
+	grav.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	grav.frequency = 0.05
 
 	_biome_grid.resize(WORLD_W * WORLD_H)
-	for y in range(WORLD_H):
-		for x in range(WORLD_W):
-			var e := elev.get_noise_2d(float(x), float(y))
-			var t := temp.get_noise_2d(float(x), float(y))
-			var m := moist.get_noise_2d(float(x), float(y))
-			var biome: String
+	for y in WORLD_H:
+		for x in WORLD_W:
+			var e := elev.get_noise_2d(x, y)
+			var t := temp.get_noise_2d(x, y)
+			var m := moist.get_noise_2d(x, y)
+			var g := grav.get_noise_2d(x, y)
+			var biome := "forest"
 			if e < -0.42:
 				biome = "water"
+			elif e > 0.52:
+				biome = "caves"
 			elif t < -0.32:
 				biome = "snow"
 			elif t > 0.42:
 				biome = "desert"
-			elif e > 0.52:
-				biome = "caves"
 			elif m > 0.28:
 				biome = "swamp"
-			else:
-				biome = "forest"
+			if biome in ["forest", "snow"] and g > 0.62:
+				biome = "graveyard"
 			_biome_grid[y * WORLD_W + x] = biome
+	_road_grid.resize(WORLD_W * WORLD_H)
 
-func _terrain_tile(biome: String, x: int, y: int) -> int:
-	var alt := ((x * 7 + y * 13) % 5) == 0
-	match biome:
-		"water": return ArtIndex.TERRAIN_INDEX["water"]
-		"snow": return ArtIndex.TERRAIN_INDEX["snow"]
-		"desert": return ArtIndex.TERRAIN_INDEX["sand2" if alt else "sand"]
-		"caves": return ArtIndex.TERRAIN_INDEX["cave" if alt else "stone"]
-		"swamp": return ArtIndex.TERRAIN_INDEX["swamp"]
-		"forest": return ArtIndex.TERRAIN_INDEX["grass2" if alt else "grass"]
-	return ArtIndex.TERRAIN_INDEX["grass"]
+# ---------------------------------------------------------- settlements -----
+func _place_settlements() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = world_seed ^ 0xC17
+	var specs := [["town", 26, 18], ["village", 14, 10], ["village", 14, 10], ["village", 14, 10]]
+	var tries := 0
+	for spec in specs:
+		var placed := false
+		while not placed and tries < 900:
+			tries += 1
+			var w: int = spec[1]
+			var h: int = spec[2]
+			var x0 := rng.randi_range(8, WORLD_W - w - 9)
+			var y0 := rng.randi_range(8, WORLD_H - h - 9)
+			var rect := Rect2i(x0, y0, w, h)
+			# settlements need dry, gentle land and personal space
+			var ok := true
+			for yy in range(y0, y0 + h, 2):
+				for xx in range(x0, x0 + w, 2):
+					if _biome_grid[yy * WORLD_W + xx] in ["water", "caves"]:
+						ok = false
+						break
+				if not ok:
+					break
+			if ok:
+				for other in settlements:
+					if rect.grow(14).intersects(other["rect"]):
+						ok = false
+						break
+			if not ok:
+				continue
+			settlements.append({
+				"type": spec[0],
+				"rect": rect,
+				"plaza": Vector2i(x0 + w / 2, y0 + h / 2),
+				"index": settlements.size(),
+			})
+			for yy in range(y0, y0 + h):
+				for xx in range(x0, x0 + w):
+					_biome_grid[yy * WORLD_W + xx] = spec[0]
+			placed = true
 
-func _prop_at(biome: String, x: int, y: int) -> String:
-	var h := _hash2(x, y)
-	match biome:
-		"forest":
-			if h < 0.075: return "tree"
-			if h < 0.10: return "bush"
-			if h < 0.12: return "flower"
-		"snow":
-			if h < 0.03: return "tree"
-			if h < 0.05: return "rock"
-		"desert":
-			if h < 0.035: return "rock"
-			if h < 0.045: return "sign"
-		"caves":
-			if h < 0.06: return "rock"
-			if h < 0.075: return "torch"
-		"swamp":
-			if h < 0.05: return "bush"
-			if h < 0.07: return "tree"
-	return ""
+func _carve_roads() -> void:
+	# L-shaped cobble roads between consecutive settlements
+	for i in range(1, settlements.size()):
+		var a: Vector2i = settlements[i - 1]["plaza"]
+		var b: Vector2i = settlements[i]["plaza"]
+		_road_line(a, Vector2i(b.x, a.y))
+		_road_line(Vector2i(b.x, a.y), b)
 
-func _hash2(x: int, y: int) -> float:
-	var n := (x * 374761393 + y * 668265263 + world_seed * 69069) & 0x7FFFFFFF
-	n = (n ^ (n >> 13)) * 1274126177 & 0x7FFFFFFF
-	return float(n & 0xFFFF) / 65535.0
+func _road_line(a: Vector2i, b: Vector2i) -> void:
+	var x := a.x
+	var y := a.y
+	while x != b.x or y != b.y:
+		for dy in range(0, 2):
+			for dx in range(0, 2):
+				var t := Vector2i(x + dx, y + dy)
+				if t.x >= 0 and t.y >= 0 and t.x < WORLD_W and t.y < WORLD_H:
+					if _biome_grid[t.y * WORLD_W + t.x] != "water":
+						_road_grid[t.y * WORLD_W + t.x] = 1
+		if x != b.x:
+			x += signi(b.x - x)
+		elif y != b.y:
+			y += signi(b.y - y)
 
-# -------------------------------------------------------------- tileset -----
+# ---------------------------------------------------------------- paint -----
 func _build_tileset_and_layers() -> void:
 	var ts := TileSet.new()
 	ts.tile_size = Vector2i(TILE, TILE)
@@ -132,12 +174,11 @@ func _build_tileset_and_layers() -> void:
 	src_props.texture = load("res://assets/sprites/tiles/props.png")
 	src_props.texture_region_size = Vector2i(TILE, TILE)
 	for i in ArtIndex.PROP_INDEX.size():
-		src_props.create_tile(Vector2i(i, 0))
+		src_props.create_tile(Vector2i(i % 8, i / 8))
 	ts.add_source(src_props, 1)
 
-	# water blocks movement
 	_set_solid(src_terrain, ArtIndex.TERRAIN_INDEX["water"], Rect2(0, 0, TILE, TILE))
-	# props block only their lower band, so you can walk "behind" a canopy
+	_set_solid(src_terrain, ArtIndex.TERRAIN_INDEX["roof"], Rect2(0, 0, TILE, TILE))
 	for prop_name in SOLID_PROPS:
 		_set_solid(src_props, ArtIndex.PROP_INDEX[prop_name], SOLID_PROPS[prop_name])
 
@@ -160,9 +201,8 @@ func _set_solid(src: TileSetAtlasSource, tile_index: int, rect: Rect2) -> void:
 	if td == null:
 		return
 	# NOTE: TileData collision polygons are specified RELATIVE TO THE TILE
-	# CENTER, not the top-left corner (verified empirically with a point-probe
-	# against the physics space). Forgetting this offsets every collider by
-	# half a tile: a silent "walls in the wrong place" bug.
+	# CENTER, not the top-left corner. Forgetting this offsets every collider
+	# by half a tile: a silent "walls in the wrong place" bug.
 	var half := Vector2(TILE, TILE) * 0.5
 	var p0 := rect.position - half
 	var p1 := rect.position + rect.size - half
@@ -174,19 +214,126 @@ func _set_solid(src: TileSetAtlasSource, tile_index: int, rect: Rect2) -> void:
 		Vector2(p0.x, p1.y),
 	]))
 
-# ---------------------------------------------------------------- paint -----
 func _paint() -> void:
-	for y in range(WORLD_H):
-		for x in range(WORLD_W):
-			var biome := _biome_grid[y * WORLD_W + x]
-			terrain_layer.set_cell(Vector2i(x, y), 0, Vector2i(_terrain_tile(biome, x, y) % 8, _terrain_tile(biome, x, y) / 8))
+	for y in WORLD_H:
+		for x in WORLD_W:
+			var i := y * WORLD_W + x
+			var biome := _biome_grid[i]
+			var tidx := _terrain_tile(biome, x, y)
 			var prop := _prop_at(biome, x, y)
+			if _road_grid[i] == 1 and biome not in ["village", "town"]:
+				tidx = ArtIndex.TERRAIN_INDEX["cobble"]
+				prop = ""
+			if biome == "village" or biome == "town":
+				var st: Dictionary = _settlement_at_tile(Vector2i(x, y))
+				var override: Array = _settlement_tile(st, Vector2i(x, y))
+				tidx = override[0]
+				prop = override[1]
+			terrain_layer.set_cell(Vector2i(x, y), 0, Vector2i(tidx % 8, tidx / 8))
 			if prop != "":
-				var pi: int = ArtIndex.PROP_INDEX[prop]
-				props_layer.set_cell(Vector2i(x, y), 1, Vector2i(pi, 0))
+				props_layer.set_cell(Vector2i(x, y), 1, Vector2i(ArtIndex.PROP_INDEX[prop] % 8, ArtIndex.PROP_INDEX[prop] / 8))
 
+func _settlement_at_tile(t: Vector2i) -> Dictionary:
+	for st in settlements:
+		if st["rect"].has_point(t):
+			return st
+	return {}
+
+## House/plaza pattern inside a settlement rect. Returns [terrain_idx, prop].
+func _settlement_tile(st: Dictionary, t: Vector2i) -> Array:
+	var rect: Rect2i = st["rect"]
+	var rel := t - rect.position
+	var w := rect.size.x
+	var h := rect.size.y
+	var plaza: Vector2i = st["plaza"]
+	# ring road around the plot
+	if rel.x == 0 or rel.y == 0 or rel.x == w - 1 or rel.y == h - 1:
+		return [ArtIndex.TERRAIN_INDEX["cobble"], ""]
+	# houses: roof blocks with a wood "door" tile at the bottom middle
+	for hr in _house_rects(st):
+		var house: Rect2i = hr
+		if house.has_point(t):
+			var door_x: int = house.position.x + house.size.x / 2
+			if t.y == house.position.y + house.size.y - 1 and t.x == door_x:
+				return [ArtIndex.TERRAIN_INDEX["wood"], ""]
+			return [ArtIndex.TERRAIN_INDEX["roof"], ""]
+	# plaza props
+	if t == plaza:
+		return [ArtIndex.TERRAIN_INDEX["cobble"], "well"]
+	if t == plaza + Vector2i(2, 0) or t == plaza + Vector2i(-2, 0):
+		return [ArtIndex.TERRAIN_INDEX["cobble"], "torch"]
+	if t == plaza + Vector2i(0, 2):
+		return [ArtIndex.TERRAIN_INDEX["cobble"], "sign"]
+	if t == plaza + Vector2i(3, 2):
+		return [ArtIndex.TERRAIN_INDEX["cobble"], "chest"]
+	if t == rect.position + Vector2i(1, h - 1):
+		return [ArtIndex.TERRAIN_INDEX["cobble"], "torch"]
+	# grassy yards with flowers
+	var hh := _hash2(t.x, t.y)
+	if hh > 0.94:
+		return [ArtIndex.TERRAIN_INDEX["grass"], "flower"]
+	if hh < 0.03:
+		return [ArtIndex.TERRAIN_INDEX["grass"], "fence"]
+	return [ArtIndex.TERRAIN_INDEX["grass"], ""]
+
+func _house_rects(st: Dictionary) -> Array:
+	var rect: Rect2i = st["rect"]
+	var houses := []
+	if st["type"] == "town":
+		for hx in [2, 9, 17]:
+			for hy in [2, 9]:
+				houses.append(Rect2i(rect.position + Vector2i(hx, hy), Vector2i(5, 4)))
+	else:
+		houses.append(Rect2i(rect.position + Vector2i(2, 2), Vector2i(4, 3)))
+		houses.append(Rect2i(rect.position + Vector2i(8, 2), Vector2i(4, 3)))
+		houses.append(Rect2i(rect.position + Vector2i(2, 6), Vector2i(4, 3)))
+	return houses
+
+func _terrain_tile(biome: String, x: int, y: int) -> int:
+	var alt := _hash2(x, y) > 0.5
+	match biome:
+		"water": return ArtIndex.TERRAIN_INDEX["water"]
+		"snow": return ArtIndex.TERRAIN_INDEX["snow"]
+		"desert": return ArtIndex.TERRAIN_INDEX["sand2" if alt else "sand"]
+		"caves": return ArtIndex.TERRAIN_INDEX["cave" if alt else "stone"]
+		"swamp": return ArtIndex.TERRAIN_INDEX["swamp"]
+		"graveyard": return ArtIndex.TERRAIN_INDEX["dirt" if alt else "grass2"]
+		"forest": return ArtIndex.TERRAIN_INDEX["grass2" if alt else "grass"]
+	return ArtIndex.TERRAIN_INDEX["grass"]
+
+func _prop_at(biome: String, x: int, y: int) -> String:
+	var h := _hash2(x, y)
+	match biome:
+		"forest":
+			if h < 0.075: return "tree"
+			if h < 0.10: return "bush"
+			if h < 0.12: return "flower"
+		"snow":
+			if h < 0.03: return "tree"
+			if h < 0.05: return "rock"
+		"desert":
+			if h < 0.035: return "rock"
+			if h < 0.045: return "sign"
+		"caves":
+			if h < 0.06: return "rock"
+			if h < 0.075: return "torch"
+		"swamp":
+			if h < 0.05: return "bush"
+			if h < 0.07: return "tree"
+		"graveyard":
+			if h < 0.16: return "tomb"
+			if h < 0.20: return "fence"
+			if h < 0.22: return "tree"
+	return ""
+
+func _hash2(x: int, y: int) -> float:
+	var n := (x * 374761393 + y * 668265263 + world_seed) & 0x7FFFFFFF
+	n = (n ^ (n >> 13)) * 1274126177 & 0x7FFFFFFF
+	return float(n & 0xFFFF) / 65535.0
+
+# ---------------------------------------------------------------- query -----
 ## True when an entity can stand here: in bounds, not water, not inside a
-## solid prop. Used by the spawner so enemies never appear in a tree.
+## solid prop, not inside a house roof.
 func is_walkable_at(world_pos: Vector2) -> bool:
 	var t := tile_at(world_pos)
 	if t.x < 0 or t.y < 0 or t.x >= WORLD_W or t.y >= WORLD_H:
@@ -194,6 +341,11 @@ func is_walkable_at(world_pos: Vector2) -> bool:
 	var biome := _biome_grid[t.y * WORLD_W + t.x]
 	if biome == "water":
 		return false
+	if biome in ["village", "town"]:
+		var tile: Array = _settlement_tile(_settlement_at_tile(t), t)
+		if tile[0] == ArtIndex.TERRAIN_INDEX["roof"]:
+			return false
+		return tile[1] == "" or not SOLID_PROPS.has(tile[1])
 	var prop := _prop_at(biome, t.x, t.y)
 	return prop == "" or not SOLID_PROPS.has(prop)
 
@@ -206,8 +358,10 @@ func biome_at(world_pos: Vector2) -> String:
 func tile_at(world_pos: Vector2) -> Vector2i:
 	return Vector2i(floori(world_pos.x / float(TILE)), floori(world_pos.y / float(TILE)))
 
-## Hero + enemies live in one y-sorted container so they draw over/under each
-## other by foot position instead of by spawn order.
+func settlement_at(world_pos: Vector2) -> Dictionary:
+	return _settlement_at_tile(tile_at(world_pos))
+
+# ---------------------------------------------------------------- actors ----
 func _spawn_actors_root() -> void:
 	actors = Node2D.new()
 	actors.name = "Actors"
@@ -220,50 +374,57 @@ func _spawn_spawner() -> void:
 	add_child(spawner)
 	spawner.world = self
 
-## Scatter a handful of chests on walkable ground away from the spawn point.
+## The story starts in the first village plaza, not in the wilderness.
+func _spawn_hero() -> void:
+	hero = Hero.new()
+	hero.name = "Hero"
+	actors.add_child(hero)
+	if not settlements.is_empty():
+		var plaza: Vector2i = settlements[0]["plaza"]
+		hero.global_position = Vector2(plaza.x * TILE + 8.0, (plaza.y + 1) * TILE + 8.0)
+	else:
+		hero.global_position = Vector2(WORLD_W * TILE * 0.5, WORLD_H * TILE * 0.5)
+	hero.cam.limit_left = 0
+	hero.cam.limit_top = 0
+	hero.cam.limit_right = WORLD_W * TILE
+	hero.cam.limit_bottom = WORLD_H * TILE
+
+func _spawn_npcs() -> void:
+	for st in settlements:
+		var plaza: Vector2i = st["plaza"]
+		var roles := ["elder", "merchant", "guard", "villager", "villager", "villager"]
+		if st["type"] == "town":
+			roles += ["merchant", "guard", "villager", "villager", "villager", "villager", "guard"]
+		for i in roles.size():
+			var npc := NPC.new()
+			npc.name = "NPC_%d_%d" % [st["index"], i]
+			actors.add_child(npc)
+			var angle := TAU * float(i) / float(roles.size())
+			npc.home = Vector2(plaza.x * TILE + 8 + cos(angle) * 26.0,
+				plaza.y * TILE + 8 + sin(angle) * 18.0)
+			npc.global_position = npc.home
+			npc.setup(roles[i], st, i)
+			npcs.append(npc)
+
+## Scatter chests: a few per settlement plus some in the wild.
 func _place_chests() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = world_seed ^ 0x51ED
 	var placed := 0
 	var tries := 0
-	while placed < 10 and tries < 400:
+	while placed < 26 and tries < 1400:
 		tries += 1
 		var t := Vector2i(rng.randi_range(4, WORLD_W - 5), rng.randi_range(4, WORLD_H - 5))
 		var pos := Vector2(t.x * TILE + 8.0, t.y * TILE + 8.0)
 		if not is_walkable_at(pos):
 			continue
-		if pos.distance_to(hero.global_position) < 70.0:
+		if pos.distance_to(hero.global_position) < 40.0:
 			continue
 		var chest := Chest.new()
 		chest.name = "Chest_%d" % placed
 		actors.add_child(chest)
 		chest.global_position = pos
 		placed += 1
-
-func _spawn_hero() -> void:
-	hero = Hero.new()
-	hero.name = "Hero"
-	actors.add_child(hero)
-	# find a walkable forest-ish tile near the centre
-	var cx := WORLD_W / 2
-	var cy := WORLD_H / 2
-	for radius in range(0, 40):
-		for dy in range(-radius, radius + 1):
-			for dx in range(-radius, radius + 1):
-				if maxi(absi(dx), absi(dy)) != radius:
-					continue
-				var t := Vector2i(cx + dx, cy + dy)
-				if t.x < 1 or t.y < 1 or t.x >= WORLD_W - 1 or t.y >= WORLD_H - 1:
-					continue
-				var biome := _biome_grid[t.y * WORLD_W + t.x]
-				if biome in ["forest", "desert", "snow", "swamp"] and _prop_at(biome, t.x, t.y) == "":
-					hero.global_position = Vector2(t.x * TILE + 8.0, t.y * TILE + 8.0)
-					hero.cam.limit_left = 0
-					hero.cam.limit_top = 0
-					hero.cam.limit_right = WORLD_W * TILE
-					hero.cam.limit_bottom = WORLD_H * TILE
-					return
-	hero.global_position = Vector2(cx * TILE, cy * TILE)
 
 func _process(_delta: float) -> void:
 	if hero == null:

@@ -30,7 +30,7 @@ const BIOME_SPAWNS := {
 }
 
 # Rare escalation: deeper biomes roll a stronger table entry.
-const ELITE_CHANCE := 0.08
+const BASE_ELITE_CHANCE := 0.12   # harder than a casual default on purpose
 
 static func stats_for(type: String, level: int) -> Dictionary:
 	var base: Dictionary = TYPES.get(type, TYPES["slime"])

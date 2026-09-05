@@ -9,6 +9,7 @@ signal stamina_changed(current: float, maximum: int)
 signal level_changed(level: int, xp: int, xp_next: int)
 signal gold_changed(gold: int)
 signal armor_changed(armor: int)
+signal talent_changed(points: int)
 signal died
 
 var max_hp: int = 40
@@ -24,6 +25,32 @@ var kills: int = 0
 
 # Damage reduction from worn gear. Recomputed by Hero whenever gear changes.
 var armor: int = 0
+
+var talent_points: int = 0
+var talents: Dictionary = {"might": 0, "vigor": 0, "swift": 0}
+
+func rank_up(key: String) -> bool:
+	if talent_points <= 0 or not talents.has(key):
+		return false
+	if int(talents[key]) >= 10:
+		return false
+	talent_points -= 1
+	talents[key] = int(talents[key]) + 1
+	if key == "vigor":
+		max_hp += 10
+		hp += 10
+		health_changed.emit(hp, max_hp)
+	elif key == "swift":
+		max_stamina += 10
+		stamina_changed.emit(stamina, max_stamina)
+	talent_changed.emit(talent_points)
+	return true
+
+func speed_mult() -> float:
+	return 1.0 + 0.03 * float(talents["swift"])
+
+func might_bonus() -> int:
+	return 2 * int(talents["might"])
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -61,6 +88,8 @@ func reset_run(start_gold: int = 25) -> void:
 	gold = start_gold
 	armor = 0
 	kills = 0
+	talent_points = 0
+	talents = {"might": 0, "vigor": 0, "swift": 0}
 	health_changed.emit(hp, max_hp)
 	stamina_changed.emit(stamina, max_stamina)
 	level_changed.emit(level, xp, xp_next)
@@ -96,6 +125,8 @@ func add_xp(amount: int) -> void:
 		xp_next = int(100.0 * pow(level, 1.5))
 		max_hp += 5
 		hp = max_hp
+		talent_points += 1
+		talent_changed.emit(talent_points)
 		level_changed.emit(level, xp, xp_next)
 	level_changed.emit(level, xp, xp_next)
 
@@ -110,6 +141,7 @@ func serialize() -> Dictionary:
 		"stamina": stamina, "max_stamina": max_stamina,
 		"level": level, "xp": xp, "xp_next": xp_next,
 		"gold": gold, "kills": kills,
+		"talent_points": talent_points, "talents": talents.duplicate(),
 	}
 
 func deserialize(data: Dictionary) -> void:
@@ -122,6 +154,10 @@ func deserialize(data: Dictionary) -> void:
 	xp_next = int(data.get("xp_next", xp_next))
 	gold = int(data.get("gold", gold))
 	kills = int(data.get("kills", kills))
+	talent_points = int(data.get("talent_points", talent_points))
+	var t: Dictionary = data.get("talents", {})
+	if not t.is_empty():
+		talents = t
 	armor_changed.emit(armor)
 	health_changed.emit(hp, max_hp)
 	stamina_changed.emit(stamina, max_stamina)

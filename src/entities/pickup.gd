@@ -79,6 +79,7 @@ func _process(delta: float) -> void:
 
 func _collect() -> void:
 	if Inventory.add(entry):
+		QuestLog.on_collect(entry["id"])
 		Juice.world_text(global_position + Vector2(0, -18), ItemGen.name_of(entry),
 			ItemGen.rarity_color(entry), 8)
 		Juice.puff(global_position)

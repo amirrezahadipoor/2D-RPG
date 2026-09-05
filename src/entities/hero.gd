@@ -70,6 +70,11 @@ func _starting_gear() -> void:
 
 # ------------------------------------------------------------- physics ------
 func _physics_process(delta: float) -> void:
+	var cutscene := get_tree().get_first_node_in_group("cutscene")
+	if (cutscene != null and cutscene.active) or _modal_open():
+		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
+		move_and_slide()
+		return
 	if Game.state == Game.State.DEAD or Inventory.screen_open:
 		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
 		move_and_slide()
@@ -85,7 +90,7 @@ func _physics_process(delta: float) -> void:
 		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
 	else:
 		if input.length() > 0.1:
-			velocity = velocity.move_toward(input * WALK_SPEED, ACCEL * delta)
+			velocity = velocity.move_toward(input * WALK_SPEED * Stats.speed_mult(), ACCEL * delta)
 			_update_facing(input)
 		else:
 			velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
@@ -99,6 +104,13 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	_animate(delta, input)
+
+## Any full-screen UI (inventory, journal, talents, dialogue) freezes play.
+func _modal_open() -> bool:
+	for ui in get_tree().get_nodes_in_group("modal_ui"):
+		if ui.visible:
+			return true
+	return false
 
 func _update_facing(input: Vector2) -> void:
 	if absf(input.x) > absf(input.y):
@@ -132,6 +144,11 @@ func _handle_actions(delta: float) -> void:
 
 	if Input.is_action_just_pressed("debug_swap_gear"):
 		cycle_gear()
+
+	if Input.is_action_just_pressed("use_potion"):
+		if Inventory.drink_health():
+			Juice.world_text(global_position + Vector2(0, -30),
+				I18N.tr_str("consumable.drink") + "!", Color(0.9, 0.3, 0.35), 8)
 
 func _aim_direction() -> Vector2:
 	match facing:
@@ -177,7 +194,7 @@ func current_weapon_id() -> String:
 func attack_damage(weapon: Dictionary = {}) -> int:
 	var w: Dictionary = weapon if not weapon.is_empty() else WeaponDB.stats_for(current_weapon_id())
 	return (int(w["damage"]) + ItemDB.attack_power(doll.get_gear())
-		+ Inventory.attack_bonus() + (Stats.level - 1))
+		+ Inventory.attack_bonus() + Stats.might_bonus() + (Stats.level - 1))
 
 ## Damage entry point used by enemies. Dodging grants brief invulnerability.
 func hurt(amount: int) -> int:

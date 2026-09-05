@@ -24,6 +24,8 @@ var _root: Control
 var _vignette: ColorRect
 var _toast: Label
 var _last_level := 1
+var _clock: Label
+var _night: ColorRect
 
 func _ready() -> void:
 	layer = 10
@@ -58,6 +60,24 @@ func _build() -> void:
 	_toast.modulate.a = 0.0
 	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_toast)
+
+	# --- day/night tint over the world, under the HUD text ---
+	_night = ColorRect.new()
+	_night.name = "NightTint"
+	_night.color = Color(0.05, 0.07, 0.2)
+	_night.modulate.a = 0.0
+	_night.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_night)
+
+	_clock = Label.new()
+	_clock.name = "Clock"
+	_clock.add_theme_font_size_override("font_size", 8)
+	_clock.add_theme_color_override("font_color", Color(0.85, 0.88, 1.0))
+	_clock.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	_clock.add_theme_constant_override("outline_size", 2)
+	_clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_clock.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_clock)
 
 	# --- vitals (top-left) ---
 	_hp_bg = _bar(Vector2(6, 6), BAR_W, 7, Color(0.15, 0.08, 0.1))
@@ -116,6 +136,12 @@ func _layout() -> void:
 	if _toast:
 		_toast.position = Vector2(0, vp.y * 0.3)
 		_toast.size = Vector2(vp.x, 14)
+	if _night:
+		_night.position = Vector2.ZERO
+		_night.size = vp
+	if _clock:
+		_clock.position = Vector2(0, 6)
+		_clock.size = Vector2(vp.x, 10)
 
 func _bar(pos: Vector2, w: float, h: float, col: Color) -> ColorRect:
 	var r := ColorRect.new()
@@ -136,6 +162,30 @@ func _label(pos: Vector2, col: Color) -> Label:
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(l)
 	return l
+
+func _process(_delta: float) -> void:
+	_update_clock()
+
+## Smooth night tint: dark blue after dusk, blood-red on blood moons.
+func _update_clock() -> void:
+	if _clock:
+		_clock.text = "%s %s  %02d:00" % [
+			I18N.tr_str("hud.day"), I18N.num(Game.day()), Game.hour()]
+		if Game.is_blood_moon():
+			_clock.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35))
+		else:
+			_clock.add_theme_color_override("font_color", Color(0.85, 0.88, 1.0))
+	if _night:
+		var h := float(Game.hour()) + fmod(Game.game_minutes, 60.0) / 60.0
+		var night_amount := 0.0
+		if h >= 19.0:
+			night_amount = clampf((h - 19.0) / 3.0, 0.0, 1.0)
+		elif h < 6.0:
+			night_amount = 1.0
+		elif h < 8.0:
+			night_amount = clampf((8.0 - h) / 2.0, 0.0, 1.0)
+		_night.modulate.a = night_amount * 0.38
+		_night.color = Color(0.45, 0.05, 0.08) if Game.is_blood_moon() else Color(0.05, 0.07, 0.2)
 
 func _connect() -> void:
 	Stats.health_changed.connect(_on_health)
@@ -214,10 +264,13 @@ func _refresh_text() -> void:
 		I18N.tag(_biome_label)
 	_on_level(Stats.level, Stats.xp, Stats.xp_next)
 	_on_gold(Stats.gold)
-	_prompts.text = "%s [J/Space]   %s [K/Shift]   %s [G]   %s [L]" % [
+	_prompts.text = "%s [J]  %s [K]  %s [I]  %s [U]  %s [T]  %s [H]  %s [L]" % [
 		I18N.tr_str("hud.prompt.attack"),
 		I18N.tr_str("hud.prompt.dodge"),
-		I18N.tr_str("hud.prompt.gear"),
+		I18N.tr_str("hud.prompt.inv"),
+		I18N.tr_str("hud.prompt.journal"),
+		I18N.tr_str("hud.prompt.talents"),
+		I18N.tr_str("hud.prompt.potion"),
 		I18N.tr_str("hud.prompt.locale"),
 	]
 	I18N.tag(_prompts)

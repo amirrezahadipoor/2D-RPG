@@ -169,7 +169,17 @@ func _maybe_drop_loot() -> void:
 		return
 	var pickup := Pickup.new()
 	parent.add_child(pickup)
-	var entry: Dictionary = Inventory.roll_entry(ItemGen.random_id(drop_rng), minf(0.15, 0.03 * level))
+	var entry: Dictionary
+	if drop_rng.randf() < 0.3:
+		var pid := "health_potion"
+		if level >= 5 and drop_rng.randf() < 0.4:
+			pid = "greater_health_potion"
+		elif drop_rng.randf() < 0.3:
+			pid = "stamina_potion"
+		entry = {"id": pid, "slot": "", "rarity": 0, "prefix": "", "suffix": "",
+			"dmg": 0, "armor": 0, "weight": 1, "qty": 1}
+	else:
+		entry = Inventory.roll_entry(ItemGen.random_id(drop_rng), minf(0.15, 0.03 * level))
 	pickup.setup(entry)
 	pickup.global_position = global_position
 

@@ -788,9 +788,11 @@ def make_props():
     """Overlay props drawn on top of terrain."""
     names = ["tree", "rock", "bush", "flower", "chest", "stairs", "sign", "torch",
              "tomb", "fence", "well"]
-    sheet = Canvas(len(names) * TILE, TILE)
+    # 8 columns x 2 rows: matches the (i % 8, i / 8) atlas coords used in-game
+    sheet = Canvas(8 * TILE, 2 * TILE)
     for i, name in enumerate(names):
-        ox = i * TILE
+        ox = (i % 8) * TILE
+        oy = (i // 8) * TILE
         c = Canvas(TILE, TILE)
         if name == "tree":
             # trunk
@@ -900,7 +902,7 @@ def make_props():
             c.rect(6, 4, 4, 3, PAL["leath_m"])
             c.hline(6, 4, 4, PAL["leath_l"])
         for (x, y), col in c.buf.items():
-            sheet.px(ox + x, y, col)
+            sheet.px(ox + x, oy + y, col)
     return sheet, names
 
 

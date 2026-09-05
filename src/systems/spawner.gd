@@ -4,7 +4,7 @@
 class_name Spawner
 extends Node
 
-const CAP := 6
+const CAP := 8
 const MIN_DIST := 150.0
 const MAX_DIST := 260.0
 const DESPAWN_DIST := 420.0
@@ -16,6 +16,7 @@ var spawn_enabled := true
 
 var _hero: Node2D = null
 var _timer := 0.0
+var elite_chance := EnemyDB.BASE_ELITE_CHANCE
 # a short breathing window so a fresh run is never ambushed on frame one.
 # Tests set this to 0 to observe spawning immediately.
 var grace := 6.0
@@ -87,7 +88,7 @@ func pick_type(biome: String) -> String:
 		return ""
 	var type: String = table[_rng.randi_range(0, table.size() - 1)]
 	# rare escalation one tier up inside the same biome table
-	if _rng.randf() < EnemyDB.ELITE_CHANCE and table.size() > 1:
+	if _rng.randf() < elite_chance and table.size() > 1:
 		type = table[table.size() - 1]
 	return type
 
@@ -99,5 +100,7 @@ func _cull() -> void:
 		if enemy.global_position.distance_to(_hero.global_position) > DESPAWN_DIST:
 			enemy.queue_free()
 
-func _on_enemy_died(_enemy: Enemy) -> void:
+func _on_enemy_died(enemy: Enemy) -> void:
 	Stats.add_kill()
+	if world != null:
+		QuestLog.on_kill(enemy.enemy_type, world.biome_at(enemy.global_position))
