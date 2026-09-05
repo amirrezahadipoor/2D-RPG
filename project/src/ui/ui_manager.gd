@@ -3,7 +3,7 @@
 # Manages HUD, menus, inventory, journal, pause
 
 extends CanvasLayer
-class_name UIManager
+# class_name UIManager
 
 @export var ui_scale: float = 1.0
 @export var safe_area_enabled: bool = true
@@ -41,7 +41,7 @@ func _apply_safe_area() -> void:
 	var bottom_inset := 0.0
 	if OS.get_name() == "Android":
 		# Estimate based on aspect ratio
-		var aspect := vp.y / max(1.0, vp.x)
+		var aspect: float = vp.y / max(1.0, vp.x)
 		if aspect > 2.0: # tall phone with notch
 			top_inset = 28.0
 			bottom_inset = 22.0
@@ -61,7 +61,7 @@ func _apply_ui_scale() -> void:
 func _apply_theme() -> void:
 	# Apply indie theme: dark gray palette from ART_BIBLE
 	# Ensure fonts are readable
-	var theme := Theme.new()
+	var theme: Theme = Theme.new()
 	# Would load custom theme resource if exists
 	if ResourceLoader.exists("res://assets/ui/theme.tres"):
 		theme = load("res://assets/ui/theme.tres")
@@ -106,21 +106,21 @@ func show_death_screen(is_hardcore: bool) -> void:
 	overlay.add_child(vbox)
 	
 	var title := Label.new()
-	title.text = tr("death.title")
+	title.text = translate_key("death.title")
 	title.add_theme_font_size_override("font_size", 42)
 	title.add_theme_color_override("font_color", Color("#FF3B30"))
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
 	
 	var subtitle := Label.new()
-	subtitle.text = tr("death.hardcore") if is_hardcore else tr("death.respawn")
+	subtitle.text = translate_key("death.hardcore") if is_hardcore else translate_key("death.respawn")
 	subtitle.add_theme_font_size_override("font_size", 18)
 	subtitle.add_theme_color_override("font_color", Color.WHITE)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(subtitle)
 	
 	var btn := Button.new()
-	btn.text = tr("menu.quit") if is_hardcore else tr("death.respawn")
+	btn.text = translate_key("menu.quit") if is_hardcore else translate_key("death.respawn")
 	btn.custom_minimum_size = Vector2(220, 56)
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	vbox.add_child(btn)
@@ -152,7 +152,7 @@ func show_victory_screen() -> void:
 	tween.tween_property(label, "scale", Vector2(1.0, 1.0), 0.4)
 	tween.set_loops(3)
 
-func tr(key: String) -> String:
+func translate_key(key: String) -> String:
 	if has_node("/root/LocalizationManager") and get_node("/root/LocalizationManager").has_method("tr_key"):
 		return get_node("/root/LocalizationManager").tr_key(key)
 	return key

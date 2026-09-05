@@ -4,7 +4,7 @@
 # Offline-only: no network calls at runtime, all polish is local & deterministic
 
 extends Node
-class_name PolishManager
+# class_name PolishManager
 
 # Singleton access
 static var instance: PolishManager

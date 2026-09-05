@@ -3,7 +3,7 @@
 # Offline, deterministic, hardcore-aware
 
 extends Node
-class_name GameManager
+# class_name GameManager
 
 enum GameState { MENU, PLAYING, PAUSED, CUTSCENE, INVENTORY, DIALOGUE, DEAD, VICTORY }
 

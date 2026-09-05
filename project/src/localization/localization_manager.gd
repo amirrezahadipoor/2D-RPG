@@ -3,7 +3,7 @@
 # Offline: loads from res://assets/locale/*.json or .csv
 
 extends Node
-class_name LocalizationManager
+# class_name LocalizationManager
 
 var current_locale: String = "en" # en or fa
 var _translations: Dictionary = {} # key -> {en, fa}

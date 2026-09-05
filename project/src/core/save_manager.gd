@@ -3,7 +3,7 @@
 # Offline-only: uses user:// saves, no cloud, encrypted if needed
 
 extends Node
-class_name SaveManager
+# class_name SaveManager
 
 const SAVE_PATH := "user://savegame.save"
 const SETTINGS_PATH := "user://settings.cfg"

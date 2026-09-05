@@ -49,7 +49,7 @@ func generate_horizontal_stripe_pattern(palette: Dictionary, width: int, height:
 	var base: Color = palette.get("base", Color.GRAY)
 	var accent: Color = palette.get("accent", Color.WHITE)
 	for i in range(stripe_count):
-		var t := float(i) / max(1, stripe_count - 1)
+		var t: float = float(i) / max(1, stripe_count - 1)
 		var stripe_color: Color = base.lerp(accent, t * 0.5 + randf() * 0.1)
 		stripes.append({
 			"y": i * stripe_height,
@@ -69,7 +69,7 @@ func generate_vertical_stripe_pattern(palette: Dictionary, width: int, height: i
 	var base: Color = palette.get("base", Color.GRAY)
 	var accent: Color = palette.get("accent", Color.WHITE)
 	for i in range(stripe_count):
-		var t := float(i) / max(1, stripe_count - 1)
+		var t: float = float(i) / max(1, stripe_count - 1)
 		var stripe_color: Color = base.lerp(accent, t * 0.5 + randf() * 0.1)
 		stripes.append({
 			"x": i * stripe_width,

@@ -59,7 +59,7 @@ func downgrade_quality() -> void:
 	if _quality_cooldown > 0:
 		return
 	if current_quality > QualityLevel.LOW:
-		apply_quality(current_quality - 1 as QualityLevel)
+		apply_quality((current_quality - 1) as QualityLevel)
 		_quality_cooldown = 3.0
 		print("[PerformanceOptimizer] downgraded to ", QualityLevel.keys()[current_quality])
 
@@ -67,7 +67,7 @@ func upgrade_quality() -> void:
 	if _quality_cooldown > 0:
 		return
 	if current_quality < QualityLevel.HIGH and _get_avg_fps() > 57:
-		apply_quality(current_quality + 1 as QualityLevel)
+		apply_quality((current_quality + 1) as QualityLevel)
 		_quality_cooldown = 5.0
 
 func _get_avg_fps() -> float:

@@ -3,7 +3,7 @@
 # Offline, no network, respects 64px minimum hero size
 
 extends CanvasLayer
-class_name TouchControls
+# class_name TouchControls
 
 @export var joystick_enabled: bool = true
 @export var joystick_radius: float = 62.0
