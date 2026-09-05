@@ -1,0 +1,42 @@
+name: Godot Unit Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-pip
+          pip3 install pytest
+      
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Run Godot headless tests
+        env:
+          GODOT_PROJECT_PATH: /home/runner/work/2D-RPG/2D-RPG
+        run: |
+          # Download Godot 4.x headless
+          wget -q https://godotengine.org/latest/download/4/stable/ -O godot.zip
+          unzip -o godot.zip -d /usr/local/bin/
+          chmod +x /usr/local/bin/godot
+          
+          # Run tests
+          cd $GODOT_PROJECT_PATH
+          godot --headless --main-pack --test
+      
+      - name. Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: /home/runner/work/2D-RPG/2D-RPG/test-results/**

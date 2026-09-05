@@ -1,0 +1,26 @@
+# Godot project files
+/user/project/.import/
+/user/project/export_*
+
+# User settings
+/user/project/user.cfg
+
+# Cache and temp
+/user/project/.cache/
+/user/project/.godot/
+
+# Environment variables
+/.env
+
+# GitHub secrets
+/.github/*/secrets/*
+!.github/workflows/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Build outputs
+/build/
+/dist/
+/coverage/

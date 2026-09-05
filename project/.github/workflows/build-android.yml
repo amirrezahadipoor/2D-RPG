@@ -1,0 +1,43 @@
+name: Android Build
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-hours: 4
+    
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zipalign openjdk-21-jdk
+          
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download Godot 4.x
+        run: |
+          wget -q https://godotengine.org/latest/download/4/stable/ -O godot.zip
+          unzip -o godot.zip -d /usr/local/bin/
+          chmod +x /usr/local/bin/godot
+          
+      - name: Export Android APK/AAB
+        env:
+          GODOT_PROJECT: /home/runner/work/2D-RPG/2D-RPG
+        run: |
+          cd $GODOT_PROJECT
+          godot --headless --export-android "2D-RPG-release"
+          
+          # Find the exported file
+          ls -la export/
+      
+      - name: Upload APK/AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: |
+            2D-RPG-release.apk
+            2D-RPG-release.aab
