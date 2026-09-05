@@ -143,10 +143,20 @@ Evidence: `tests/verify.tscn` (125 checks), `docs/screenshots/10_story_intro.png
 
 ## M6 — Audio, polish & release
 
-- [ ] Procedural SFX + biome music (currently the game is silent)
-- [ ] Main menu / pause / settings screens
-- [ ] Touch controls (virtual joystick + action buttons)
-- [ ] Performance quality tiers
+- [x] Procedural SFX + biome music: `Sfx` autoload synthesizes 15 SFX and 9
+      generative biome loops into 16-bit WAV at runtime (zero audio assets),
+      crossfaded on biome change; hooked into combat/pickups/UI/death
+      (checks: `all 15 SFX synthesize...`, `every biome has a >3s looping music bed`)
+- [x] Main menu / pause / settings screens: animated night-sky title screen
+      (continue / adventure / hardcore / settings / quit), Esc pause menu
+      (resume / settings / save-&-quit), shared settings overlay with volume
+      bars, quality tier and language; settings persist in user://settings.cfg
+- [x] Touch controls (virtual joystick + action buttons): `TouchUI`
+      translates screen touches into the existing input actions
+      (checks: `virtual stick right holds move_right`, `touch attack button...`)
+- [x] Performance quality tiers: low/medium/high in settings flips contact
+      shadows, torch/lantern point lights, dungeon dim and the vignette
+      (checks: `low quality drops contact shadows`, `high turns the torch glows on`)
 - [ ] Signed AAB, real package id, store metadata
 
 ---

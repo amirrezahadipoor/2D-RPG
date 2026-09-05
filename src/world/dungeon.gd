@@ -22,6 +22,7 @@ var boss: Enemy = null
 
 var _grid: PackedByteArray = PackedByteArray()
 var _lights: Array = []
+var _dark: CanvasModulate = null
 var _spawn_timer := 0.0
 var _rng := RandomNumberGenerator.new()
 var _seed := 0
@@ -46,10 +47,11 @@ func build(depth_value: int, seed_value: int) -> void:
 	_paint()
 	# darkness: the whole canvas dims while a dungeon is in the tree, so the
 	# torches and the hero's lantern are what you actually see by
-	var dark := CanvasModulate.new()
-	dark.name = "Darkness"
-	dark.color = Color(0.2, 0.19, 0.25)
-	add_child(dark)
+	_dark = CanvasModulate.new()
+	_dark.name = "Darkness"
+	add_child(_dark)
+	apply_quality()
+	Settings.settings_changed.connect(apply_quality)
 	actors = Node2D.new()
 	actors.name = "Actors"
 	actors.y_sort_enabled = true
@@ -58,6 +60,14 @@ func build(depth_value: int, seed_value: int) -> void:
 	print("[Dungeon] depth=%d rooms=%d" % [depth, rooms.size()])
 
 # ------------------------------------------------------------- generate -----
+## Low quality keeps dungeons readable with a lighter dim and no torch glows.
+func apply_quality() -> void:
+	if _dark != null:
+		_dark.color = Color(0.2, 0.19, 0.25) if Settings.quality == "high" \
+			else Color(0.55, 0.53, 0.6)
+	for entry in _lights:
+		entry["light"].visible = Settings.quality == "high"
+
 func _gen_rooms() -> void:
 	var target := 6 + depth
 	var tries := 0

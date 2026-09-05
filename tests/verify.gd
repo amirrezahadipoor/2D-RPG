@@ -39,6 +39,7 @@ func run() -> void:
 	await _check_bestiary()
 	await _check_audio()
 	await _check_menus()
+	await _check_touch_quality()
 
 	print("")
 	if _failures.is_empty():
@@ -1383,3 +1384,62 @@ func _check_menus() -> void:
 	Settings.load_settings()
 	Settings.apply()
 	Game.change_state(prev_state if prev_state == Game.State.PLAYING else Game.State.PLAYING)
+
+# ---------------------------------------------------- touch & quality tiers ----
+func _check_touch_quality() -> void:
+	print("== touch & quality ==")
+	var touch := TouchUI.new()
+	add_child(touch)
+	await get_tree().process_frame
+	touch.set_enabled(true)
+	_ok(touch.visible, "touch overlay can be forced on for testing")
+	var xform := touch._root.get_canvas_transform()
+	# stick: press right of center -> move_right action is held
+	var right_pos: Vector2 = xform * (TouchUI.STICK_CENTER + Vector2(20, 0))
+	var down := InputEventScreenTouch.new()
+	down.position = right_pos
+	down.pressed = true
+	down.index = 7
+	Input.parse_input_event(down)
+	await get_tree().process_frame
+	_ok(Input.is_action_pressed("move_right"), "virtual stick right holds move_right")
+	_ok(not Input.is_action_pressed("move_left"), "and not move_left")
+	var up := InputEventScreenTouch.new()
+	up.position = right_pos
+	up.pressed = false
+	up.index = 7
+	Input.parse_input_event(up)
+	await get_tree().process_frame
+	_ok(not Input.is_action_pressed("move_right"), "lifting the stick releases move_right")
+	# attack button: tap holds the action while pressed
+	var atk: Dictionary = TouchUI.BUTTONS["attack"]
+	var atk_pos: Vector2 = xform * atk["pos"]
+	var tap := InputEventScreenTouch.new()
+	tap.position = atk_pos
+	tap.pressed = true
+	tap.index = 9
+	Input.parse_input_event(tap)
+	await get_tree().process_frame
+	_ok(Input.is_action_pressed("attack"), "touch attack button presses the attack action")
+	var tap_up := InputEventScreenTouch.new()
+	tap_up.position = atk_pos
+	tap_up.pressed = false
+	tap_up.index = 9
+	Input.parse_input_event(tap_up)
+	await get_tree().process_frame
+	_ok(not Input.is_action_pressed("attack"), "and releases it on lift")
+	touch.set_enabled(false)
+	_ok(not Input.is_action_pressed("move_right") and not Input.is_action_pressed("attack"),
+		"disabling the overlay releases every synthetic action")
+	touch.queue_free()
+	# quality tiers flip lights / shade / vignette
+	Settings.set_quality("low")
+	_ok(world.shade_layer.visible == false, "low quality drops contact shadows")
+	_ok(world._lights.size() > 0 and (world._lights[0]["light"] as PointLight2D).visible == false,
+		"low quality drops torch glows")
+	Settings.set_quality("medium")
+	_ok(world.shade_layer.visible, "medium keeps the shadow pass")
+	_ok((world._lights[0]["light"] as PointLight2D).visible == false, "medium still skips lights")
+	Settings.set_quality("high")
+	_ok((world._lights[0]["light"] as PointLight2D).visible, "high turns the torch glows on")
+	Settings.set_quality("high")

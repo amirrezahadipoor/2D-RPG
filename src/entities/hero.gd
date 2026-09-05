@@ -63,6 +63,8 @@ func _ready() -> void:
 
 	# a warm lantern that wakes up at night and underground
 	lantern = PointLight2D.new()
+	lantern.visible = Settings.quality == "high"
+	Settings.settings_changed.connect(func(): lantern.visible = Settings.quality == "high")
 	lantern.texture = load("res://assets/sprites/fx/glow.png")
 	lantern.color = Color(1.0, 0.82, 0.55)
 	lantern.scale = Vector2(2.1, 2.1)

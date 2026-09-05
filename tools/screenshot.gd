@@ -336,6 +336,17 @@ func run() -> void:
 		await get_tree().process_frame
 	await _grab("22_pause")
 	Game.change_state(Game.State.PLAYING)
+	# ---- 23: touch controls overlay ----
+	var touch := TouchUI.new()
+	get_tree().root.add_child.call_deferred(touch)
+	for i in 4:
+		await get_tree().process_frame
+	touch.set_enabled(true)
+	for i in 8:
+		await get_tree().process_frame
+	await _grab("23_touch")
+	touch.set_enabled(false)
+	touch.queue_free()
 
 	print("[screenshot] done")
 	get_tree().quit(0)

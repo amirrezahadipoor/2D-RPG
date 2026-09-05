@@ -11,6 +11,7 @@ var dialogue: DialogueUI
 var cutscene: Cutscene
 var events: WorldEvents
 var dungeon: Dungeon = null
+var touch: TouchUI = null
 var _overworld_hero_pos := Vector2.ZERO
 
 func _ready() -> void:
@@ -56,6 +57,10 @@ func _ready() -> void:
 	var pause_menu := PauseMenu.new()
 	pause_menu.name = "PauseMenu"
 	add_child(pause_menu)
+
+	touch = TouchUI.new()
+	touch.name = "TouchUI"
+	add_child(touch)
 
 	cutscene = Cutscene.new()
 	cutscene.name = "Cutscene"

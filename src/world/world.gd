@@ -40,6 +40,7 @@ var world_seed: int = 0
 var forced_seed := -1
 
 func _ready() -> void:
+	Settings.settings_changed.connect(apply_quality)
 	build(forced_seed if forced_seed >= 0 else randi())
 
 # ---------------------------------------------------------------- build -----
@@ -64,6 +65,15 @@ func build(seed_value: int) -> void:
 	add_child(ambient)
 	ambient.world = self
 	Juice.register_camera(hero.cam)
+	apply_quality()
+
+## Quality tiers: low drops contact shadows + torch glows, medium keeps the
+## shadows, high adds the point lights that make nights and caves glow.
+func apply_quality() -> void:
+	if shade_layer != null:
+		shade_layer.visible = Settings.quality != "low"
+	for entry in _lights:
+		entry["light"].visible = Settings.quality == "high"
 	Juice.register_world(actors)
 	print("[World] seed=%d size=%dx%d settlements=%d" % [world_seed, WORLD_W, WORLD_H, settlements.size()])
 

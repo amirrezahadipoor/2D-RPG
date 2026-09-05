@@ -47,6 +47,8 @@ func _build() -> void:
 	_grade = TextureRect.new()
 	_grade.name = "Grade"
 	_grade.texture = load("res://assets/sprites/fx/vignette.png")
+	_grade.visible = Settings.quality != "low"
+	Settings.settings_changed.connect(func(): _grade.visible = Settings.quality != "low")
 	_grade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_grade.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	_grade.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
