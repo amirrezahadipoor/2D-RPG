@@ -1,0 +1,127 @@
+name: android-apk
+
+# Builds a SIGNED UNIVERSAL APK (armeabi-v7a + arm64-v8a in one file) on every
+# push to main and on demand — shaped for Cafe Bazaar (dev.bazaar.ir), which
+# takes universal APKs, not AABs.
+#
+# Signing:
+#   * Production: set repo secrets ANDROID_KEYSTORE_B64 (base64 of your .jks),
+#     ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_ALIAS_PASSWORD.
+#     tools/make_keystore.sh creates the key and prints the base64 line.
+#   * No secrets yet? The job generates a throwaway CI keystore so the artifact
+#     is always a valid, installable, signed APK (fine for Bazaar test tracks;
+#     never ship the same temp key twice to production).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Universal APK (Cafe Bazaar)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Java 17 (keytool / apksigner)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Android SDK (platform 34 + build-tools)
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-34 build-tools;34.0.0"
+
+      - name: Godot 4.4.1 + export templates
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.4.1-stable
+          use-dotnet: false
+          include-templates: true
+
+      - name: Gate — automated checks must pass before shipping
+        run: |
+          godot --headless --path . --import > import.log 2>&1
+          if grep -qE "SCRIPT ERROR|Parse Error|^ERROR:" import.log; then
+            echo "::error::import not clean"; exit 1
+          fi
+          godot --headless --path . res://tests/verify.tscn
+
+      - name: Prepare signing keystore
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KS_ALIAS_PASS: ${{ secrets.ANDROID_KEY_ALIAS_PASSWORD }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > /tmp/release.keystore
+            echo "KS_PATH=/tmp/release.keystore" >> $GITHUB_ENV
+            echo "KS_PASSWORD=$KS_PASS" >> $GITHUB_ENV
+            echo "KS_ALIAS_NAME=${KS_ALIAS:-pixel}" >> $GITHUB_ENV
+            echo "KS_ALIAS_PASSWORD=$KS_ALIAS_PASS" >> $GITHUB_ENV
+            echo "::notice::signing with the production keystore from secrets"
+          else
+            echo "::warning::no keystore secrets set - using a throwaway CI key"
+            keytool -genkeypair -v -keystore /tmp/release.keystore -alias pixel \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass ci-temp-pass -keypass ci-temp-pass \
+              -dname "CN=Pixel Realms CI, OU=CI, O=hadipoor, C=IR"
+            echo "KS_PATH=/tmp/release.keystore" >> $GITHUB_ENV
+            echo "KS_PASSWORD=ci-temp-pass" >> $GITHUB_ENV
+            echo "KS_ALIAS_NAME=pixel" >> $GITHUB_ENV
+            echo "KS_ALIAS_PASSWORD=ci-temp-pass" >> $GITHUB_ENV
+          fi
+
+      - name: Stamp keystore + version into the export preset
+        run: |
+          python3 - "$KS_PATH" "$KS_PASSWORD" "$KS_ALIAS_NAME" "$KS_ALIAS_PASSWORD" <<'PYEOF'
+import sys, re
+path, pw, alias, apw = sys.argv[1:5]
+p = "export_presets.cfg"
+s = open(p, encoding="utf-8").read()
+s = re.sub(r'keystore/release_path=.*', f'keystore/release_path="{path}"', s)
+s = re.sub(r'keystore/release_password=.*', f'keystore/release_password="{pw}"', s)
+s = re.sub(r'keystore/release_alias=.*', f'keystore/release_alias="{alias}"', s)
+s = re.sub(r'keystore/release_alias_password=.*', f'keystore/release_alias_password="{apw}"', s)
+open(p, "w", encoding="utf-8").write(s)
+print("preset stamped")
+PYEOF
+
+      - name: Export universal APK
+        run: |
+          mkdir -p build/android
+          godot --headless --path . --export-release "Android" \
+            build/android/pixel-realms-universal.apk
+
+      - name: Sanity — signature, alignment, universal ABIs, manifest
+        run: |
+          BT=$ANDROID_HOME/build-tools/34.0.0
+          APK=build/android/pixel-realms-universal.apk
+          ls -la "$APK"
+          $BT/apksigner verify --print-certs "$APK" | tee sign.log
+          $BT/zipalign -c 4 "$APK" && echo "zipalign: OK"
+          $BT/aapt dump badging "$APK" > badging.txt
+          grep -E "^package|sdkVersion|targetSdkVersion|native-code|launchable-activity" badging.txt
+          grep -q "armeabi-v7a" badging.txt && grep -q "arm64-v8a" badging.txt \
+            || { echo "::error::APK is not universal (missing an ARM ABI)"; exit 1; }
+          grep -q "versionCode=" badging.txt || exit 1
+          echo "UNIVERSAL APK SANITY: PASS"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixel-realms-universal-apk
+          path: |
+            build/android/pixel-realms-universal.apk
+            badging.txt
+            sign.log
+          retention-days: 30
