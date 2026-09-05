@@ -116,6 +116,13 @@ func _compose_pages() -> Array:
 	pages.append({"text": "%s\n%s" % [
 		I18N.tr_str("npc.role." + npc.role_name),
 		I18N.tr_str("npc.hello." + npc.role_name)], "mode": "talk"})
+	# the elder carries the tale of the current act, so the story reads as a
+	# continuing chronicle rather than a bare to-do list
+	var live_main := QuestLog.current_main()
+	if npc.role_name == "elder" and not live_main.is_empty():
+		var act_line: String = I18N.tr_str("story.act.%d" % QuestLog.current_act())
+		if not act_line.begins_with("story.act."):
+			pages.append({"text": act_line, "mode": "talk"})
 	var turn_in = QuestLog.turn_in_at(npc.sett_index, npc.role_name)
 	if turn_in != null:
 		pages.append({"text": QuestDB.desc_of(turn_in) + "\n%s: %s/%s" % [

@@ -740,7 +740,43 @@ func _check_quests() -> void:
 	_ok(fa_title.ends_with(I18N.num(100) + "/" + I18N.num(100)),
 		"continuous numbering localises (FA: %s)" % fa_title)
 	I18N.set_locale("en")
+	# the main story is layered with continuous "act" narration
 	QuestLog.reset_run()
+	_ok(QuestLog.current_act() == 0, "fresh run opens on act 1")
+	QuestLog.main_progress = 9
+	_ok(QuestLog.current_act() == 0, "act 1 spans the first ten objectives")
+	QuestLog.main_progress = 10
+	_ok(QuestLog.current_act() == 1, "the act advances with the story")
+	QuestLog.main_progress = 99
+	_ok(QuestLog.current_act() == 9, "the last objective is the final act")
+	var acts_ok := true
+	for loc in ["en", "fa"]:
+		I18N.set_locale(loc)
+		for i in 10:
+			var v: String = I18N.tr_str("story.act.%d" % i)
+			if v.begins_with("story.act."):
+				acts_ok = false
+	I18N.set_locale("en")
+	_ok(acts_ok, "every act line resolves in EN and FA")
+	QuestLog.reset_run()
+	Stats.reset_run()
+	QuestLog.main_progress = 0
+	var npc := NPC.new()
+	npc.role_name = "elder"
+	npc.sett_index = 0
+	var dlg := DialogueUI.new()
+	add_child(dlg)
+	dlg.open_with(npc)
+	var tale_found := false
+	for p in dlg._pages:
+		if str(p.get("text", "")).find("crown") >= 0 or str(p.get("text", "")).find("تاج") >= 0:
+			tale_found = true
+	_ok(tale_found and dlg._pages.size() >= 3, "the elder tells the tale of the act during dialogue")
+	dlg.close()
+	dlg.queue_free()
+	npc.free()
+	QuestLog.reset_run()
+	Stats.reset_run()
 
 func _check_endgame() -> void:
 	print("== endgame: dungeon entry, boss slaying, victory ==")

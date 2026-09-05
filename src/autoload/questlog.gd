@@ -66,6 +66,11 @@ func main_gate_ok() -> bool:
 	var q := current_main()
 	return not q.is_empty() and Stats.level >= int(q["level_gate"])
 
+## Which story act (0..9) the run is in. Acts are flavour arcs layered on top
+## of the internal 10x10 grid; the grid itself is never shown to the player.
+func current_act() -> int:
+	return clampi(main_progress / QuestDB.STAGES, 0, QuestDB.STAGES - 1)
+
 # ------------------------------------------------------------------ side ----
 ## Index of the next side quest this NPC can offer, or -1.
 func offer_at(npc_settlement: int, npc_role: String) -> int:
