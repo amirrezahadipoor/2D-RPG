@@ -13,6 +13,9 @@ var events: WorldEvents
 var dungeon: Dungeon = null
 var touch: TouchUI = null
 var victory_screen: VictoryScreen
+var _interiors := {}          # house_id -> Interior
+var _house_id := -1
+var _house_return_pos := Vector2.ZERO
 var _overworld_hero_pos := Vector2.ZERO
 
 func _ready() -> void:
@@ -34,6 +37,11 @@ func _ready() -> void:
 	var entrance := world.find_child("CaveEntrance", true, false)
 	if entrance != null and entrance.has_signal("used"):
 		entrance.used.connect(_on_cave_entrance)
+
+	# every house door leads into its own walk-in interior
+	for door in world.actors.find_children("HouseDoor_*", "Stairs", false, false):
+		var hid := int(String(door.name).trim_prefix("HouseDoor_"))
+		door.used.connect(func(_d: int): enter_house(hid))
 
 	hud = Hud.new()
 	hud.name = "Hud"
@@ -246,6 +254,55 @@ func _on_victory_menu() -> void:
 
 ## Interact with the overworld cave mouth: drop into dungeon depth 1.
 func _on_cave_entrance(_direction: int) -> void:
-	if dungeon != null or Game.state != Game.State.PLAYING:
+	if dungeon != null or _house_id >= 0 or Game.state != Game.State.PLAYING:
 		return
 	enter_dungeon(1)
+
+# ------------------------------------------------------------ houses -------
+## Step through a house door into that home's furnished Interior.
+func enter_house(house_id_value: int) -> void:
+	if dungeon != null or _house_id >= 0 or Game.state != Game.State.PLAYING:
+		return
+	_house_id = house_id_value
+	_house_return_pos = world.hero.global_position
+	world.spawner.spawn_enabled = false
+	if world.ambient:
+		world.ambient.set_process(false)
+	var interior: Interior = _interiors.get(_house_id)
+	if interior == null:
+		interior = Interior.new()
+		interior.name = "House_%d" % _house_id
+		add_child(interior)
+		interior.build(world.house_kind(_house_id), _house_id, world.world_seed)
+		interior.exit_stairs.used.connect(func(_d: int): exit_house())
+		_interiors[_house_id] = interior
+	world.actors.remove_child(world.hero)
+	interior.actors.add_child(world.hero)
+	world.hero.global_position = interior.cell_center(interior.spawn_tile)
+	world.hero.cam.limit_left = 0
+	world.hero.cam.limit_top = 0
+	world.hero.cam.limit_right = Interior.MAP_W * Interior.TILE
+	world.hero.cam.limit_bottom = Interior.MAP_H * Interior.TILE
+	var kind := world.house_kind(_house_id)
+	hud.set_biome_text(I18N.tr_str("house.title." + kind))
+	hud.show_toast(I18N.tr_str("toast.enter_house") % I18N.tr_str("house.name." + kind))
+	Sfx.set_biome("house")
+
+## Leave the Interior through its front door back onto the overworld.
+func exit_house() -> void:
+	if _house_id < 0:
+		return
+	var interior: Interior = _interiors[_house_id]
+	interior.actors.remove_child(world.hero)
+	world.actors.add_child(world.hero)
+	world.hero.global_position = _house_return_pos
+	world.hero.cam.limit_left = 0
+	world.hero.cam.limit_top = 0
+	world.hero.cam.limit_right = Overworld.WORLD_W * Overworld.TILE
+	world.hero.cam.limit_bottom = Overworld.WORLD_H * Overworld.TILE
+	_house_id = -1
+	world.spawner.spawn_enabled = true
+	if world.ambient:
+		world.ambient.set_process(true)
+	hud.set_biome(world.biome_at(world.hero.global_position))
+	Sfx.set_biome(world.biome_at(world.hero.global_position))

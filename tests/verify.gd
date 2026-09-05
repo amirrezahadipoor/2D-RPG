@@ -25,6 +25,7 @@ func run() -> void:
 	await _check_spawner()
 	await _check_inventory()
 	await _check_world_scale()
+	await _check_houses()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -671,6 +672,62 @@ func _roof_pos() -> Vector2:
 	return Vector2(-100, -100)
 
 # ---------------------------------------------------------------- people ----
+func _check_houses() -> void:
+	print("== houses & interiors ==")
+	var door_count := 0
+	for st in world.settlements:
+		var houses: Array = world._house_rects(st)
+		for hi in houses.size():
+			door_count += 1
+			var h: Rect2i = houses[hi]
+			var tile := Vector2i(h.position.x + h.size.x / 2, h.position.y + h.size.y - 1)
+			var pos := Vector2(tile.x * 16 + 8.0, tile.y * 16 + 8.0)
+			var found := world.actors.find_children(
+				"HouseDoor_%d" % (int(st["index"]) * 16 + hi), "Stairs", false, false)
+			_ok(found.size() == 1 and world.is_walkable_at(pos),
+				"settlement %d house %d has a door on walkable ground" % [st["index"], hi])
+	_ok(door_count == world.house_door_count(),
+		"painted houses and doors are in step (%d doors)" % door_count)
+	# a full palace-to-cottage sample of interiors must be walkable and lootable
+	for kind in ["home", "town_house", "palace"]:
+		var it := Interior.new()
+		add_child(it)
+		it.build(kind, 3, 20260905)
+		await get_tree().process_frame
+		var start: Vector2i = it.tile_at(it.cell_center(it.spawn_tile))
+		var goal: Vector2i = it.entry_tile
+		var seen := {}
+		var q: Array = [start]
+		seen[start] = true
+		while not q.is_empty():
+			var t: Vector2i = q.pop_front()
+			for nb in [t + Vector2i.UP, t + Vector2i.DOWN, t + Vector2i.LEFT, t + Vector2i.RIGHT]:
+				if nb.x >= 0 and nb.y >= 0 and nb.x < Interior.MAP_W and nb.y < Interior.MAP_H \
+						and not seen.has(nb) and it._grid[nb.y * Interior.MAP_W + nb.x] == 1:
+					seen[nb] = true
+					q.append(nb)
+		_ok(seen.has(goal), "%s interior connects its door to the living room" % kind)
+		_ok(it.exit_stairs != null and it.is_walkable_at(it.cell_center(it.entry_tile)),
+			"%s interior offers the way back out" % kind)
+		_ok(it.actors.find_children("Chest", "", true, false).size() >= 1,
+			"%s interior hides a stash" % kind)
+		var rooms := 0
+		for c in it.terrain_layer.get_used_cells():
+			if it._grid[c.y * Interior.MAP_W + c.x] == 1:
+				rooms += 1
+		_ok(rooms > 40, "%s interior paints a real floor (%d walkable tiles)" % [kind, rooms])
+		it.queue_free()
+		await get_tree().physics_frame
+	var keys_ok := true
+	for loc in ["en", "fa"]:
+		I18N.set_locale(loc)
+		for key in ["house.title.home", "house.name.palace", "toast.enter_house"]:
+			var v: String = I18N.tr_str(key)
+			if v == key:
+				keys_ok = false
+	I18N.set_locale("en")
+	_ok(keys_ok, "house strings resolve in EN and FA")
+
 func _check_people() -> void:
 	print("== people ==")
 	_ok(world.npcs.size() >= 8, "NPCs live in the settlements (%d)" % world.npcs.size())

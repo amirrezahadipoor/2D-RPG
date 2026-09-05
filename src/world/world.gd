@@ -57,6 +57,7 @@ func build(seed_value: int) -> void:
 	_spawn_npcs()
 	_place_chests()
 	_place_cave_entrance()
+	_place_house_doors()
 	_paint_shade()
 	_collect_water()
 	_spawn_decals()
@@ -603,6 +604,41 @@ func _place_cave_entrance() -> void:
 	entrance.direction = 1
 	actors.add_child(entrance)
 	entrance.global_position = Vector2(best.x * TILE + 8.0, best.y * TILE + 8.0)
+
+## Every painted house gets a real door (a Stairs) standing on its door tile.
+## Using it walks the hero into that house's Interior (see Main.enter_house).
+## The door id encodes settlement * 16 + house index so Main can look up the
+## layout kind without any scene-side registry.
+func _place_house_doors() -> void:
+	for st in settlements:
+		var houses := _house_rects(st)
+		for hi in houses.size():
+			var h: Rect2i = houses[hi]
+			var door_t := Vector2i(h.position.x + h.size.x / 2,
+				h.position.y + h.size.y - 1)
+			var door := Stairs.new()
+			door.name = "HouseDoor_%d" % (int(st["index"]) * 16 + hi)
+			door.direction = 1
+			actors.add_child(door)
+			door.global_position = Vector2(door_t.x * TILE + 8.0, door_t.y * TILE + 8.0)
+
+## The Interior flavour for a house id (door tile + layout kind).
+func house_kind(house_id: int) -> String:
+	var sett_index := house_id / 16
+	var house_index := house_id % 16
+	for st in settlements:
+		if int(st["index"]) == sett_index:
+			if st["type"] == "town":
+				return "palace" if house_index == 1 else "town_house"
+			return "home"
+	return "home"
+
+## How many door ids this world carries (kept tiny so tests can assert).
+func house_door_count() -> int:
+	var n := 0
+	for st in settlements:
+		n += _house_rects(st).size()
+	return n
 
 ## How much the hero's lantern is needed here (caves are dark).
 func ambient_light_need() -> float:
