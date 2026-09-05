@@ -1,10 +1,6 @@
-[gdscenes]
-editors/1/classes/Node2D/name="Root"
-editors/1/classes/Camera2D/name="Camera2D"
-editors/1/classes/Camera2D/position=[0,0]
-Root/children=[Camera2D]
-Camera2D/children=[]
-# Camera2D settings will be configured via inspector:
-# - Current: true (follow target)
-# - Limit Left/Right/Top/Bottom: set for world bounds
-# - Zoom: 2.0 (initial, will be adjusted for phone readability)
+[gd_scene load_steps=1 format=3 uid="uid://c0cam00000001"]
+
+[node name="Camera2D" type="Camera2D"]
+current = true
+zoom = Vector2(2, 2)
+

@@ -52,7 +52,7 @@ func _apply_safe_area() -> void:
 func _apply_ui_scale() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	var base_width := 720.0 # design width
-	var calculated_scale := clamp(vp.x / base_width, 0.85, 1.35)
+	var calculated_scale: float = clamp(vp.x / base_width, 0.85, 1.35)
 	ui_scale = calculated_scale
 	if _hud:
 		_hud.scale = Vector2(ui_scale, ui_scale)
@@ -61,7 +61,7 @@ func _apply_ui_scale() -> void:
 func _apply_theme() -> void:
 	# Apply indie theme: dark gray palette from ART_BIBLE
 	# Ensure fonts are readable
-	var theme: Theme = Theme.new()
+	var theme: Theme = Theme.new() as Theme
 	# Would load custom theme resource if exists
 	if ResourceLoader.exists("res://assets/ui/theme.tres"):
 		theme = load("res://assets/ui/theme.tres")

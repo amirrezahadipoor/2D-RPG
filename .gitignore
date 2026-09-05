@@ -31,3 +31,8 @@ Thumbs.db
 
 # Godot cache
 .project.godot.tmp
+
+# Allow export_presets.cfg for Android build
+!export_presets.cfg
+!assets/icon.png
+!project/assets/icon.png
