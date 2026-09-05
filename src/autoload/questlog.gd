@@ -8,8 +8,14 @@ signal toast(key: String)
 
 var active: Array = []                 # side quest instances with progress
 var completed_side: Dictionary = {}    # id -> true
-var declined: Dictionary = {}          # id -> true (re-offerable later)
+var declined: Dictionary = {}          # id -> level declined at (re-offered after a level-up)
 var main_progress: int = 0             # completed main stages, 0..100
+
+# The ONE live instance of the current main stage. QuestDB.main_quest() builds
+# a fresh dict per call, so progress written to it used to vanish instantly:
+# the whole campaign was uncompletable. This cache is what hooks mutate and
+# what gets serialized; it is rebuilt whenever main_progress advances.
+var main_active: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -18,13 +24,18 @@ func serialize() -> Dictionary:
 	return {"active": active.duplicate(true),
 		"completed_side": completed_side.duplicate(true),
 		"declined": declined.duplicate(true),
-		"main_progress": main_progress}
+		"main_progress": main_progress,
+		"main_active": main_active.duplicate(true)}
 
 func deserialize(data: Dictionary) -> void:
 	active = (data.get("active", []) as Array).duplicate(true)
 	completed_side = (data.get("completed_side", {}) as Dictionary).duplicate(true)
 	declined = (data.get("declined", {}) as Dictionary).duplicate(true)
 	main_progress = int(data.get("main_progress", 0))
+	main_active = (data.get("main_active", {}) as Dictionary).duplicate(true)
+	# never trust a cached stage from a different save/version
+	if not main_active.is_empty() and int(main_active.get("_index", -1)) != main_progress:
+		main_active.clear()
 	changed.emit()
 
 func reset_run() -> void:
@@ -32,13 +43,24 @@ func reset_run() -> void:
 	completed_side.clear()
 	declined.clear()
 	main_progress = 0
+	main_active.clear()
 	changed.emit()
 
 # ------------------------------------------------------------------ main ----
+## The live current main stage, rebuilt lazily. Callers may mutate it; those
+## writes are the durable progress record (unlike QuestDB.main_quest()).
 func current_main() -> Dictionary:
 	if main_progress >= QuestDB.main_count():
+		if not main_active.is_empty():
+			main_active.clear()
 		return {}
-	return QuestDB.main_quest(main_progress / QuestDB.STAGES, main_progress % QuestDB.STAGES)
+	if not main_active.is_empty() and int(main_active.get("_index", -1)) == main_progress:
+		return main_active
+	main_active = QuestDB.main_quest(main_progress / QuestDB.STAGES, main_progress % QuestDB.STAGES)
+	main_active["_index"] = main_progress
+	if not main_active.has("progress"):
+		main_active["progress"] = 0
+	return main_active
 
 func main_gate_ok() -> bool:
 	var q := current_main()
@@ -51,7 +73,10 @@ func offer_at(npc_settlement: int, npc_role: String) -> int:
 		var q := QuestDB.side_quest(i)
 		if int(q["giver_settlement"]) != npc_settlement or q["giver_role"] != npc_role:
 			continue
-		if completed_side.has(q["id"]) or declined.has(q["id"]):
+		if completed_side.has(q["id"]):
+			continue
+		# declined quests come back once the hero has levelled up since
+		if declined.has(q["id"]) and Stats.level <= int(declined[q["id"]]):
 			continue
 		if _is_active(q["id"]):
 			continue
@@ -68,7 +93,7 @@ func start_side(index: int) -> void:
 	changed.emit()
 
 func decline_side(index: int) -> void:
-	declined[QuestDB.side_quest(index)["id"]] = true
+	declined[QuestDB.side_quest(index)["id"]] = Stats.level
 	changed.emit()
 
 func _is_active(qid: String) -> bool:
@@ -137,27 +162,40 @@ func turn_in_at(npc_settlement: int, npc_role: String):
 			if int(q["giver_settlement"]) == npc_settlement and q["giver_role"] == npc_role:
 				return q
 	var m := current_main()
-	if not m.is_empty() and npc_role == "elder" and main_gate_ok():
-		if int(m.get("progress", 0)) >= int(m["goal"]):
+	if m.is_empty() or not main_gate_ok():
+		return null
+	if int(m.get("progress", 0)) < int(m["goal"]):
+		return null
+	# kill/collect/clear/boss stages are reported to the elder of a settlement.
+	# "talk" stages are turned in to the very NPC the stage names (same role
+	# and settlement), so merchant/guard talk stages are completable too.
+	if m["kind"] == "talk":
+		if npc_role == "elder" \
+				or (npc_role == m.get("role", "") and int(m.get("settlement", -1)) == npc_settlement):
 			return m
-	return null
+		return null
+	return m if npc_role == "elder" else null
 
 func complete(quest: Dictionary) -> void:
 	Stats.add_xp(int(quest["xp"]))
 	Stats.add_gold(int(quest["gold"]))
 	if quest["main"]:
 		main_progress += 1
+		main_active.clear()
 		if int(quest["stage"]) == QuestDB.STAGES - 1:
 			Stats.talent_points += 1
 			Stats.talent_changed.emit(Stats.talent_points)
+		# the hundredth completed stage is the end of the story
+		if main_progress >= QuestDB.main_count():
+			Game.change_state(Game.State.VICTORY)
 	else:
 		completed_side[quest["id"]] = true
 		for i in active.size():
 			if active[i]["id"] == quest["id"]:
 				active.remove_at(i)
 				break
-		# side rewards sometimes include a potion
-		if int(quest["gold"]) % 2 == 0:
+		# villagers thank you with a brew - deterministic, no gold-parity lottery
+		if quest.get("giver_role", "") == "villager":
 			Inventory.add({"id": "health_potion", "slot": "", "rarity": 0,
 				"prefix": "", "suffix": "", "dmg": 0, "armor": 0, "weight": 1, "qty": 1})
 	toast.emit("quest.done")

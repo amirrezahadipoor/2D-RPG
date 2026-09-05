@@ -30,6 +30,7 @@ static func main_quest(chapter: int, stage: int) -> Dictionary:
 		"stage": stage,
 		"kind": kind,
 		"level_gate": 1 + chapter * 4 + stage / 2,
+		"progress": 0,
 	}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = chapter * 131 + stage * 17
