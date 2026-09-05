@@ -1726,6 +1726,45 @@ func _check_touch_quality() -> void:
 	_ok(not Input.is_action_pressed("move_right") and not Input.is_action_pressed("attack"),
 		"disabling the overlay releases every synthetic action")
 	touch.queue_free()
+	# the quest journal scrolls with the mouse wheel and finger swipes, not
+	# just the keyboard (mobile users need more than the virtual stick)
+	var jr := JournalUI.new()
+	add_child(jr)
+	await get_tree().process_frame
+	QuestLog.reset_run()
+	QuestLog.main_progress = 0
+	for i in 12:
+		QuestLog.start_side(i)
+	jr.toggle()
+	_ok(jr.visible and jr._entries().size() > 1, "journal lists several entries")
+	var before := jr._scroll
+	var wheel := InputEventMouseButton.new()
+	wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
+	wheel.pressed = true
+	Input.parse_input_event(wheel)
+	await get_tree().process_frame
+	_ok(jr._scroll == before + 1, "mouse wheel scrolls the journal (%d -> %d)" % [before, jr._scroll])
+	jr._scroll = 3
+	var jt := InputEventScreenTouch.new()
+	jt.position = Vector2(300, 120)
+	jt.pressed = true
+	jt.index = 5
+	Input.parse_input_event(jt)
+	var jd := InputEventScreenDrag.new()
+	jd.position = Vector2(300, 80)
+	jd.relative = Vector2(0, -40)   # finger slides up = newer entries
+	jd.index = 5
+	Input.parse_input_event(jd)
+	var jl := InputEventScreenTouch.new()
+	jl.position = Vector2(300, 80)
+	jl.pressed = false
+	jl.index = 5
+	Input.parse_input_event(jl)
+	await get_tree().process_frame
+	_ok(jr._scroll == 4, "finger swipe scrolls the journal (%d -> %d)" % [3, jr._scroll])
+	jr.toggle()
+	jr.queue_free()
+	QuestLog.reset_run()
 	# quality tiers flip lights / shade / vignette
 	Settings.set_quality("low")
 	_ok(world.shade_layer.visible == false, "low quality drops contact shadows")

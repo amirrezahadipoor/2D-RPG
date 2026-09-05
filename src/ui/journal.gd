@@ -55,6 +55,8 @@ func toggle() -> void:
 		_scroll = 0
 		_refresh()
 
+var _drag_y := 0.0
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
@@ -62,6 +64,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		_scroll = maxi(0, _scroll - 1); _refresh(); get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
 		_scroll += 1; _refresh(); get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_scroll = maxi(0, _scroll - 1); _refresh(); get_viewport().set_input_as_handled()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_scroll += 1; _refresh(); get_viewport().set_input_as_handled()
+
+func _input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if event is InputEventScreenDrag:
+		# a finger swipe scrolls the journal just like the virtual stick; this
+		# is read at _input level so mobile drags always arrive (unhandled does
+		# not reliably deliver raw drags)
+		_drag_y += (event as InputEventScreenDrag).relative.y
+		if absf(_drag_y) >= 12.0:
+			_scroll += -1 if _drag_y > 0 else 1
+			_drag_y = 0.0
+			_scroll = maxi(0, _scroll)
+			_refresh()
+			get_viewport().set_input_as_handled()
 
 func _entries() -> Array:
 	var out := []
