@@ -104,9 +104,12 @@ static func _biome_enemy(biome: String, rng: RandomNumberGenerator) -> String:
 # -------------------------------------------------------------- texts -------
 static func title_of(q: Dictionary) -> String:
 	if q["main"]:
-		return "%s %s - %s %s" % [
-			I18N.tr_str("journal.main"), I18N.num(int(q["chapter"]) + 1),
-			I18N.tr_str("journal.active"), I18N.num(int(q["stage"]) + 1)]
+		# The story is ONE continuous arc of 100 objectives. Chapters/stages are
+		# internal bookkeeping (10x10 grid) and are never surfaced to the player,
+		# so the journal shows a plain "Main story N/100" step, not a stage.
+		var index := int(q["chapter"]) * STAGES + int(q["stage"])
+		return "%s %s/%s" % [I18N.tr_str("journal.main"),
+			I18N.num(index + 1), I18N.num(main_count())]
 	return "%s %s" % [I18N.tr_str("journal.side"), I18N.num(int(q.get("tier", 0)) + 1)]
 
 static func desc_of(q: Dictionary) -> String:

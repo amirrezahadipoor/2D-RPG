@@ -727,6 +727,19 @@ func _check_quests() -> void:
 	_ok(QuestLog.completed_side_count() == 1, "side completion counted")
 	var m := QuestLog.current_main()
 	_ok(not m.is_empty() and m["id"] == "main_0_0", "main story starts at chapter 1 stage 1")
+	# the campaign is shown as one continuous 1..100 arc, never as a stage
+	I18N.set_locale("en")
+	var first_title: String = QuestDB.title_of(QuestDB.main_quest(0, 0))
+	var last_title: String = QuestDB.title_of(QuestDB.main_quest(9, 9))
+	var mid_title: String = QuestDB.title_of(QuestDB.main_quest(4, 6))
+	_ok(first_title.ends_with("1/100") and last_title.ends_with("100/100")
+		and mid_title.ends_with("47/100") and first_title.find("Active") < 0,
+		"main quest is numbered continuously 1-100, not as chapter/stage (%s)" % mid_title)
+	I18N.set_locale("fa")
+	var fa_title: String = QuestDB.title_of(QuestDB.main_quest(9, 9))
+	_ok(fa_title.ends_with(I18N.num(100) + "/" + I18N.num(100)),
+		"continuous numbering localises (FA: %s)" % fa_title)
+	I18N.set_locale("en")
 	QuestLog.reset_run()
 
 func _check_endgame() -> void:
