@@ -1,12 +1,12 @@
-# Localization Manager - Phase 8 + 11 Polish
+# Localization Manager - Phase 8 + 11 Polish - Fixed
 # Bilingual EN/FA with RTL support, Persian numerals, locale files externalized
 # Offline: loads from res://assets/locale/*.json or .csv
 
 extends Node
-# class_name LocalizationManager
+class_name LocalizationManager
 
-var current_locale: String = "en" # en or fa
-var _translations: Dictionary = {} # key -> {en, fa}
+var current_locale: String = "en"
+var _translations: Dictionary = {}
 var _rtl_enabled: bool = false
 
 signal locale_changed(new_locale: String)
@@ -18,7 +18,7 @@ func _ready() -> void:
 	print("[LocalizationManager] locale=", current_locale, " rtl=", _rtl_enabled)
 
 func _load_locale_setting() -> void:
-	var cfg := ConfigFile.new()
+	var cfg = ConfigFile.new()
 	if cfg.load("user://settings.cfg") == OK:
 		current_locale = cfg.get_value("localization", "locale", "en")
 		if current_locale != "en" and current_locale != "fa":
@@ -26,43 +26,44 @@ func _load_locale_setting() -> void:
 	_rtl_enabled = (current_locale == "fa")
 
 func _load_translations() -> void:
-	# Try to load locale files
-	var paths := [
+	var paths = [
 		"res://assets/locale/en.json",
 		"res://assets/locale/fa.json",
 		"res://project/assets/locale/en.json",
 		"res://project/assets/locale/fa.json"
 	]
-	# Also try CSV
-	var csv_paths := [
+	
+	var csv_paths = [
 		"res://assets/locale/translations.csv",
 		"res://project/assets/locale/translations.csv"
 	]
-	# Load JSONs if exist
+	
+	# Load JSONs
 	for p in paths:
-		if ResourceLoader.exists(p) or FileAccess.file_exists(p):
-			var f := FileAccess.open(p, FileAccess.READ)
+		if FileAccess.file_exists(p):
+			var f = FileAccess.open(p, FileAccess.READ)
 			if f:
-				var json := JSON.new()
+				var json = JSON.new()
 				if json.parse(f.get_as_text()) == OK and json.data is Dictionary:
-					var locale_code := "en" if "en" in p else "fa"
+					var locale_code = "en" if "en" in p else "fa"
 					for k in json.data.keys():
 						if not _translations.has(k):
 							_translations[k] = {}
 						_translations[k][locale_code] = str(json.data[k])
-	# Load CSV if exists
+	
+	# Load CSV
 	for p in csv_paths:
 		if FileAccess.file_exists(p):
-			var f := FileAccess.open(p, FileAccess.READ)
+			var f = FileAccess.open(p, FileAccess.READ)
 			if f:
-				var header := f.get_csv_line()
+				var header = f.get_csv_line()
 				while not f.eof_reached():
-					var line := f.get_csv_line()
+					var line = f.get_csv_line()
 					if line.size() >= 3:
-						var key := line[0]
+						var key = line[0]
 						_translations[key] = {"en": line[1], "fa": line[2]}
 	
-	# Fallback: built-in minimal translations if no files
+	# Fallback minimal translations
 	if _translations.is_empty():
 		_translations = {
 			"menu.play": {"en": "Play", "fa": "بازی"},
@@ -89,12 +90,6 @@ func _load_translations() -> void:
 
 func _apply_locale() -> void:
 	_rtl_enabled = (current_locale == "fa")
-	# Set Godot TranslationServer if .translation files exist
-	var trans_path := "res://assets/locale/%s.translation" % current_locale
-	if ResourceLoader.exists(trans_path):
-		# TranslationServer would handle it
-		pass
-	# Notify UI to refresh
 	get_tree().call_group("localizable", "_on_locale_changed", current_locale)
 
 func tr_key(key: String) -> String:
@@ -102,7 +97,7 @@ func tr_key(key: String) -> String:
 		return _translations[key][current_locale]
 	elif _translations.has(key) and _translations[key].has("en"):
 		return _translations[key]["en"]
-	return key # fallback to key itself
+	return key
 
 func set_locale(locale: String) -> void:
 	if locale != "en" and locale != "fa":
@@ -110,7 +105,7 @@ func set_locale(locale: String) -> void:
 		return
 	current_locale = locale
 	_rtl_enabled = (locale == "fa")
-	var cfg := ConfigFile.new()
+	var cfg = ConfigFile.new()
 	cfg.load("user://settings.cfg")
 	cfg.set_value("localization", "locale", locale)
 	cfg.save("user://settings.cfg")
@@ -127,23 +122,28 @@ func is_rtl() -> bool:
 func to_persian_numerals(text: String) -> String:
 	if current_locale != "fa":
 		return text
-	return PersianNumerals.to_persian(text)
+	return _convert_to_persian_numerals(text)
+
+func _convert_to_persian_numerals(text: String) -> String:
+	var western = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
+	var persian = ["۰", "۱", "۲", "۳", "۴", "۵", "۶", "۷", "۸", "۹"]
+	var result = text
+	for i in range(10):
+		result = result.replace(western[i], persian[i])
+	return result
 
 func format_number(n: int) -> String:
-	var s := str(n)
+	var s = str(n)
 	if current_locale == "fa":
-		s = PersianNumerals.to_persian(s)
-		# Optionally use Persian thousands separator
-		# s = PersianNumerals.format_with_separator(s)
+		s = _convert_to_persian_numerals(s)
 	return s
 
 func get_font_for_locale() -> Font:
-	# Returns appropriate font: Vazirmatn for FA, default for EN
 	if current_locale == "fa":
-		var fa_font_path := "res://assets/fonts/Vazirmatn-Regular.ttf"
+		var fa_font_path = "res://assets/fonts/Vazirmatn-Regular.ttf"
 		if ResourceLoader.exists(fa_font_path):
 			return load(fa_font_path)
-	return null # use default
+	return null
 
 func localize_control(control: Control, key: String) -> void:
 	if "text" in control:
