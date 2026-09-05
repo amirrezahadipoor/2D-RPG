@@ -16,7 +16,9 @@ const SOLID_PROPS := {"tree": Rect2(0, 10, 16, 6), "rock": Rect2(0, 6, 16, 10)}
 
 var terrain_layer: TileMapLayer
 var props_layer: TileMapLayer
+var actors: Node2D
 var hero: Hero
+var spawner: Spawner
 
 var _biome_grid: PackedStringArray = PackedStringArray()
 var _current_biome := ""
@@ -31,7 +33,11 @@ func build(seed_value: int) -> void:
 	_generate_biomes()
 	_build_tileset_and_layers()
 	_paint()
+	_spawn_actors_root()
 	_spawn_hero()
+	_spawn_spawner()
+	Juice.register_camera(hero.cam)
+	Juice.register_world(actors)
 	print("[World] seed=%d size=%dx%d" % [world_seed, WORLD_W, WORLD_H])
 
 func _generate_biomes() -> void:
@@ -178,6 +184,18 @@ func _paint() -> void:
 				var pi: int = ArtIndex.PROP_INDEX[prop]
 				props_layer.set_cell(Vector2i(x, y), 1, Vector2i(pi, 0))
 
+## True when an entity can stand here: in bounds, not water, not inside a
+## solid prop. Used by the spawner so enemies never appear in a tree.
+func is_walkable_at(world_pos: Vector2) -> bool:
+	var t := tile_at(world_pos)
+	if t.x < 0 or t.y < 0 or t.x >= WORLD_W or t.y >= WORLD_H:
+		return false
+	var biome := _biome_grid[t.y * WORLD_W + t.x]
+	if biome == "water":
+		return false
+	var prop := _prop_at(biome, t.x, t.y)
+	return prop == "" or not SOLID_PROPS.has(prop)
+
 func biome_at(world_pos: Vector2) -> String:
 	var t := tile_at(world_pos)
 	if t.x < 0 or t.y < 0 or t.x >= WORLD_W or t.y >= WORLD_H:
@@ -187,10 +205,24 @@ func biome_at(world_pos: Vector2) -> String:
 func tile_at(world_pos: Vector2) -> Vector2i:
 	return Vector2i(floori(world_pos.x / float(TILE)), floori(world_pos.y / float(TILE)))
 
+## Hero + enemies live in one y-sorted container so they draw over/under each
+## other by foot position instead of by spawn order.
+func _spawn_actors_root() -> void:
+	actors = Node2D.new()
+	actors.name = "Actors"
+	actors.y_sort_enabled = true
+	add_child(actors)
+
+func _spawn_spawner() -> void:
+	spawner = Spawner.new()
+	spawner.name = "Spawner"
+	add_child(spawner)
+	spawner.world = self
+
 func _spawn_hero() -> void:
 	hero = Hero.new()
 	hero.name = "Hero"
-	add_child(hero)
+	actors.add_child(hero)
 	# find a walkable forest-ish tile near the centre
 	var cx := WORLD_W / 2
 	var cy := WORLD_H / 2

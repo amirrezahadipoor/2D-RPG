@@ -16,7 +16,7 @@ with real RTL + Persian numerals.
 
 ## M0 — Foundation: it boots, it renders, it's solid  ✅ DONE
 
-Evidence: `tests/verify.tscn` (33 checks), `docs/screenshots/01_world.png`.
+Evidence: `tests/verify.tscn` (74 checks), `docs/screenshots/01_world.png`.
 
 - [x] Project imports with **0 errors and 0 warnings** (warnings are ON)
 - [x] Pixel-art pipeline: native 480×270, `stretch=viewport`, integer scale,
@@ -33,19 +33,27 @@ Evidence: `tests/verify.tscn` (33 checks), `docs/screenshots/01_world.png`.
 - [x] Headless self-test suite that **exits non-zero on failure**
 - [x] CI that runs the import + the suite and fails on error
 
-## M1 — Paper-doll equipment + combat feel  🟡 IN PROGRESS
+## M1 — Paper-doll equipment + combat feel  ✅ DONE
 
-Evidence so far: `docs/screenshots/02_paper_doll.png`, `03_attack.png`.
+Evidence: `tests/verify.tscn` (74 checks), `docs/screenshots/05_combat.png`,
+`06_death_hardcore.png`, `07_death_fa.png`.
 
 - [x] Paper-doll: 7 synced sprite layers
       (accessory → body → legs → boots → chest → helmet → weapon);
       equipping changes the character on screen in all 4 directions
 - [x] Attack state machine (stamina-gated, 2-frame swing) + dodge dash
 - [x] Gear cycling demo hotkey `G`
-- [ ] Enemies spawn in the world, chase, attack, die (with XP/gold rewards)
-- [ ] Damage numbers + hit flash + screenshake (juice)
-- [ ] Weapon reach/hitbox differs per weapon type
-- [ ] Death + hardcore permadeath flow
+- [x] Enemies spawn in the world (biome-aware, capped, culled), chase, wind up,
+      attack, die and pay XP/gold — checks: `enemy chases…`, `kill pays xp/gold`
+- [x] Damage numbers + hit flash + screenshake + hurt vignette + death puffs
+      (`src/autoload/juice.gd`, visible in `05_combat.png`)
+- [x] Weapon reach/damage/cooldown/stamina/knockback differ per weapon
+      (`src/data/weapons.gd`; check: `axe swing hits harder than dagger`)
+- [x] Armor from worn gear reduces incoming damage (min 1 per hit)
+- [x] Death + hardcore permadeath flow: `Game.State.DEAD`, death screen with run
+      summary (EN+FA/RTL), hardcore deletes `user://savegame.save`
+      (checks: `hardcore death deletes the save file`,
+      `non-hardcore death keeps the save`)
 
 ## M2 — Inventory, loot & equipment UI
 

@@ -13,7 +13,6 @@ const WALK_SPEED := 78.0
 const DASH_SPEED := 210.0
 const ACCEL := 900.0
 const FRICTION := 1100.0
-const ATTACK_STAMINA := 12.0
 const DODGE_STAMINA := 22.0
 const ATTACK_TIME := 0.28
 const DODGE_TIME := 0.22
@@ -31,6 +30,7 @@ var act: Act = Act.NONE
 var act_timer := 0.0
 var anim_time := 0.0
 var _gear_slot_cursor := 0
+var _attack_cooldown := 0.0
 
 func _ready() -> void:
 	# Collision: a small box at the FEET so the sprite can overhang upward
@@ -42,7 +42,9 @@ func _ready() -> void:
 	shape.position = Vector2(0, -3)
 	add_child(shape)
 
+	add_to_group("player")
 	doll = PaperDoll.new()
+	doll.gear_changed.connect(_on_gear_changed)
 	add_child(doll)
 
 	cam = Camera2D.new()
@@ -55,6 +57,7 @@ func _ready() -> void:
 	cam.make_current()
 
 	_starting_gear()
+	_on_gear_changed(doll.get_gear())
 	print("[Hero] ready")
 
 func _starting_gear() -> void:
@@ -65,6 +68,11 @@ func _starting_gear() -> void:
 
 # ------------------------------------------------------------- physics ------
 func _physics_process(delta: float) -> void:
+	if Game.state == Game.State.DEAD:
+		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
+		move_and_slide()
+		return
+	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
 	_handle_actions(delta)
 
 	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
@@ -104,12 +112,14 @@ func _handle_actions(delta: float) -> void:
 			act = Act.NONE
 		return
 
-	if Input.is_action_just_pressed("attack"):
-		if Stats.spend_stamina(ATTACK_STAMINA):
+	if Input.is_action_just_pressed("attack") and _attack_cooldown <= 0.0:
+		var weapon: Dictionary = WeaponDB.stats_for(current_weapon_id())
+		if Stats.spend_stamina(float(weapon["stamina"])):
 			act = Act.ATTACK
 			act_timer = ATTACK_TIME
 			anim_time = 0.0
-			var hits := _sweep_attack()
+			_attack_cooldown = float(weapon["cooldown"])
+			var hits := _sweep_attack(weapon)
 			attack_landed.emit(hits)
 	elif Input.is_action_just_pressed("dodge"):
 		if Stats.spend_stamina(DODGE_STAMINA):
@@ -128,15 +138,53 @@ func _aim_direction() -> Vector2:
 		"right": return Vector2.RIGHT
 	return Vector2.DOWN
 
-## Melee sweep in the tile(s) directly in front of the hero. Enemies/damage
-## land in a later milestone; for now it reports how many registered.
-func _sweep_attack() -> int:
-	var origin := global_position + _aim_direction() * 14.0
-	var found := 0
+## Melee sweep: a band `reach` long and `arc` wide in the direction the hero
+## faces. Every enemy inside it takes weapon damage + attack power + level, and
+## is knocked back along the swing direction. Returns how many were hit.
+func _sweep_attack(weapon: Dictionary) -> int:
+	var dir := _aim_direction()
+	var side := dir.orthogonal()
+	var reach: float = weapon["reach"]
+	var arc: float = weapon["arc"]
+	var amount := attack_damage(weapon)
+	var knock := float(weapon["knockback"])
+	var hits := 0
 	for node in get_tree().get_nodes_in_group("enemy"):
-		if node is Node2D and node.global_position.distance_to(origin) < 18.0:
-			found += 1
-	return found
+		var enemy := node as Enemy
+		if enemy == null:
+			continue
+		var offset: Vector2 = enemy.global_position - global_position
+		var along := offset.dot(dir)
+		if along < -6.0 or along > reach:
+			continue
+		if absf(offset.dot(side)) > arc:
+			continue
+		enemy.take_damage(amount, dir * knock)
+		hits += 1
+	if hits > 0:
+		Juice.shake(1.5)
+	return hits
+
+func current_weapon_id() -> String:
+	return str(doll.get_gear().get("weapon", ""))
+
+## What a swing from `weapon` deals with the hero's current gear and level.
+func attack_damage(weapon: Dictionary = {}) -> int:
+	var w: Dictionary = weapon if not weapon.is_empty() else WeaponDB.stats_for(current_weapon_id())
+	return int(w["damage"]) + ItemDB.attack_power(doll.get_gear()) + (Stats.level - 1)
+
+## Damage entry point used by enemies. Dodging grants brief invulnerability.
+func hurt(amount: int) -> int:
+	if Game.state == Game.State.DEAD:
+		return 0
+	if act == Act.DODGE:
+		Juice.miss(global_position + Vector2(0, -30))
+		return 0
+	return Stats.damage(amount)
+
+func _on_gear_changed(gear: Dictionary) -> void:
+	Stats.set_armor(ItemDB.armor_total(gear))
+	gear_changed.emit(gear)
 
 # ------------------------------------------------------------ animation -----
 func _animate(delta: float, input: Vector2) -> void:

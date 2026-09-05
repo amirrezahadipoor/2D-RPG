@@ -23,6 +23,7 @@ boot_splash/show_image=false
 I18N="*res://src/autoload/i18n.gd"
 Game="*res://src/autoload/game.gd"
 Stats="*res://src/autoload/stats.gd"
+Juice="*res://src/autoload/juice.gd"
 
 [audio]
 

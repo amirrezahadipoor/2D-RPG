@@ -8,6 +8,8 @@ signal health_changed(current: int, maximum: int)
 signal stamina_changed(current: float, maximum: int)
 signal level_changed(level: int, xp: int, xp_next: int)
 signal gold_changed(gold: int)
+signal armor_changed(armor: int)
+signal died
 
 var max_hp: int = 40
 var hp: int = 40
@@ -18,16 +20,52 @@ var level: int = 1
 var xp: int = 0
 var xp_next: int = 100
 var gold: int = 25
+var kills: int = 0
+
+# Damage reduction from worn gear. Recomputed by Hero whenever gear changes.
+var armor: int = 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 # ---------------------------------------------------------------- combat ----
+## Armor absorbs a flat part of every hit, but a hit always lands for at least 1.
 func damage(amount: int) -> int:
-	var taken := clampi(amount, 0, hp)
+	if hp <= 0:
+		return 0
+	var reduced := maxi(1, amount - armor)
+	var taken := clampi(reduced, 0, hp)
 	hp -= taken
 	health_changed.emit(hp, max_hp)
+	if hp <= 0:
+		died.emit()
 	return taken
+
+func set_armor(value: int) -> void:
+	if value == armor:
+		return
+	armor = maxi(0, value)
+	armor_changed.emit(armor)
+
+func add_kill() -> void:
+	kills += 1
+
+func reset_run(start_gold: int = 25) -> void:
+	max_hp = 40
+	hp = max_hp
+	max_stamina = 100
+	stamina = float(max_stamina)
+	level = 1
+	xp = 0
+	xp_next = 100
+	gold = start_gold
+	armor = 0
+	kills = 0
+	health_changed.emit(hp, max_hp)
+	stamina_changed.emit(stamina, max_stamina)
+	level_changed.emit(level, xp, xp_next)
+	gold_changed.emit(gold)
+	armor_changed.emit(armor)
 
 func heal(amount: int) -> void:
 	hp = clampi(hp + amount, 0, max_hp)
@@ -71,7 +109,7 @@ func serialize() -> Dictionary:
 		"hp": hp, "max_hp": max_hp,
 		"stamina": stamina, "max_stamina": max_stamina,
 		"level": level, "xp": xp, "xp_next": xp_next,
-		"gold": gold,
+		"gold": gold, "kills": kills,
 	}
 
 func deserialize(data: Dictionary) -> void:
@@ -83,6 +121,8 @@ func deserialize(data: Dictionary) -> void:
 	xp = int(data.get("xp", xp))
 	xp_next = int(data.get("xp_next", xp_next))
 	gold = int(data.get("gold", gold))
+	kills = int(data.get("kills", kills))
+	armor_changed.emit(armor)
 	health_changed.emit(hp, max_hp)
 	stamina_changed.emit(stamina, max_stamina)
 	level_changed.emit(level, xp, xp_next)

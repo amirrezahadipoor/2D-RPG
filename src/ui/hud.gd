@@ -21,12 +21,16 @@ var _prompts: Label
 var _strip: HBoxContainer
 var _last_biome := ""
 var _root: Control
+var _vignette: ColorRect
+var _toast: Label
+var _last_level := 1
 
 func _ready() -> void:
 	layer = 10
 	_build()
 	_connect()
 	I18N.locale_changed.connect(func(_l): _refresh_text())
+	Juice.hurt_taken.connect(_flash_hurt)
 	_refresh_text()
 
 func _build() -> void:
@@ -35,6 +39,25 @@ func _build() -> void:
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
+
+	# --- hurt vignette: full-screen red flash, drawn under the rest ---
+	_vignette = ColorRect.new()
+	_vignette.name = "HurtFlash"
+	_vignette.color = Color(0.75, 0.05, 0.1)
+	_vignette.modulate.a = 0.0
+	_vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_vignette)
+
+	_toast = Label.new()
+	_toast.name = "Toast"
+	_toast.add_theme_font_size_override("font_size", 12)
+	_toast.add_theme_color_override("font_color", Color(1, 0.86, 0.35))
+	_toast.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	_toast.add_theme_constant_override("outline_size", 3)
+	_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast.modulate.a = 0.0
+	_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_toast)
 
 	# --- vitals (top-left) ---
 	_hp_bg = _bar(Vector2(6, 6), BAR_W, 7, Color(0.15, 0.08, 0.1))
@@ -87,6 +110,12 @@ func _layout() -> void:
 		# fixed width: the container's own size is 0 on the first layout pass
 		var strip_w := float(ArtIndex.EQUIPMENT_SLOTS.size()) * 20.0 - 2.0
 		_strip.position = Vector2(vp.x - 6 - strip_w, vp.y - 6 - 18)
+	if _vignette:
+		_vignette.position = Vector2.ZERO
+		_vignette.size = vp
+	if _toast:
+		_toast.position = Vector2(0, vp.y * 0.3)
+		_toast.size = Vector2(vp.x, 14)
 
 func _bar(pos: Vector2, w: float, h: float, col: Color) -> ColorRect:
 	var r := ColorRect.new()
@@ -113,6 +142,7 @@ func _connect() -> void:
 	Stats.stamina_changed.connect(_on_stamina)
 	Stats.level_changed.connect(_on_level)
 	Stats.gold_changed.connect(_on_gold)
+	_last_level = Stats.level
 	_on_health(Stats.hp, Stats.max_hp)
 	_on_stamina(Stats.stamina, Stats.max_stamina)
 	_on_level(Stats.level, Stats.xp, Stats.xp_next)
@@ -127,6 +157,27 @@ func _on_stamina(cur: float, maxi: int) -> void:
 func _on_level(level: int, xp: int, xp_next: int) -> void:
 	_level_label.text = "%s %s" % [I18N.tr_str("hud.level"), I18N.num(level)]
 	I18N.tag(_level_label)
+	if level > _last_level:
+		_show_toast(I18N.tr_str("toast.levelup"))
+	_last_level = level
+
+# ---------------------------------------------------------------- juice -----
+func _flash_hurt() -> void:
+	if _vignette == null:
+		return
+	_vignette.modulate.a = 0.55
+	var tween := create_tween()
+	tween.tween_property(_vignette, "modulate:a", 0.0, 0.35)
+
+func _show_toast(text: String) -> void:
+	if _toast == null:
+		return
+	_toast.text = text
+	I18N.tag(_toast)
+	_toast.modulate.a = 1.0
+	var tween := create_tween()
+	tween.tween_interval(0.9)
+	tween.tween_property(_toast, "modulate:a", 0.0, 0.5)
 
 func _on_gold(gold: int) -> void:
 	_gold_label.text = "%s: %s" % [I18N.tr_str("hud.gold"), I18N.num(gold)]

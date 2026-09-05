@@ -18,6 +18,11 @@ export/
 .env
 **/.env
 
+# Script UIDs and import sidecars for docs images are regenerated on first
+# import with 0 warnings (verified in CI); only assets/ sidecars are committed.
+*.uid
+docs/screenshots/*.import
+
 # Editor / OS cruft
 *.tmp
 .DS_Store

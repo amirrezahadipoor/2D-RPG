@@ -15,6 +15,8 @@
 class_name PaperDoll
 extends Node2D
 
+signal gear_changed(gear: Dictionary)
+
 const STACK := ["accessory", "body", "legs", "boots", "chest", "helmet", "weapon"]
 
 ## Feet anchor inside the 24x32 cell. Sprite offsets put this pixel exactly on
@@ -51,6 +53,8 @@ func equip(slot: String, item_id: String) -> void:
 	var spr: Sprite2D = _layers[slot]
 	if item_id.is_empty():
 		spr.texture = null
+		_apply_region()
+		gear_changed.emit(_gear.duplicate())
 		return
 	var path := "res://assets/sprites/equipment/%s/%s.png" % [slot, item_id]
 	if not ResourceLoader.exists(path):
@@ -59,6 +63,7 @@ func equip(slot: String, item_id: String) -> void:
 		return
 	spr.texture = load(path)
 	_apply_region()
+	gear_changed.emit(_gear.duplicate())
 
 func unequip(slot: String) -> void:
 	equip(slot, "")
