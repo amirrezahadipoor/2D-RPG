@@ -84,17 +84,17 @@ jobs:
       - name: Stamp keystore + version into the export preset
         run: |
           python3 - "$KS_PATH" "$KS_PASSWORD" "$KS_ALIAS_NAME" "$KS_ALIAS_PASSWORD" <<'PYEOF'
-import sys, re
-path, pw, alias, apw = sys.argv[1:5]
-p = "export_presets.cfg"
-s = open(p, encoding="utf-8").read()
-s = re.sub(r'keystore/release_path=.*', f'keystore/release_path="{path}"', s)
-s = re.sub(r'keystore/release_password=.*', f'keystore/release_password="{pw}"', s)
-s = re.sub(r'keystore/release_alias=.*', f'keystore/release_alias="{alias}"', s)
-s = re.sub(r'keystore/release_alias_password=.*', f'keystore/release_alias_password="{apw}"', s)
-open(p, "w", encoding="utf-8").write(s)
-print("preset stamped")
-PYEOF
+          import sys, re
+          path, pw, alias, apw = sys.argv[1:5]
+          p = "export_presets.cfg"
+          s = open(p, encoding="utf-8").read()
+          s = re.sub(r'keystore/release_path=.*', f'keystore/release_path="{path}"', s)
+          s = re.sub(r'keystore/release_password=.*', f'keystore/release_password="{pw}"', s)
+          s = re.sub(r'keystore/release_alias=.*', f'keystore/release_alias="{alias}"', s)
+          s = re.sub(r'keystore/release_alias_password=.*', f'keystore/release_alias_password="{apw}"', s)
+          open(p, "w", encoding="utf-8").write(s)
+          print("preset stamped")
+          PYEOF
 
       - name: Export universal APK
         run: |
