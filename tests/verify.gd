@@ -1675,6 +1675,48 @@ func _check_menus() -> void:
 	su._adjust(-1)
 	_ok(absf(Settings.master - m0) < 0.001, "and lowers it back")
 	su.queue_free()
+	# talent rows answer to direct taps: a tap selects, a second tap spends a point
+	Stats.reset_run()
+	Stats.talent_points = 5
+	var tl := TalentsUI.new()
+	add_child(tl)
+	await get_tree().process_frame
+	tl.toggle()
+	_ok(tl.visible, "talents screen opens for testing")
+	var t1 := InputEventMouseButton.new()
+	t1.button_index = MOUSE_BUTTON_LEFT
+	t1.pressed = true
+	t1.position = Vector2(250, 104 + 2 * 18 + 4)
+	Input.parse_input_event(t1)
+	await get_tree().process_frame
+	_ok(tl._sel == 2, "tap selects the third talent row")
+	# release the mouse used for selection so the attack action is not left held
+	var mrel := InputEventMouseButton.new()
+	mrel.button_index = MOUSE_BUTTON_LEFT
+	mrel.pressed = false
+	mrel.position = Vector2(250, 146)
+	Input.parse_input_event(mrel)
+	await get_tree().process_frame
+	# a second tap on the chosen row spends a point (pure touch events: parsed
+	# mouse clicks synthesise an extra touch, and the handler dedupes per frame)
+	var tp_before := Stats.talent_points
+	var ts2 := InputEventScreenTouch.new()
+	ts2.position = Vector2(250, 146)
+	ts2.pressed = true
+	ts2.index = 4
+	Input.parse_input_event(ts2)
+	await get_tree().process_frame
+	var ts2u := InputEventScreenTouch.new()
+	ts2u.position = Vector2(250, 146)
+	ts2u.pressed = false
+	ts2u.index = 4
+	Input.parse_input_event(ts2u)
+	await get_tree().process_frame
+	_ok(Stats.talent_points == tp_before - 1 and int(Stats.talents["swift"]) == 1,
+		"tapping the chosen row again ranks it up")
+	tl.toggle()
+	tl.queue_free()
+	Stats.reset_run()
 	Settings.load_settings()
 	Settings.apply()
 	Game.change_state(prev_state if prev_state == Game.State.PLAYING else Game.State.PLAYING)
