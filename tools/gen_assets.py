@@ -877,15 +877,16 @@ def make_props():
             c.rect(7, 2, 2, 3, PAL["gold_l"])
             c.px(7, 4, PAL["white"]); c.px(8, 3, PAL["white"])
         elif name == "tomb":
-            # rounded headstone with a carved cross, cracked base
-            _stamp(c, ["..ssss..", ".ssssss.", ".ssssss.", ".ss.sss.", ".ssssss.", ".ssssss."],
-                   4, 5, {"s": PAL["stone_m"]})
-            c.hline(6, 5, 4, PAL["stone_l"])
-            c.vline(5, 6, 5, PAL["stone_d"]); c.vline(10, 6, 5, PAL["stone_d"])
-            c.vline(8, 7, 3, PAL["stone_d"]); c.hline(7, 8, 3, PAL["stone_d"])
-            c.rect(3, 11, 10, 3, PAL["stone_d"])
-            c.hline(3, 11, 10, PAL["stone_m"])
-            c.px(4, 12, PAL["stone_l"]); c.px(11, 13, PAL["black"])
+            # tall grey headstone, lit left edge, carved cross, mossy mound
+            _stamp(c, ["..gggg..", ".gggggg.", ".gggggg.", ".gggggg.", ".gggggg.",
+                       ".gggggg.", ".gggggg."], 4, 4, {"g": PAL["stone_m"]})
+            c.vline(4, 4, 7, PAL["stone_l"]); c.hline(5, 4, 4, PAL["stone_l"])
+            c.vline(11, 4, 7, PAL["stone_d"])
+            c.vline(8, 6, 4, PAL["stone_d"]); c.hline(6, 7, 5, PAL["stone_d"])
+            c.rect(2, 11, 12, 3, PAL["stone_d"])
+            c.hline(2, 11, 12, PAL["stone_m"])
+            c.px(3, 12, PAL["leaf_d"]); c.px(12, 12, PAL["leaf_d"])
+            c.px(5, 13, PAL["black"]); c.px(10, 12, PAL["black"])
         elif name == "fence":
             c.vline(3, 6, 9, PAL["leath_m"]); c.vline(4, 6, 9, PAL["leath_d"])
             c.vline(11, 6, 9, PAL["leath_m"]); c.vline(12, 6, 9, PAL["leath_d"])
@@ -1099,6 +1100,24 @@ def build_icon_sheet(specs):
     return sheet, [s[0] for s in specs]
 
 
+# --------------------------------------------------------------------- fx ----
+def make_glow():
+    """Soft radial falloff used by Light2D (lanterns, torches, wisps)."""
+    c = Canvas(64, 64)
+    import math
+    for y in range(64):
+        for x in range(64):
+            dx = (x - 31.5) / 31.5
+            dy = (y - 31.5) / 31.5
+            d = math.sqrt(dx * dx + dy * dy)
+            if d > 1.0:
+                continue
+            a = (1.0 - d) ** 2.2
+            col = (255, 255, 255, int(255 * a))
+            c.buf[(x, y)] = col
+    return c
+
+
 # ------------------------------------------------------------------- main ---
 def main():
     print("Generating pixel-art assets ->", OUT)
@@ -1215,6 +1234,10 @@ def main():
     ]
     isheet, icon_names = build_icon_sheet(icon_specs)
     save(isheet, "items/equipment_icons.png")
+
+    # --- light glow -----------------------------------------------------
+    print("[fx]")
+    save(make_glow(), "fx/glow.png")
 
     # --- icon.png (app icon) -------------------------------------------
     print("[app icon]")

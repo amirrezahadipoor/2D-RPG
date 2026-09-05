@@ -184,7 +184,7 @@ func _update_clock() -> void:
 			night_amount = 1.0
 		elif h < 8.0:
 			night_amount = clampf((8.0 - h) / 2.0, 0.0, 1.0)
-		_night.modulate.a = night_amount * 0.38
+		_night.modulate.a = night_amount * 0.5
 		_night.color = Color(0.45, 0.05, 0.08) if Game.is_blood_moon() else Color(0.05, 0.07, 0.2)
 
 func _connect() -> void:

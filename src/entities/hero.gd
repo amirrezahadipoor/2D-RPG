@@ -25,6 +25,7 @@ enum Act { NONE, ATTACK, DODGE }
 
 var doll: PaperDoll
 var cam: Camera2D
+var lantern: PointLight2D
 
 var facing := "down"
 var act: Act = Act.NONE
@@ -48,6 +49,14 @@ func _ready() -> void:
 	doll.gear_changed.connect(_on_gear_changed)
 	add_child(doll)
 	Inventory.equipment_changed.connect(_refresh_stats)
+
+	# a warm lantern that wakes up at night and underground
+	lantern = PointLight2D.new()
+	lantern.texture = load("res://assets/sprites/fx/glow.png")
+	lantern.color = Color(1.0, 0.82, 0.55)
+	lantern.scale = Vector2(2.1, 2.1)
+	lantern.energy = 0.0
+	add_child(lantern)
 
 	cam = Camera2D.new()
 	cam.position_smoothing_enabled = true
@@ -104,6 +113,7 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 	_animate(delta, input)
+	_update_lantern(delta)
 
 ## Any full-screen UI (inventory, journal, talents, dialogue) freezes play.
 func _modal_open() -> bool:
@@ -111,6 +121,21 @@ func _modal_open() -> bool:
 		if ui.visible:
 			return true
 	return false
+
+## Light follows time of day and depth: dark nights, dark caves, dungeons.
+func _update_lantern(delta: float) -> void:
+	var target := 0.0
+	if Game.is_blood_moon():
+		target = 0.7
+	elif Game.is_night():
+		target = 0.6
+	var biome := ""
+	var world_node := get_parent()
+	while world_node != null and not (world_node is Overworld) and not (world_node.has_method("is_dungeon") if world_node.has_method("has_method") else false):
+		world_node = world_node.get_parent()
+	if world_node != null and world_node.has_method("ambient_light_need"):
+		target = maxf(target, world_node.ambient_light_need())
+	lantern.energy = lerpf(lantern.energy, target, 6.0 * delta)
 
 func _update_facing(input: Vector2) -> void:
 	if absf(input.x) > absf(input.y):

@@ -24,6 +24,8 @@ var spawner: Spawner
 
 var settlements: Array = []   # {type, rect: Rect2i, plaza: Vector2i, index}
 var npcs: Array = []
+var ambient: AmbientFX
+var _lights: Array = []       # PointLight2D torches / wisps
 
 var _biome_grid: PackedStringArray = PackedStringArray()
 var _road_grid: PackedByteArray = PackedByteArray()
@@ -46,6 +48,11 @@ func build(seed_value: int) -> void:
 	_spawn_spawner()
 	_spawn_npcs()
 	_place_chests()
+	_place_lights()
+	ambient = AmbientFX.new()
+	ambient.name = "Ambient"
+	add_child(ambient)
+	ambient.world = self
 	Juice.register_camera(hero.cam)
 	Juice.register_world(actors)
 	print("[World] seed=%d size=%dx%d settlements=%d" % [world_seed, WORLD_W, WORLD_H, settlements.size()])
@@ -426,7 +433,53 @@ func _place_chests() -> void:
 		chest.global_position = pos
 		placed += 1
 
-func _process(_delta: float) -> void:
+## How much the hero's lantern is needed here (caves are dark).
+func ambient_light_need() -> float:
+	var b := biome_at(hero.global_position) if hero else ""
+	return 0.8 if b == "caves" else 0.0
+
+func _place_lights() -> void:
+	var glow := load("res://assets/sprites/fx/glow.png")
+	for st in settlements:
+		var plaza: Vector2i = st["plaza"]
+		for off in [Vector2(2, 0), Vector2(-2, 0), Vector2(1 - st["rect"].size.x / 2, st["rect"].size.y - 1)]:
+			var light := PointLight2D.new()
+			light.texture = glow
+			light.color = Color(1.0, 0.75, 0.4)
+			light.scale = Vector2(2.6, 2.6)
+			light.energy = 0.0
+			add_child(light)
+			light.global_position = Vector2((plaza.x + off.x) * TILE + 8, (plaza.y + off.y) * TILE + 4)
+			_lights.append({"light": light, "kind": "torch", "phase": randf() * TAU})
+	# cursed green glows over a few graveyard clusters
+	var rng := RandomNumberGenerator.new()
+	rng.seed = world_seed ^ 0xA115
+	var placed := 0
+	var tries := 0
+	while placed < 8 and tries < 600:
+		tries += 1
+		var t := Vector2i(rng.randi_range(4, WORLD_W - 5), rng.randi_range(4, WORLD_H - 5))
+		var pos := Vector2(t.x * TILE + 8.0, t.y * TILE + 8.0)
+		if biome_at(pos) != "graveyard":
+			continue
+		var light := PointLight2D.new()
+		light.texture = glow
+		light.color = Color(0.4, 1.0, 0.55)
+		light.scale = Vector2(1.8, 1.8)
+		light.energy = 0.0
+		add_child(light)
+		light.global_position = pos
+		_lights.append({"light": light, "kind": "wisp", "phase": randf() * TAU})
+		placed += 1
+
+func _process(delta: float) -> void:
+	for entry in _lights:
+		var light: PointLight2D = entry["light"]
+		entry["phase"] += delta
+		if entry["kind"] == "torch":
+			light.energy = 0.9 + 0.12 * sin(entry["phase"] * 9.0) if Game.is_night() else 0.0
+		else:
+			light.energy = (0.3 + 0.2 * sin(entry["phase"] * 2.2)) if Game.is_night() else 0.12
 	if hero == null:
 		return
 	var b := biome_at(hero.global_position)
