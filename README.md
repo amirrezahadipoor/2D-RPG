@@ -116,3 +116,25 @@ equipment piece priced by rarity.
 - New monsters: wolf (fast pack hunter), shaman (ranged caster that heals its
   pack and keeps distance), golem (armored slow tank). 10% of spawns are
   elites: bigger, richer, with a golden glow. Relic pickups glow too.
+
+### M5 addendum — save, checkpoints, permadeath
+One save path for the whole game (`Game.save_run/load_run`): stats, bag,
+equipment, quest log, world seed and hero position in one JSON document —
+no raw Vector2/Color ever touches the file. Checkpoints land on new days,
+level-ups and dungeon stairs. Adventure death offers *revive from last
+checkpoint*; hardcore death deletes the save for good.
+
+### M6 addendum — audio, menus, touch, quality, release
+- **Procedural audio**: every SFX (swing, hit, coin, potion, level-up, death,
+  fireball...) and nine biome music beds are synthesized into 16-bit WAV at
+  runtime — zero audio assets, and they crossfade as you walk between biomes.
+- **Screens**: animated night-sky main menu (continue / adventure / hardcore /
+  settings / quit), Esc pause menu with save-&-quit, and a settings overlay
+  with volume bars, quality tier and EN/FA language — all persisted.
+- **Touch**: virtual stick + A/K/E/H/pause buttons on Android, translated into
+  the same input actions the keyboard uses.
+- **Quality tiers**: low/medium/high trade contact shadows, point lights,
+  dungeon dim and vignette for framerate on weak phones.
+- **Release**: `tools/release.sh` gates on verify, stamps versions and prints
+  the exact keystore signing steps; `docs/STORE.md` holds the EN/FA store
+  listing for `com.hadipoor.pixelrealms`.

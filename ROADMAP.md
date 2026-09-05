@@ -157,7 +157,12 @@ Evidence: `tests/verify.tscn` (125 checks), `docs/screenshots/10_story_intro.png
 - [x] Performance quality tiers: low/medium/high in settings flips contact
       shadows, torch/lantern point lights, dungeon dim and the vignette
       (checks: `low quality drops contact shadows`, `high turns the torch glows on`)
-- [ ] Signed AAB, real package id, store metadata
+- [x] Signed AAB pipeline, real package id, store metadata:
+      `com.hadipoor.pixelrealms` in export_presets.cfg, version stamping +
+      verify-gate in `tools/release.sh`, full EN/FA store listing in
+      `docs/STORE.md`. The keystore signature itself is deliberately manual
+      (the script prints exact keytool/Console steps) — a signing key must
+      never live in a public repo or CI.
 
 ---
 
