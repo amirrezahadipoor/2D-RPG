@@ -116,10 +116,10 @@ func _compose_pages() -> Array:
 	pages.append({"text": "%s\n%s" % [
 		I18N.tr_str("npc.role." + npc.role_name),
 		I18N.tr_str("npc.hello." + npc.role_name)], "mode": "talk"})
-	# the elder carries the tale of the current act, so the story reads as a
-	# continuing chronicle rather than a bare to-do list
+	# the elder (and the king, who watches the whole realm) carries the tale of
+	# the current act, so the story reads as a continuing chronicle
 	var live_main := QuestLog.current_main()
-	if npc.role_name == "elder" and not live_main.is_empty():
+	if npc.role_name in ["elder", "king"] and not live_main.is_empty():
 		var act_line: String = I18N.tr_str("story.act.%d" % QuestLog.current_act())
 		if not act_line.begins_with("story.act."):
 			pages.append({"text": act_line, "mode": "talk"})
@@ -138,7 +138,7 @@ func _compose_pages() -> Array:
 		elif npc.role_name == "merchant":
 			_make_shop()
 			pages.append({"text": "", "mode": "shop"})
-		elif npc.role_name == "elder":
+		elif npc.role_name == "elder" or npc.role_name == "king":
 			var m := QuestLog.current_main()
 			if not m.is_empty():
 				if QuestLog.main_gate_ok():

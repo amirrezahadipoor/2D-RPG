@@ -5,7 +5,7 @@ extends CharacterBody2D
 
 const SPEED := 34.0
 
-enum Role { VILLAGER, ELDER, MERCHANT, GUARD }
+enum Role { VILLAGER, ELDER, MERCHANT, GUARD, KING }
 
 var role: Role = Role.VILLAGER
 var role_name := "villager"
@@ -29,12 +29,13 @@ var ROLE_GEAR := {
 	"merchant": {"helmet": "leather_cap", "chest": "leather_vest", "legs": "leather_pants", "boots": "leather_boots", "weapon": "", "accessory": "red_cloak"},
 	"guard":    {"helmet": "iron_helm", "chest": "iron_plate", "legs": "iron_greaves", "boots": "iron_boots", "weapon": "iron_sword", "accessory": ""},
 	"villager": {"helmet": "", "chest": "tunic_cloth", "legs": "cloth_pants", "boots": "cloth_shoes", "weapon": "", "accessory": ""},
+	"king":    {"helmet": "golden_crown", "chest": "royal_plate", "legs": "iron_greaves", "boots": "iron_boots", "weapon": "golden_sword", "accessory": "royal_cloak"},
 }
 
 func setup(role_str: String, settlement: Dictionary, index: int) -> void:
 	role_name = role_str
 	role = {"villager": Role.VILLAGER, "elder": Role.ELDER,
-		"merchant": Role.MERCHANT, "guard": Role.GUARD}.get(role_str, Role.VILLAGER)
+		"merchant": Role.MERCHANT, "guard": Role.GUARD, "king": Role.KING}.get(role_str, Role.VILLAGER)
 	sett_index = int(settlement.get("index", 0))
 	npc_index = index
 	display_name = I18N.tr_str("npc.name.%d" % (index % 8))

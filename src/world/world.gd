@@ -522,6 +522,29 @@ func _spawn_npcs() -> void:
 			npc.global_position = npc.home
 			npc.setup(roles[i], st, i)
 			npcs.append(npc)
+		# the realm's sovereign rules from the town's palace: a unique, named
+		# presence rather than one more copy of the eight generic villagers
+		if st["type"] == "town":
+			var door_tile := _town_palace_door(st)
+			var king := NPC.new()
+			king.name = "NPC_KING"
+			actors.add_child(king)
+			king.home = Vector2((door_tile.x) * TILE + 8.0, (door_tile.y + 1) * TILE + 8.0)
+			king.global_position = king.home
+			king.setup("king", st, 99)
+			king.display_name = I18N.tr_str("npc.name.king")
+			npcs.append(king)
+
+## The palace is the top-centre house of the town's house grid: the king
+## rules from there, its door is the entrance to the throne-hall interior,
+## and two torches flank the door so it reads as the seat of power.
+func _town_palace_door(st: Dictionary) -> Vector2i:
+	var houses := _house_rects(st)
+	if houses.size() < 2:
+		return st["plaza"]
+	var palace: Rect2i = houses[1]
+	return Vector2i(palace.position.x + palace.size.x / 2,
+		palace.position.y + palace.size.y - 1)
 
 ## Scatter chests: a few per settlement plus some in the wild.
 func _place_chests() -> void:

@@ -684,6 +684,20 @@ func _check_people() -> void:
 		roles[n.role_name] = true
 	_ok(roles.has("elder") and roles.has("merchant") and roles.has("guard"),
 		"role variety: elder/merchant/guard present")
+	# the realm has exactly one crowned king, living in the town's palace
+	var towns := 0
+	for st in world.settlements:
+		if st["type"] == "town":
+			towns += 1
+	var kings := 0
+	var king_crowned := false
+	for n in world.npcs:
+		if n.role_name == "king":
+			kings += 1
+			king_crowned = String(n.doll.get_gear().get("helmet", "")) == "golden_crown"
+			king_crowned = king_crowned and n.display_name != ""
+	_ok(towns == 0 or (kings == 1 and king_crowned),
+		"the town rules exactly one crowned king (%d towns, %d kings)" % [towns, kings])
 	# an NPC actually walks towards its schedule target
 	var target: Vector2 = npc.schedule_target(Game.hour())
 	npc.global_position = npc.home
