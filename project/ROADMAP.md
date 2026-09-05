@@ -36,9 +36,10 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 - ✅ CI workflows push successfully on every commit
 - ✅ Android build workflow triggers on `main` push
 - ✅ All docs present and version-controlled
+- ✅ Phase 1: Core movement/camera implemented with player KinematicBody2D, 8-direction movement, Camera2D zoom bounds, minimum 64px hero size enforcement, GDScript input handling
 
 ### Next Phase Start
-Proceed to Phase 1: Core movement/camera ✅ **IN PROGRESS**
+Proceed to Phase 2: Art pipeline
 
 ---
 
