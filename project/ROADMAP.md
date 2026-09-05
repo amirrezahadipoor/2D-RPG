@@ -51,8 +51,10 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 
 - ✅ Phase 9: Equipment system implemented with 6 equip slots (weapon, helmet, chest, legs, boots, accessories), visual hero sprite updates per equipment, indie-style art design with appealing color schemes from material tiers + patterns, and full stat bonuses (STR/AGI/DEF/LUCK). Equipment integrates with hero appearance and combat stats. All equipment data programmatic - no pre-made art assets.
 
+- ✅ Phase 10: Economy & balance implemented with currency system (gold, magic, artifacts), living NPCs with daily routines and dialogue, intro animated cutscene at game start, item upgrading system with risk/reward balance, enemy drop chances scaled by depth and type, item level scaling based on player level, vendor NPCs with buying/selling, distinctive character and enemy designs, and comprehensive economic balancing (gold sinks, reward scaling, vendor pricing). All systems programmatic - no pre-made art assets.
+
 ### Next Phase Start
-Proceed to Phase 9: Bosses/hardcore balance
+Proceed to Phase 11: Polish
 
 ---
 
