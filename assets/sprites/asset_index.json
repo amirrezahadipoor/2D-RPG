@@ -136,6 +136,24 @@
       "frames": 4,
       "cols": 4
     },
+    "wolf": {
+      "w": 24,
+      "h": 24,
+      "frames": 4,
+      "cols": 4
+    },
+    "shaman": {
+      "w": 24,
+      "h": 24,
+      "frames": 4,
+      "cols": 4
+    },
+    "golem": {
+      "w": 24,
+      "h": 24,
+      "frames": 4,
+      "cols": 4
+    },
     "dragon": {
       "w": 32,
       "h": 32,

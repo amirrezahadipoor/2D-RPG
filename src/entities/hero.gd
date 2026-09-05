@@ -260,11 +260,9 @@ func _aim_direction() -> Vector2:
 ## Melee sweep: a band `reach` long and `arc` wide in the direction the hero
 ## faces. Every enemy inside it takes weapon damage + attack power + level, and
 ## is knocked back along the swing direction. Returns how many were hit.
-func _sweep_attack(weapon: Dictionary, heavy: bool = false) -> int:
-	var dir := _aim_direction()
-	var side := dir.orthogonal()
-	var reach: float = weapon["reach"] + (6.0 if heavy else 0.0)
-	var arc: float = weapon["arc"] * (1.8 if heavy else 1.5 if _combo == 2 else 1.15 if _combo == 1 else 1.0)
+## Raw swing damage for the current combo step / heavy flag, before crits.
+## Exposed so tests (and the UI someday) can reason about it deterministically.
+func swing_amount(weapon: Dictionary, heavy: bool) -> int:
 	var amount := attack_damage(weapon)
 	if heavy:
 		amount = int(roundf(amount * 2.2))
@@ -272,6 +270,14 @@ func _sweep_attack(weapon: Dictionary, heavy: bool = false) -> int:
 		amount = int(roundf(amount * 1.35))
 	elif _combo == 1:
 		amount = int(roundf(amount * 1.1))
+	return amount
+
+func _sweep_attack(weapon: Dictionary, heavy: bool = false) -> int:
+	var dir := _aim_direction()
+	var side := dir.orthogonal()
+	var reach: float = weapon["reach"] + (6.0 if heavy else 0.0)
+	var arc: float = weapon["arc"] * (1.8 if heavy else 1.5 if _combo == 2 else 1.15 if _combo == 1 else 1.0)
+	var amount := swing_amount(weapon, heavy)
 	var crit := randf() < CRIT_CHANCE
 	if crit:
 		amount *= 2

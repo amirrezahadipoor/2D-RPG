@@ -20,6 +20,9 @@ const TACTICS := {
 	"skeleton": {"skirmish": true},
 	"orc": {"berserk_hp": 0.35},
 	"demon": {"ranged": true},
+	"wolf": {"pack": true},
+	"shaman": {"ranged": true, "keep_distance": true, "healer": true},
+	"golem": {"armored": true},
 	"dragon": {"ranged": true, "boss": true},
 }
 
@@ -59,6 +62,9 @@ var _tele: Label = null
 var _stagger_timer := 0.0
 var _tilt := 0.0
 var _death_timer := -1.0
+var elite := false
+var _heal_timer := 5.0
+var _glow: Sprite2D = null
 
 func setup(type: String, lvl: int) -> void:
 	enemy_type = type
@@ -114,6 +120,22 @@ func setup(type: String, lvl: int) -> void:
 
 	add_to_group("enemy")
 	_set_frame(0)
+
+## Elites: bigger, tougher, gold-veined glow under their feet.
+func mark_elite() -> void:
+	elite = true
+	max_hp = int(roundf(max_hp * 1.35))
+	hp = max_hp
+	gold_value = int(roundf(gold_value * 1.6))
+	xp_value = int(roundf(xp_value * 1.4))
+	_glow = Sprite2D.new()
+	_glow.texture = load("res://assets/sprites/fx/glow.png")
+	_glow.modulate = Color(1.0, 0.75, 0.25, 0.55)
+	_glow.scale = Vector2(1.4, 1.4)
+	_glow.position = Vector2(0, -2)
+	_glow.z_index = -1
+	add_child(_glow)
+	_spr.scale *= 1.12
 
 func _tactic(key: String) -> bool:
 	return bool(TACTICS.get(enemy_type, {}).get(key, false))
@@ -200,6 +222,9 @@ func _physics_process(delta: float) -> void:
 				# circle the hero while the claw cools
 				velocity = velocity.move_toward(to_hero.normalized().orthogonal()
 					* _strafe_dir * sp, 300 * delta)
+			elif _tactic("keep_distance") and dist < attack_range * 1.6:
+				# casters never want you in their face
+				velocity = velocity.move_toward(-to_hero.normalized() * sp, 300 * delta)
 			elif _tactic("ranged") and dist > attack_range * 1.2 and _attack_timer <= 0.0:
 				state = State.WINDUP
 				_windup_timer = 0.45
@@ -240,6 +265,33 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_animate(delta)
 	_boss_brain(delta, dist, to_hero)
+	_healer_brain(delta)
+
+## Shamans knit their wounded pack back together - kill them first.
+func _healer_brain(delta: float) -> void:
+	if not _tactic("healer") or state == State.DEAD:
+		return
+	_heal_timer -= delta
+	if _heal_timer > 0.0:
+		return
+	_heal_timer = 6.0
+	var best: Enemy = null
+	for node in get_tree().get_nodes_in_group("enemy"):
+		var other := node as Enemy
+		if other == null or other == self or other.state == State.DEAD:
+			continue
+		if other.hp >= other.max_hp:
+			continue
+		if other.global_position.distance_to(global_position) > 90.0:
+			continue
+		if best == null or float(other.hp) / float(other.max_hp) < float(best.hp) / float(best.max_hp):
+			best = other
+	if best == null:
+		return
+	best.hp = mini(best.max_hp, best.hp + int(roundf(best.max_hp * 0.2)))
+	best._hp_bg.visible = true
+	best._hp_fill.size.x = 14.0 * clampf(float(best.hp) / float(best.max_hp), 0.0, 1.0)
+	Juice.world_text(best.global_position + Vector2(0, -26), "+", Color(0.4, 1.0, 0.5), 9)
 
 ## Melee claw, or a hurled fireball when the species fights at range.
 func _resolve_attack(dist: float, to_hero: Vector2) -> void:
@@ -318,6 +370,8 @@ func _set_frame(i: int) -> void:
 func take_damage(amount: int, knock_dir: Vector2 = Vector2.ZERO, crit: bool = false) -> int:
 	if state == State.DEAD:
 		return 0
+	if _tactic("armored"):
+		amount = int(roundf(float(amount) * 0.7))   # rock skin shrugs off blows
 	var taken := mini(amount, hp)
 	hp -= taken
 	_flash_timer = 0.12

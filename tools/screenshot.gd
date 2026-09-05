@@ -285,6 +285,31 @@ func run() -> void:
 		for i in 6:
 			await get_tree().physics_frame
 
+	# ---- bestiary lineup: the new species, one of them elite ----
+	if world and hero:
+		var types := ["wolf", "shaman", "golem", "demon", "orc"]
+		var offs := [Vector2(-52, 14), Vector2(-26, 22), Vector2(4, 24),
+			Vector2(34, 18), Vector2(58, 26)]
+		var made: Array = []
+		for i in types.size():
+			var e := Enemy.new()
+			world.actors.add_child(e)
+			e.setup(types[i], 3)
+			e.speed = 0.0
+			e.detect = 0.0
+			e.global_position = hero.global_position + offs[i]
+			if i == 2:
+				e.mark_elite()
+			made.append(e)
+		for i in 20:
+			await get_tree().physics_frame
+		await _grab("19_bestiary")
+		for e in made:
+			if is_instance_valid(e):
+				e.queue_free()
+		for i in 6:
+			await get_tree().physics_frame
+
 	print("[screenshot] done")
 	get_tree().quit(0)
 

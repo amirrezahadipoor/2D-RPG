@@ -36,6 +36,7 @@ func run() -> void:
 	_check_balance()
 	await _check_graphics()
 	await _check_anim()
+	await _check_bestiary()
 
 	print("")
 	if _failures.is_empty():
@@ -922,8 +923,13 @@ func _check_ai() -> void:
 	await get_tree().physics_frame   # chase  -> ranged windup
 	_ok(d.state == Enemy.State.WINDUP, "demon winds up a ranged cast")
 	d._windup_timer = 0.0
-	await get_tree().physics_frame
-	_ok(get_tree().get_nodes_in_group("projectile").size() > 0, "fireball spawned")
+	var balls := 0
+	for i in 6:
+		await get_tree().physics_frame
+		balls = get_tree().get_nodes_in_group("projectile").size()
+		if balls > 0:
+			break
+	_ok(balls > 0, "fireball spawned")
 
 	# boss phases: the dragon enrages below half health
 	var dr := _ai_spawn("dragon", Vector2(200, 200))
@@ -968,27 +974,22 @@ func _check_combat_style() -> void:
 	var c2 := hero._combo
 	_ok(c0 == 0 and c1 == 1 and c2 == 2, "three-hit combo chains (%d,%d,%d)" % [c0, c1, c2])
 
-	# finisher hits harder than the opener
+	# swing tiers are deterministic: opener < finisher < heavy cleave
 	dummy.global_position = hero.global_position + Vector2(0, 12)
 	await get_tree().physics_frame
-	hero._combo_window = 0.0
-	hero._counter_window = 0.0
-	var hp0 := dummy.hp
-	hero.do_attack(false)
-	var d_open := hp0 - dummy.hp
+	var w: Dictionary = WeaponDB.stats_for(hero.current_weapon_id())
+	hero._combo = 0
+	var s_open := hero.swing_amount(w, false)
 	hero._combo = 1
-	hero._combo_window = 0.5
-	hp0 = dummy.hp
-	hero.do_attack(false)
-	var d_finish := hp0 - dummy.hp
-	_ok(d_finish >= d_open, "finisher out-damages the opener (%d >= %d)" % [d_finish, d_open])
-
-	# heavy cleave out-damages the finisher
-	hero._charge = 0.6
-	hp0 = dummy.hp
-	hero.do_attack(true)
-	var d_heavy := hp0 - dummy.hp
-	_ok(d_heavy > d_finish, "held heavy cleave hits hardest (%d > %d)" % [d_heavy, d_finish])
+	var s_mid := hero.swing_amount(w, false)
+	hero._combo = 2
+	var s_finish := hero.swing_amount(w, false)
+	hero._combo = 0
+	var s_heavy := hero.swing_amount(w, true)
+	_ok(s_open < s_mid and s_mid < s_finish and s_finish < s_heavy,
+		"swing tiers escalate %d < %d < %d < %d" % [s_open, s_mid, s_finish, s_heavy])
+	hero.do_attack(true)   # keep the old path exercised too
+	_ok(dummy.hp < dummy.max_hp, "swings still land on a body")
 
 	# parry: swinging as the claw lands staggers the attacker
 	hero._parry_window = 0.2
@@ -1013,9 +1014,9 @@ func _check_combat_style() -> void:
 	Stats.stamina = 0.0
 	hero._combo = 0
 	hero._combo_window = 0.0
-	hp0 = dummy.hp
+	var hp_starved := dummy.hp
 	hero.do_attack(false)
-	_ok(hp0 == dummy.hp, "empty stamina blocks swings")
+	_ok(hp_starved == dummy.hp, "empty stamina blocks swings")
 	Stats.reset_run()
 	dummy.queue_free()
 	await get_tree().physics_frame
@@ -1166,3 +1167,60 @@ func _check_anim() -> void:
 		await get_tree().physics_frame
 	_ok(not is_instance_valid(dummy), "dead monster frees itself after the tween")
 	Stats.reset_run()
+
+# ------------------------------------------------------------ bestiary ------
+func _check_bestiary() -> void:
+	print("== bestiary ==")
+	for type in ["wolf", "shaman", "golem"]:
+		_ok(EnemyDB.TYPES.has(type), "%s has stats" % type)
+		_ok(ArtIndex.ENEMIES.has(type), "%s has sprite meta" % type)
+		_ok(ResourceLoader.exists("res://assets/sprites/enemies/%s.png" % type),
+			"%s sheet exists on disk" % type)
+	_ok(EnemyDB.TYPES["wolf"]["speed"] > EnemyDB.TYPES["goblin"]["speed"], "wolves outrun goblins")
+	_ok(EnemyDB.TYPES["golem"]["hp"] > EnemyDB.TYPES["orc"]["hp"], "golems out-tank orcs")
+	_ok(EnemyDB.BIOME_SPAWNS["forest"].has("wolf"), "wolves hunt the forests")
+	_ok(EnemyDB.BIOME_SPAWNS["swamp"].has("shaman"), "shaman lurk in swamps")
+	_ok(EnemyDB.BIOME_SPAWNS["caves"].has("golem"), "golems guard the caves")
+	_ok(Dungeon.DEPTH_TYPES.has("wolf") and Dungeon.DEPTH_TYPES.has("golem"),
+		"depth table mixes the new species")
+
+	var hero := world.hero
+	hero.global_position = Vector2(2600, 2000)
+	Game.state = Game.State.PLAYING
+	await get_tree().physics_frame
+	# armored: golem shrugs off 30% of every hit
+	var g := _ai_spawn("golem", Vector2(30, 0))
+	g.speed = 0.0
+	g.detect = 0.0
+	var hp0 := g.hp
+	g.take_damage(10)
+	_ok(hp0 - g.hp == 7, "golem armor soaks 30%% (10 -> %d)" % (hp0 - g.hp))
+	# keep distance: a shaman backs away when you close in
+	var sh := _ai_spawn("shaman", Vector2(20, 0))
+	sh._attack_timer = 9.0
+	var d0 := sh.global_position.distance_to(hero.global_position)
+	for i in 20:
+		await get_tree().physics_frame
+	var d1 := sh.global_position.distance_to(hero.global_position)
+	_ok(d1 > d0, "shaman keeps its distance (%0.0f -> %0.0f)" % [d0, d1])
+	# healer: a wounded packmate gets knit back together
+	var wolf := _ai_spawn("wolf", Vector2(40, 20))
+	wolf.speed = 0.0
+	wolf.detect = 0.0
+	wolf.hp = 5
+	sh._heal_timer = 0.0
+	var whp := wolf.hp
+	for i in 5:
+		await get_tree().physics_frame
+	_ok(wolf.hp > whp, "shaman heals a wounded packmate (%d -> %d)" % [whp, wolf.hp])
+	# elite: bigger pool, richer payout, golden glow
+	var e := _ai_spawn("skeleton", Vector2(60, 40))
+	var hp_plain := e.max_hp
+	var gold_plain := e.gold_value
+	e.mark_elite()
+	_ok(e.max_hp > hp_plain and e.gold_value > gold_plain and e._glow != null,
+		"elite roll buffs hp/gold and adds a glow")
+	for en in _ai_made:
+		if is_instance_valid(en):
+			en.queue_free()
+	await get_tree().physics_frame

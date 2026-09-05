@@ -8,7 +8,7 @@ const W := 72
 const H := 54
 const MAX_DEPTH := 6
 const SPAWN_CAP := 6
-const DEPTH_TYPES := ["skeleton", "skeleton", "orc", "orc", "demon", "demon"]
+const DEPTH_TYPES := ["wolf", "skeleton", "orc", "golem", "demon", "demon"]
 
 var depth := 1
 var terrain_layer: TileMapLayer
@@ -309,6 +309,8 @@ func _dungeon_spawn(delta: float) -> void:
 		actors.add_child(enemy)
 		var type: String = DEPTH_TYPES[clampi(depth - 1, 0, DEPTH_TYPES.size() - 1)]
 		enemy.setup(type, maxi(1, Stats.level + depth - 1))
+		if _rng.randf() < 0.1:
+			enemy.mark_elite()
 		enemy.global_position = pos
 		enemy.died.connect(_on_enemy_died)
 		return

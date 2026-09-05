@@ -122,7 +122,8 @@ Evidence: `tests/verify.tscn` (125 checks), `docs/screenshots/10_story_intro.png
 - [x] Animated torch flames in settlements and dungeons + ambient vignette
 - [x] Movement - [ ] Movement & combat animation pass (slash arcs, charge ring, dodge combat animation pass (slash arcs, charge ring, dodge
       streaks, walk bounce, death topple, hit tilt)
-- [ ] Enemy roster expansion (wolf, shaman, golem) with elite glow
+- [x] Enemy roster expansion: wolf (pack runner), shaman (ranged healer,
+      keeps distance), golem (armored tank) + 10% elite rolls with golden glow
 
 ## M5 — Progression, talents & save
 

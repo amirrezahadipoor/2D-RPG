@@ -15,17 +15,23 @@ const TYPES := {
 	             "detect": 75,  "attack_range": 18, "attack_cd": 1.5, "scale": 1.2},
 	"demon":    {"hp": 78,  "damage": 16, "speed": 42, "xp": 70,  "gold": 45,
 	             "detect": 100, "attack_range": 16, "attack_cd": 1.0, "scale": 1.2},
+	"wolf":     {"hp": 22,  "damage": 7,  "speed": 62, "xp": 16,  "gold": 6,
+	             "detect": 95,  "attack_range": 12, "attack_cd": 0.9, "scale": 1.0},
+	"shaman":   {"hp": 30,  "damage": 9,  "speed": 30, "xp": 26,  "gold": 14,
+	             "detect": 90,  "attack_range": 14, "attack_cd": 1.3, "scale": 1.0},
+	"golem":    {"hp": 140, "damage": 20, "speed": 18, "xp": 60,  "gold": 35,
+	             "detect": 60,  "attack_range": 20, "attack_cd": 2.0, "scale": 1.4},
 	"dragon":   {"hp": 260, "damage": 26, "speed": 36, "xp": 250, "gold": 200,
 	             "detect": 130, "attack_range": 24, "attack_cd": 1.6, "scale": 1.6},
 }
 
 # Which enemies a biome can hold. Keeps forests from spawning dragons.
 const BIOME_SPAWNS := {
-	"forest": ["slime", "bat", "goblin"],
-	"desert": ["goblin", "skeleton"],
-	"snow":   ["skeleton", "orc"],
-	"swamp":  ["slime", "bat", "skeleton"],
-	"caves":  ["skeleton", "orc", "demon"],
+	"forest": ["slime", "bat", "goblin", "wolf"],
+	"desert": ["goblin", "skeleton", "shaman"],
+	"snow":   ["skeleton", "orc", "wolf"],
+	"swamp":  ["slime", "bat", "skeleton", "shaman"],
+	"caves":  ["skeleton", "orc", "golem", "demon"],
 	"water":  [],
 }
 

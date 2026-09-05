@@ -1023,6 +1023,96 @@ def enemy_dragon():
     return frames
 
 
+def enemy_wolf():
+    """Lean grey quadruped: long stride, lowered head, yellow eyes."""
+    r = _ramp("stone")
+    frames = []
+    for f in range(4):
+        c = Canvas(24, 24)
+        bob = [0, -1, 0, -1][f]
+        # body
+        c.rect(5, 12 + bob, 12, 6, r["m"])
+        c.hline(5, 12 + bob, 12, r["l"])
+        c.hline(5, 17 + bob, 12, r["d"])
+        # head lowered forward
+        c.rect(15, 10 + bob, 6, 5, r["m"])
+        c.rect(19, 12 + bob, 3, 2, r["d"])          # snout
+        c.px(16, 11 + bob, PAL["gold_l"])           # eye
+        c.px(15, 8 + bob, r["d"]); c.px(18, 8 + bob, r["d"])  # ears
+        # tail
+        c.px(4, 11 + bob, r["d"]); c.px(3, 10 + bob, r["d"])
+        # legs: diagonal stride pairs
+        ph = [(0, 0, 1, 1), (1, 0, 0, 1), (0, 1, 1, 0), (1, 1, 0, 0)][f]
+        lx = [6, 9, 13, 16]
+        for i, x in enumerate(lx):
+            ext = ph[i % 4]
+            c.vline(x, 18 + bob, 3 - ext, r["d"])
+            c.px(x + (1 if ext else 0), 20, r["d"])
+        c.outline()
+        frames.append(c)
+    return frames
+
+
+def enemy_shaman():
+    """Hooded caster: robe, bone staff with an ember orb, no visible face."""
+    frames = []
+    r = _ramp("purple")
+    for f in range(4):
+        c = Canvas(24, 24)
+        bob = [0, -1, 0, -1][f]
+        # hood + shadowed face
+        c.rect(8, 4 + bob, 8, 6, r["m"])
+        c.hline(8, 4 + bob, 8, r["l"])
+        c.rect(9, 6 + bob, 6, 3, PAL["black"])
+        c.px(10, 7 + bob, PAL["ember"]); c.px(13, 7 + bob, PAL["ember"])
+        # robe
+        c.rect(7, 10 + bob, 10, 9, r["m"])
+        c.hline(7, 10 + bob, 10, r["l"])
+        c.rect(6, 17 + bob, 12, 3, r["d"])
+        # staff with orb
+        c.vline(18, 5 + bob, 14, PAL["leath_m"])
+        c.rect(17, 2 + bob, 3, 3, PAL["ember"])
+        c.px(18, 3 + bob, PAL["gold_l"])
+        # casting arm
+        c.rect(15, 11 + bob, 3, 2, r["m"])
+        c.outline()
+        frames.append(c)
+    return frames
+
+
+def enemy_golem():
+    """Slow rock brute: boulder shoulders, crack veins, tiny glowing core."""
+    r = _ramp("stone")
+    frames = []
+    for f in range(4):
+        c = Canvas(24, 24)
+        bob = [0, -1, 0, 1][f]
+        # hulking torso
+        c.rect(5, 8 + bob, 14, 10, r["m"])
+        c.hline(5, 8 + bob, 14, r["l"])
+        c.hline(5, 17 + bob, 14, r["d"])
+        # head bump
+        c.rect(9, 4 + bob, 6, 4, r["m"])
+        c.px(10, 5 + bob, PAL["ember"]); c.px(13, 5 + bob, PAL["ember"])
+        # crack veins
+        c.px(8, 11 + bob, r["d"]); c.px(9, 12 + bob, r["d"]); c.px(9, 13 + bob, r["d"])
+        c.px(14, 10 + bob, r["d"]); c.px(15, 11 + bob, r["d"])
+        # glowing core
+        c.px(11, 13 + bob, PAL["ember"]); c.px(12, 13 + bob, PAL["ember"])
+        # massive arms
+        sway = [0, 1, 0, -1][f]
+        c.rect(2, 9 + bob + sway, 3, 8, r["m"])
+        c.rect(19, 9 + bob - sway, 3, 8, r["m"])
+        c.hline(2, 16 + bob + sway, 3, r["d"])
+        c.hline(19, 16 + bob - sway, 3, r["d"])
+        # stubby legs
+        c.rect(7, 18, 4, 3, r["d"])
+        c.rect(13, 18, 4, 3, r["d"])
+        c.outline()
+        frames.append(c)
+    return frames
+
+
 def build_enemy_sheet(frames, cols=4):
     w = max(f.w for f in frames)
     h = max(f.h for f in frames)
@@ -1307,6 +1397,9 @@ def main():
         ("skeleton", enemy_humanoid("stone", "stone", skeleton=True), 24, 24),
         ("orc",      enemy_humanoid("red", "leath", horns=True), 24, 24),
         ("demon",    enemy_humanoid("purple", "red", horns=True), 24, 24),
+        ("wolf",     enemy_wolf(), 24, 24),
+        ("shaman",   enemy_shaman(), 24, 24),
+        ("golem",    enemy_golem(), 24, 24),
         ("dragon",   enemy_dragon(), 32, 32),
     ]
     enemy_index = {}

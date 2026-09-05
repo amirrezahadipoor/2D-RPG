@@ -81,6 +81,7 @@ func spawn(type: String, pos: Vector2, level: int = -1) -> Enemy:
 	enemy.name = "Enemy_" + type
 	world.add_child(enemy)
 	enemy.setup(type, lvl)
+	_maybe_elite(enemy)
 	enemy.global_position = pos
 	enemy.died.connect(_on_enemy_died)
 	return enemy
@@ -102,6 +103,10 @@ func _cull() -> void:
 			continue
 		if enemy.global_position.distance_to(_hero.global_position) > DESPAWN_DIST:
 			enemy.queue_free()
+
+func _maybe_elite(enemy: Enemy) -> void:
+	if _rng.randf() < 0.1:
+		enemy.mark_elite()
 
 func _on_enemy_died(enemy: Enemy) -> void:
 	Stats.add_kill()
