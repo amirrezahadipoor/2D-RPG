@@ -16,7 +16,16 @@ var _overworld_hero_pos := Vector2.ZERO
 func _ready() -> void:
 	world = Overworld.new()
 	world.name = "Overworld"
+	if Game.pending_load:
+		Game.load_run()
+		world.forced_seed = Game.saved_world_seed
 	add_child(world)
+	if Game.pending_load and Game.saved_hero_pos != Vector2.ZERO \
+			and world.is_walkable_at(Game.saved_hero_pos):
+		world.hero.global_position = Game.saved_hero_pos
+	Game.pending_load = false
+
+	_hook_autosave()
 
 	hud = Hud.new()
 	hud.name = "Hud"
@@ -26,6 +35,7 @@ func _ready() -> void:
 	death_screen.name = "DeathScreen"
 	add_child(death_screen)
 	death_screen.retry_pressed.connect(_on_retry)
+	death_screen.revive_pressed.connect(_on_revive)
 
 	inv_screen = InventoryScreen.new()
 	inv_screen.name = "InventoryScreen"
@@ -139,6 +149,7 @@ func _on_secret() -> void:
 	hud.show_toast(I18N.tr_str("toast.secret"))
 
 func _on_stairs(direction: int) -> void:
+	Game.save_checkpoint()
 	if direction > 0:
 		enter_dungeon(dungeon.depth + 1)
 	else:
@@ -156,6 +167,23 @@ func _on_game_state(new_state: int, _old_state: int) -> void:
 
 ## Hardcore: the save was already deleted inside Game.die(), so "Start Over"
 ## simply rebuilds a fresh world with reset stats.
+## Autosave rhythm: every new in-game day, every level, every stair.
+func _hook_autosave() -> void:
+	Game.hour_changed.connect(func(h: int, _d: int):
+		if h == 8:
+			Game.save_checkpoint())
+	Stats.level_changed.connect(func(_l: int, _x: int, _n: int): Game.save_checkpoint())
+
+func _reload_scene() -> void:
+	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+func _on_revive() -> void:
+	Game.pending_load = true
+	_reload_scene()
+
 func _on_retry() -> void:
+	if not Game.is_hardcore:
+		Game.wipe_save()   # abandoning an adventure run deletes it
 	Game.start_new_run(Game.is_hardcore)
+	_reload_scene()
 	get_tree().reload_current_scene()

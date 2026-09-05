@@ -179,5 +179,7 @@
  "item.dragonfang_talisman": "طلسم دندان اژدها",
  "toast.secret": "راهی پنهان گشوده شد!",
  "toast.parried": "دفع شد!",
- "toast.perfect": "جاخالی کامل!"
+ "toast.perfect": "جاخالی کامل!",
+ "death.revive": "بیداری در آخرین نقطهٔ ذخیره",
+ "death.abandon": "رها کردن این سفر"
 }

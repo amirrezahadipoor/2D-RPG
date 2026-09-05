@@ -37,8 +37,10 @@ var _road_grid: PackedByteArray = PackedByteArray()
 var _current_biome := ""
 var world_seed: int = 0
 
+var forced_seed := -1
+
 func _ready() -> void:
-	build(randi())
+	build(forced_seed if forced_seed >= 0 else randi())
 
 # ---------------------------------------------------------------- build -----
 func build(seed_value: int) -> void:

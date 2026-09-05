@@ -3,6 +3,7 @@ class_name DeathScreen
 extends CanvasLayer
 
 signal retry_pressed
+signal revive_pressed
 
 var _root: Control
 var _dim: ColorRect
@@ -10,6 +11,7 @@ var _title: Label
 var _hardcore_note: Label
 var _summary: Label
 var _retry: Button
+var _revive: Button
 
 func _ready() -> void:
 	layer = 30
@@ -58,6 +60,11 @@ func _build() -> void:
 	_retry.pressed.connect(func(): retry_pressed.emit())
 	_root.add_child(_retry)
 
+	_revive = Button.new()
+	_revive.add_theme_font_size_override("font_size", 9)
+	_revive.pressed.connect(func(): revive_pressed.emit())
+	_root.add_child(_revive)
+
 	_layout()
 	get_viewport().size_changed.connect(_layout)
 
@@ -70,8 +77,10 @@ func _layout() -> void:
 	_hardcore_note.size = Vector2(vp.x, 12)
 	_summary.position = Vector2(0, vp.y * 0.5)
 	_summary.size = Vector2(vp.x, 34)
-	_retry.position = Vector2(vp.x * 0.5 - 50, vp.y * 0.78)
+	_retry.position = Vector2(vp.x * 0.5 - 50, vp.y * 0.78 if _revive.visible else vp.y * 0.72)
 	_retry.size = Vector2(100, 16)
+	_revive.position = Vector2(vp.x * 0.5 - 50, vp.y * 0.66)
+	_revive.size = Vector2(100, 16)
 
 func show_death() -> void:
 	_title.text = I18N.tr_str("death.title")
@@ -83,7 +92,10 @@ func show_death() -> void:
 		I18N.tr_str("death.gold"), I18N.num(Stats.gold),
 	]
 	_retry.text = I18N.tr_str("death.retry")
-	for control: Control in [_title, _hardcore_note, _summary, _retry]:
+	var can_revive := not Game.last_death_was_hardcore and Game.has_save()
+	_revive.visible = can_revive
+	_revive.text = I18N.tr_str("death.revive")
+	for control: Control in [_title, _hardcore_note, _summary, _retry, _revive]:
 		I18N.tag(control)
 	visible = true
 

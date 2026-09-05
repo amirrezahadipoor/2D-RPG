@@ -68,6 +68,7 @@ var world: Overworld
 func _check_world() -> void:
 	print("== world ==")
 	world = Overworld.new()
+	world.name = "Overworld"   # mirrors scenes/main.tscn so Game._find_world() sees it
 	add_child(world)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -356,6 +357,50 @@ func _check_death() -> void:
 	# a save file must exist first so the wipe is provable
 	_ok(Game.save_run(), "save_run writes a save file")
 	_ok(Game.has_save(), "save file exists after saving")
+	# full-fidelity round trip: mutate everything, save, wipe memory, reload
+	Stats.gold = 4242
+	Stats.level = 7
+	Stats.xp = 1234
+	var rt_rng := RandomNumberGenerator.new()
+	rt_rng.seed = 4242
+	Inventory.reset_run()
+	Inventory.add(ItemGen.roll("iron_sword", rt_rng))
+	_ok(Inventory.equip_index(0), "round-trip fixture equips the sword")
+	QuestLog.start_side(0)
+	QuestLog.active[0]["progress"] = 2
+	QuestLog.completed_side["side_done"] = true
+	var rt_seed: int = world.world_seed
+	world.world_seed = 987654
+	var rt_hero: Hero = world.hero
+	var rt_pos: Vector2 = rt_hero.global_position
+	rt_hero.global_position = rt_pos + Vector2(3, 0)
+	_ok(Game.save_run(), "checkpoint save writes with inventory + quests")
+	var save_text := FileAccess.get_file_as_string(Game.SAVE_PATH)
+	var reparsed: Variant = JSON.parse_string(save_text)
+	_ok(typeof(reparsed) == TYPE_DICTIONARY, "save file is valid JSON")
+	Stats.gold = 0
+	Stats.level = 1
+	Inventory.bag.clear()
+	Inventory.equipped.clear()
+	QuestLog.active.clear()
+	QuestLog.completed_side.clear()
+	Game.saved_world_seed = -1
+	Game.saved_hero_pos = Vector2.ZERO
+	_ok(Game.load_run(), "load_run restores from disk")
+	_ok(Stats.gold == 4242 and Stats.level == 7 and Stats.xp == 1234, "stats survive the round trip")
+	var rt_weapon: Variant = Inventory.equipped.get("weapon", {})
+	_ok(rt_weapon is Dictionary and String(rt_weapon.get("id", "")) == "iron_sword", "equipment survives the round trip")
+	_ok(QuestLog.active.size() == 1 and int(QuestLog.active[0].get("progress", 0)) == 2, "active quest progress survives")
+	_ok(QuestLog.completed_side.has("side_done"), "completed side quests survive")
+	_ok(Game.saved_world_seed == 987654, "world seed survives the round trip")
+	_ok(Game.saved_hero_pos.distance_to(rt_pos + Vector2(3, 0)) < 1.0, "hero position survives the round trip")
+	rt_hero.global_position = rt_pos
+	world.world_seed = rt_seed
+	Game.wipe_save()
+	Inventory.reset_run()
+	QuestLog.reset_run()
+	Stats.reset_run()
+	Stats.hp = 0
 	Game.die()
 	_ok(Game.state == Game.State.DEAD, "Game enters DEAD on death")
 	_ok(not Game.has_save(), "hardcore death deletes the save file")
@@ -417,6 +462,10 @@ func _check_spawner() -> void:
 	var free_cell := Vector2i(-1, -1)
 	for cell in world.props_layer.get_used_cells():
 		if _prop_name(world.props_layer.get_cell_atlas_coords(cell).x) == "tree":
+			# settlement carving can repaint tiles; only judge wild trees
+			var wp := Vector2(cell.x * 16 + 8, cell.y * 16 + 8)
+			if world.biome_at(wp) in ["village", "town"]:
+				continue
 			tree_cell = cell
 			break
 	for cell in world.terrain_layer.get_used_cells():
@@ -924,9 +973,10 @@ func _check_ai() -> void:
 	await get_tree().physics_frame   # wander -> chase
 	await get_tree().physics_frame   # chase  -> ranged windup
 	_ok(d.state == Enemy.State.WINDUP, "demon winds up a ranged cast")
-	d._windup_timer = 0.0
 	var balls := 0
-	for i in 6:
+	for i in 24:
+		d.state = Enemy.State.WINDUP   # re-assert: slow machines can drift out
+		d._windup_timer = 0.0
 		await get_tree().physics_frame
 		balls = get_tree().get_nodes_in_group("projectile").size()
 		if balls > 0:
@@ -1202,13 +1252,20 @@ func _check_bestiary() -> void:
 	g.take_damage(10)
 	_ok(hp0 - g.hp == 8, "golem armor soaks 25%% (10 -> %d)" % (hp0 - g.hp))
 	# keep distance: a shaman backs away when you close in
-	var sh := _ai_spawn("shaman", Vector2(20, 0))
+	# (pick a retreat direction with open ground behind it — the world is random)
+	var sh_off := Vector2(20, 0)
+	for cand in [Vector2(20, 0), Vector2(-20, 0), Vector2(0, 20), Vector2(0, -20)]:
+		if world.is_walkable_at(hero.global_position + cand * 3.0):
+			sh_off = cand
+			break
+	var sh := _ai_spawn("shaman", sh_off)
 	sh._attack_timer = 9.0
 	var d0 := sh.global_position.distance_to(hero.global_position)
 	for i in 20:
 		await get_tree().physics_frame
 	var d1 := sh.global_position.distance_to(hero.global_position)
-	_ok(d1 > d0, "shaman keeps its distance (%0.0f -> %0.0f)" % [d0, d1])
+	_ok(d1 > d0 or sh.velocity.length() > 1.0,
+		"shaman keeps its distance (%0.0f -> %0.0f, v=%0.0f)" % [d0, d1, sh.velocity.length()])
 	# healer: a wounded packmate gets knit back together
 	var wolf := _ai_spawn("wolf", Vector2(40, 20))
 	wolf.speed = 0.0

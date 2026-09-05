@@ -179,5 +179,7 @@
  "item.dragonfang_talisman": "Dragonfang Talisman",
  "toast.secret": "A hidden way opens!",
  "toast.parried": "Parried!",
- "toast.perfect": "Perfect dodge!"
+ "toast.perfect": "Perfect dodge!",
+ "death.revive": "Wake at last checkpoint",
+ "death.abandon": "Abandon run"
 }

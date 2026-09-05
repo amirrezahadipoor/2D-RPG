@@ -25,6 +25,9 @@ var playtime: float = 0.0
 var last_death_was_hardcore: bool = false
 var game_minutes: float = 8.0 * 60.0
 var seen_intro: bool = false
+var saved_world_seed: int = -1
+var saved_hero_pos := Vector2.ZERO
+var pending_load := false
 
 func hour() -> int:
 	return int(game_minutes / 60.0) % 24
@@ -112,7 +115,15 @@ func save_run() -> bool:
 		"game_minutes": game_minutes,
 		"seen_intro": seen_intro,
 		"stats": Stats.serialize(),
+		"inventory": Inventory.serialize(),
+		"quests": QuestLog.serialize(),
 	}
+	var world := _find_world()
+	if world != null:
+		payload["world_seed"] = int(world.get("world_seed"))
+		var hero: Node2D = world.get("hero")
+		if hero != null:
+			payload["hero_pos"] = [hero.global_position.x, hero.global_position.y]
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
 		push_error("[Game] cannot open save for writing")
@@ -138,7 +149,19 @@ func load_run() -> bool:
 	game_minutes = float(parsed.get("game_minutes", 8.0 * 60.0))
 	seen_intro = bool(parsed.get("seen_intro", false))
 	Stats.deserialize(parsed.get("stats", {}))
+	Inventory.deserialize(parsed.get("inventory", {}))
+	QuestLog.deserialize(parsed.get("quests", {}))
+	saved_world_seed = int(parsed.get("world_seed", -1))
+	var hp: Array = parsed.get("hero_pos", [])
+	saved_hero_pos = Vector2(float(hp[0]), float(hp[1])) if hp.size() == 2 else Vector2.ZERO
 	return true
+
+## Checkpoints are ordinary saves taken at safe moments (stairs, new day).
+func save_checkpoint() -> bool:
+	return save_run()
+
+func _find_world() -> Node:
+	return get_tree().root.find_child("Overworld", true, false)
 
 func wipe_save() -> void:
 	var dir := DirAccess.open("user://")

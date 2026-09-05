@@ -129,10 +129,17 @@ Evidence: `tests/verify.tscn` (125 checks), `docs/screenshots/10_story_intro.png
 
 - [x] Talent tracks (might/vigor/swift) + point economy from levels/chapters
       (pulled into M3 for balance; deeper tree still open)
-- [ ] Talent tree UI + real point economy
-- [ ] Single save system (one code path), JSON-safe serialization
-      (no raw Vector2/Color in JSON — the old save crashed on load)
-- [ ] Autosave + checkpoint + permadeath deletion
+- [x] Talent tree UI + real point economy (`T` opens the 3-track screen;
+      points from level-ups, spent on might/vigor/swift nodes)
+- [x] Talent tree UI (pulled forward into M4 — see above)
+- [x] Single save system (one code path), JSON-safe serialization
+      (no raw Vector2/Color in JSON — the old save crashed on load):
+      `Game.save_run/load_run` now carry stats + inventory + quests +
+      world seed + hero position; full round-trip verified
+      (checks: `stats/equipment/quest/seed/position survive the round trip`)
+- [x] Autosave + checkpoint + permadeath deletion: checkpoints on new day
+      (08:00), level-up and dungeon stairs; hardcore death wipes the save,
+      adventure death offers revive-from-checkpoint or abandon
 
 ## M6 — Audio, polish & release
 

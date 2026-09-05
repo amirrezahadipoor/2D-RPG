@@ -22,6 +22,16 @@ func _ready() -> void:
 
 var artifacts_found: Array = []
 
+func serialize() -> Dictionary:
+	return {"bag": bag.duplicate(true), "equipped": equipped.duplicate(true),
+		"artifacts": artifacts_found.duplicate(true)}
+
+func deserialize(data: Dictionary) -> void:
+	bag = (data.get("bag", []) as Array).duplicate(true)
+	equipped = (data.get("equipped", {}) as Dictionary).duplicate(true)
+	artifacts_found = (data.get("artifacts", []) as Array).duplicate(true)
+	equipment_changed.emit()
+
 ## Next relic the hero has not claimed yet (secret chests and the dragon).
 func claim_artifact() -> Dictionary:
 	for aid in ItemDB.ARTIFACTS:

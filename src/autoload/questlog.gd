@@ -14,6 +14,19 @@ var main_progress: int = 0             # completed main stages, 0..100
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
+func serialize() -> Dictionary:
+	return {"active": active.duplicate(true),
+		"completed_side": completed_side.duplicate(true),
+		"declined": declined.duplicate(true),
+		"main_progress": main_progress}
+
+func deserialize(data: Dictionary) -> void:
+	active = (data.get("active", []) as Array).duplicate(true)
+	completed_side = (data.get("completed_side", {}) as Dictionary).duplicate(true)
+	declined = (data.get("declined", {}) as Dictionary).duplicate(true)
+	main_progress = int(data.get("main_progress", 0))
+	changed.emit()
+
 func reset_run() -> void:
 	active.clear()
 	completed_side.clear()
