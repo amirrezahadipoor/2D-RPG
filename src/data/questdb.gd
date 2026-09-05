@@ -51,7 +51,11 @@ static func main_quest(chapter: int, stage: int) -> Dictionary:
 			q["goal"] = 2 + chapter
 		"boss":
 			q["enemy"] = "dragon" if chapter >= 7 else ("demon" if chapter >= 4 else "orc")
-			q["biome"] = "caves" if chapter >= 7 else "graveyard"
+			# bosses are dungeon creatures (orcs/demons spawn on the deep
+			# floors, the dragon guards the last one); the caves biome is what
+			# on_kill() checks, so killing a random forest orc cannot complete
+			# a boss stage
+			q["biome"] = "caves"
 			q["goal"] = 1
 	q["xp"] = 30 * (chapter + 1) * (2 + stage / 2)
 	q["gold"] = 15 * (chapter + 1)

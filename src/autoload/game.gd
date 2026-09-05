@@ -66,8 +66,9 @@ func change_state(next_state: State) -> void:
 	match next_state:
 		State.PAUSED:
 			get_tree().paused = true
-		State.PLAYING, State.MENU, State.DEAD:
-			# the tree stays unpaused while dead so the death screen is clickable
+		State.PLAYING, State.MENU, State.DEAD, State.VICTORY:
+			# the tree stays unpaused while dead/victorious so the overlay is
+			# clickable and tappable
 			get_tree().paused = false
 	state_changed.emit(next_state, old)
 	print("[Game] %s -> %s" % [State.keys()[old], State.keys()[next_state]])

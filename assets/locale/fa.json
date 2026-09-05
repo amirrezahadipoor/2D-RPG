@@ -195,5 +195,10 @@
  "settings.language": "زبان",
  "quality.low": "کم",
  "quality.medium": "متوسط",
- "quality.high": "زیاد"
+ "quality.high": "زیاد",
+ "victory.title": "تاج اخگر یکپارچه شد",
+ "victory.sub": "ده فصل و صد کردار - همهٔ پاره‌ها دوباره از آنِ توست. امبرهولد از تو خواهد سرود.",
+ "victory.continue": "ادامهٔ کاوش",
+ "victory.new_run": "شروع دوباره",
+ "victory.menu": "منوی اصلی"
 }

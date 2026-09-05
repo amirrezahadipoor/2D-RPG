@@ -195,5 +195,10 @@
  "settings.language": "Language",
  "quality.low": "Low",
  "quality.medium": "Medium",
- "quality.high": "High"
+ "quality.high": "High",
+ "victory.title": "The Ember Crown is Whole",
+ "victory.sub": "Ten chapters, a hundred deeds - every shard is yours again. Emberhold will sing of you.",
+ "victory.continue": "Keep Exploring",
+ "victory.new_run": "New Run",
+ "victory.menu": "Main Menu"
 }

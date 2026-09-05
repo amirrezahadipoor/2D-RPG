@@ -120,7 +120,7 @@ func on_kill(enemy_type: String, biome: String) -> void:
 		elif m["kind"] == "clear" and biome == "graveyard":
 			m["progress"] = mini(int(m.get("progress", 0)) + 1, int(m["goal"]))
 			dirty = true
-		elif m["kind"] == "boss" and m.get("enemy", "") == enemy_type:
+		elif m["kind"] == "boss" and biome == "caves" and m.get("enemy", "") == enemy_type:
 			m["progress"] = mini(int(m.get("progress", 0)) + 1, int(m["goal"]))
 			dirty = true
 	if dirty:
@@ -177,25 +177,32 @@ func turn_in_at(npc_settlement: int, npc_role: String):
 	return m if npc_role == "elder" else null
 
 func complete(quest: Dictionary) -> void:
+	# The quest passed in is usually a LIVE cache entry (current_main() or an
+	# active instance), and clearing main_active below would empty it in place.
+	# Snapshot every field we still need BEFORE mutating any bookkeeping.
+	var is_main: bool = quest["main"]
+	var q_id: String = quest.get("id", "")
+	var q_stage: int = int(quest.get("stage", -1))
+	var q_giver: String = quest.get("giver_role", "")
 	Stats.add_xp(int(quest["xp"]))
 	Stats.add_gold(int(quest["gold"]))
-	if quest["main"]:
+	if is_main:
 		main_progress += 1
-		main_active.clear()
-		if int(quest["stage"]) == QuestDB.STAGES - 1:
+		main_active.clear()   # next current_main() rebuilds the following stage
+		if q_stage == QuestDB.STAGES - 1:
 			Stats.talent_points += 1
 			Stats.talent_changed.emit(Stats.talent_points)
 		# the hundredth completed stage is the end of the story
 		if main_progress >= QuestDB.main_count():
 			Game.change_state(Game.State.VICTORY)
 	else:
-		completed_side[quest["id"]] = true
+		completed_side[q_id] = true
 		for i in active.size():
-			if active[i]["id"] == quest["id"]:
+			if active[i]["id"] == q_id:
 				active.remove_at(i)
 				break
 		# villagers thank you with a brew - deterministic, no gold-parity lottery
-		if quest.get("giver_role", "") == "villager":
+		if q_giver == "villager":
 			Inventory.add({"id": "health_potion", "slot": "", "rarity": 0,
 				"prefix": "", "suffix": "", "dmg": 0, "armor": 0, "weight": 1, "qty": 1})
 	toast.emit("quest.done")

@@ -27,6 +27,7 @@ func run() -> void:
 	await _check_world_scale()
 	await _check_people()
 	_check_quests()
+	await _check_endgame()
 	await _check_potions_talents()
 	_check_i18n()
 	await _check_m4()
@@ -727,6 +728,98 @@ func _check_quests() -> void:
 	var m := QuestLog.current_main()
 	_ok(not m.is_empty() and m["id"] == "main_0_0", "main story starts at chapter 1 stage 1")
 	QuestLog.reset_run()
+
+func _check_endgame() -> void:
+	print("== endgame: dungeon entry, boss slaying, victory ==")
+	Game.change_state(Game.State.PLAYING)
+	# the starting settlement always shows a reachable dungeon mouth (a Stairs)
+	var ce: Node = world.find_child("CaveEntrance", true, false)
+	_ok(ce != null, "overworld places a cave entrance by the first settlement")
+	if ce != null:
+		_ok(ce is Stairs and ce.has_signal("used"), "cave mouth is usable stairs")
+		_ok(int(ce.get("direction")) == 1, "cave mouth leads down into the dungeon")
+		_ok(world.is_walkable_at(ce.global_position), "cave mouth stands on walkable ground")
+		var cb := world.biome_at(ce.global_position)
+		_ok(cb != "water" and cb != "village" and cb != "town",
+			"cave mouth sits on open land (%s)" % cb)
+		# the hero spawns on the first settlement's plaza, so the mouth must be
+		# close enough to that plaza to reach on foot (the suite moves the hero
+		# around, so measure from the plaza, not the current hero position)
+		var plaza: Vector2i = world.settlements[0]["plaza"]
+		var plaza_px := Vector2(plaza.x * Overworld.TILE + 8.0, plaza.y * Overworld.TILE + 8.0)
+		_ok(ce.global_position.distance_to(plaza_px) < 40.0 * Overworld.TILE,
+			"cave mouth sits within walking range of the starting plaza")
+	# live end of the story: slay the dragon at the bottom of the dungeon and
+	# the hundredth main stage completes -> Game enters State.VICTORY
+	Stats.reset_run()
+	Stats.level = 60
+	Stats.hp = Stats.max_hp
+	QuestLog.reset_run()
+	QuestLog.main_progress = 99
+	var last_q: Dictionary = QuestLog.current_main()
+	_ok(str(last_q.get("kind")) == "boss" and str(last_q.get("enemy")) == "dragon",
+		"the final stage asks for the dragon (kind=%s enemy=%s)" % [last_q.get("kind"), last_q.get("enemy")])
+	var d := Dungeon.new()
+	add_child(d)
+	d.build(Dungeon.MAX_DEPTH, 20260905)
+	_ok(d.boss != null and d.boss.enemy_type == "dragon", "the bottom depth guards a dragon")
+	var k0 := Stats.kills
+	if d.boss != null:
+		d.boss.take_damage(99999)
+	for i in 40:
+		await get_tree().physics_frame
+	_ok(Stats.kills == k0 + 1, "dragon slay counts as a kill (%d -> %d)" % [k0, Stats.kills])
+	_ok(int(QuestLog.current_main().get("progress", 0)) >= 1, "dragon slay advances the final stage")
+	var final_turn: Variant = QuestLog.turn_in_at(0, "elder")
+	_ok(final_turn != null, "the finished final stage can be turned in to an elder")
+	var tp0 := Stats.talent_points
+	if final_turn != null:
+		QuestLog.complete(final_turn)
+	await get_tree().process_frame
+	_ok(QuestLog.main_progress == 100, "the 100th main stage is recorded")
+	_ok(Game.state == Game.State.VICTORY, "completing stage 100 reaches the victory state")
+	_ok(Stats.talent_points >= tp0 + 1, "the final chapter hands out its talent point")
+	Game.change_state(Game.State.PLAYING)
+	d.queue_free()
+	await get_tree().physics_frame
+	QuestLog.reset_run()
+	Stats.reset_run()
+	# the victory overlay itself
+	var vs := VictoryScreen.new()
+	add_child(vs)
+	await get_tree().process_frame
+	_ok(not vs.visible, "victory overlay starts hidden")
+	Stats.kills = 123
+	Stats.gold = 4567
+	Game.game_minutes = 2.0 * 1440.0 + 1.0
+	vs.show_victory()
+	_ok(vs.visible, "show_victory reveals the overlay")
+	_ok(vs._title.text == I18N.tr_str("victory.title") and not vs._title.text.begins_with("victory."),
+		"victory title resolves in the active locale")
+	_ok(vs._summary.text.find(I18N.num(123)) >= 0 and vs._summary.text.find(I18N.num(4567)) >= 0,
+		"victory summary shows kills and gold")
+	var fired := {"continue": false, "new_run": false, "menu": false}
+	vs.continue_pressed.connect(func(): fired["continue"] = true)
+	vs.new_run_pressed.connect(func(): fired["new_run"] = true)
+	vs.menu_pressed.connect(func(): fired["menu"] = true)
+	vs._continue_btn.pressed.emit()
+	vs._new_run_btn.pressed.emit()
+	vs._menu_btn.pressed.emit()
+	_ok(fired["continue"] and fired["new_run"] and fired["menu"], "victory buttons emit continue/new/menu")
+	vs.hide_victory()
+	_ok(not vs.visible, "hide_victory dismisses the overlay")
+	var keys_ok := true
+	for loc in ["en", "fa"]:
+		I18N.set_locale(loc)
+		for key in ["victory.title", "victory.sub", "victory.continue", "victory.new_run", "victory.menu"]:
+			if I18N.tr_str(key).begins_with(key) and I18N.tr_str(key) == key:
+				keys_ok = false
+	I18N.set_locale("en")
+	_ok(keys_ok, "victory.* strings resolve in EN and FA")
+	vs.queue_free()
+	Game.change_state(Game.State.PLAYING)
+	QuestLog.reset_run()
+	Stats.reset_run()
 
 # --------------------------------------------------- potions and talents ----
 func _check_potions_talents() -> void:

@@ -1,5 +1,6 @@
 # Dungeons: room-and-corridor depths under the caves. Dark by design - the
-# hero's lantern and wall torches are the only light. Depth 3 ends in a boss.
+# hero's lantern and wall torches are the only light. The last depth (6)
+# ends in the dragon boss; demon guards sit deeper on the way down.
 class_name Dungeon
 extends Node2D
 
@@ -241,6 +242,10 @@ func _place_entities() -> void:
 		boss = Enemy.new()
 		actors.add_child(boss)
 		boss.setup(boss_type, Stats.level + depth)
+		# the boss is spawned here, NOT by _dungeon_spawn(), so it used to miss
+		# the died hook entirely: no XP/kill/quest progress for slaying the
+		# dragon at the bottom of the world
+		boss.died.connect(_on_enemy_died)
 		boss.global_position = _pos_of(_center(last_room))
 		stairs_down = Vector2.ZERO
 	var up := Stairs.new()

@@ -32,6 +32,9 @@ const BIOME_SPAWNS := {
 	"snow":   ["skeleton", "orc", "wolf"],
 	"swamp":  ["slime", "bat", "skeleton", "shaman"],
 	"caves":  ["skeleton", "orc", "golem", "demon"],
+	# graveyard had NO spawn table, so quests that demand graveyard kills
+	# (30 main 'clear' stages + 75 side 'clear' quests) were unsatisfiable
+	"graveyard": ["skeleton", "bat", "shaman"],
 	"water":  [],
 }
 

@@ -12,6 +12,7 @@ var cutscene: Cutscene
 var events: WorldEvents
 var dungeon: Dungeon = null
 var touch: TouchUI = null
+var victory_screen: VictoryScreen
 var _overworld_hero_pos := Vector2.ZERO
 
 func _ready() -> void:
@@ -28,6 +29,12 @@ func _ready() -> void:
 
 	_hook_autosave()
 
+	# the overworld's cave mouth leads to dungeon depth 1; its "used" signal
+	# is connected here so the dungeon becomes reachable in normal play
+	var entrance := world.find_child("CaveEntrance", true, false)
+	if entrance != null and entrance.has_signal("used"):
+		entrance.used.connect(_on_cave_entrance)
+
 	hud = Hud.new()
 	hud.name = "Hud"
 	add_child(hud)
@@ -37,6 +44,13 @@ func _ready() -> void:
 	add_child(death_screen)
 	death_screen.retry_pressed.connect(_on_retry)
 	death_screen.revive_pressed.connect(_on_revive)
+
+	victory_screen = VictoryScreen.new()
+	victory_screen.name = "VictoryScreen"
+	add_child(victory_screen)
+	victory_screen.continue_pressed.connect(func(): Game.change_state(Game.State.PLAYING))
+	victory_screen.new_run_pressed.connect(_on_retry)
+	victory_screen.menu_pressed.connect(_on_victory_menu)
 
 	inv_screen = InventoryScreen.new()
 	inv_screen.name = "InventoryScreen"
@@ -107,7 +121,7 @@ func _ready() -> void:
 		cutscene.play()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if Game.state == Game.State.DEAD:
+	if Game.state == Game.State.DEAD or Game.state == Game.State.VICTORY:
 		return
 	if event.is_action_pressed("pause"):
 		Game.toggle_pause()
@@ -185,9 +199,22 @@ func _on_player_died() -> void:
 
 func _on_game_state(new_state: int, _old_state: int) -> void:
 	if new_state == Game.State.DEAD:
+		victory_screen.hide_victory()
 		death_screen.show_death()
+	elif new_state == Game.State.VICTORY:
+		death_screen.hide_death()
+		_close_modals()
+		victory_screen.show_victory()
 	else:
 		death_screen.hide_death()
+		victory_screen.hide_victory()
+
+func _close_modals() -> void:
+	for ui in get_tree().get_nodes_in_group("modal_ui"):
+		if ui.has_method("close"):
+			ui.close()
+		else:
+			ui.visible = false
 
 ## Hardcore: the save was already deleted inside Game.die(), so "Start Over"
 ## simply rebuilds a fresh world with reset stats.
@@ -208,6 +235,17 @@ func _on_revive() -> void:
 func _on_retry() -> void:
 	if not Game.is_hardcore:
 		Game.wipe_save()   # abandoning an adventure run deletes it
+	Game.pending_load = false
 	Game.start_new_run(Game.is_hardcore)
 	_reload_scene()
-	get_tree().reload_current_scene()
+
+func _on_victory_menu() -> void:
+	Game.pending_load = false
+	Game.change_state(Game.State.MENU)
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+## Interact with the overworld cave mouth: drop into dungeon depth 1.
+func _on_cave_entrance(_direction: int) -> void:
+	if dungeon != null or Game.state != Game.State.PLAYING:
+		return
+	enter_dungeon(1)

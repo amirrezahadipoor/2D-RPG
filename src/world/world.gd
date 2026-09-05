@@ -56,6 +56,7 @@ func build(seed_value: int) -> void:
 	_spawn_spawner()
 	_spawn_npcs()
 	_place_chests()
+	_place_cave_entrance()
 	_paint_shade()
 	_collect_water()
 	_spawn_decals()
@@ -541,6 +542,44 @@ func _place_chests() -> void:
 		actors.add_child(chest)
 		chest.global_position = pos
 		placed += 1
+
+## The dungeon's mouth: one reachable Stairs on the walkable fringe of the
+## starting settlement. enter_dungeon()/exit_dungeon() (Main) own the actual
+## depth switching; this node only exists so the 330 lines of dungeon content
+## are actually reachable from the overworld instead of orphaned.
+func _place_cave_entrance() -> void:
+	if settlements.is_empty():
+		return
+	var center: Vector2i = settlements[0]["plaza"]
+	var best := Vector2i(-1, -1)
+	# spiral outward from the plaza to the first legal tile
+	for radius in range(4, 30):
+		for dy in range(-radius, radius + 1):
+			for dx in range(-radius, radius + 1):
+				if maxi(absi(dx), absi(dy)) != radius:
+					continue
+				var t := center + Vector2i(dx, dy)
+				if t.x < 2 or t.y < 2 or t.x >= WORLD_W - 2 or t.y >= WORLD_H - 2:
+					continue
+				var p := Vector2(t.x * TILE + 8.0, t.y * TILE + 8.0)
+				if not is_walkable_at(p):
+					continue
+				var b := biome_at(p)
+				if b == "water" or b in ["village", "town"]:
+					continue
+				best = t
+				break
+			if best.x >= 0:
+				break
+		if best.x >= 0:
+			break
+	if best.x < 0:
+		return
+	var entrance := Stairs.new()
+	entrance.name = "CaveEntrance"
+	entrance.direction = 1
+	actors.add_child(entrance)
+	entrance.global_position = Vector2(best.x * TILE + 8.0, best.y * TILE + 8.0)
 
 ## How much the hero's lantern is needed here (caves are dark).
 func ambient_light_need() -> float:
