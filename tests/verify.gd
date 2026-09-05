@@ -971,7 +971,14 @@ func _check_ai() -> void:
 	o.state = Enemy.State.CHASE
 
 	# ranged: a demon at distance winds up and hurls fire
-	var d := _ai_spawn("demon", Vector2(60, 0))
+	# stand the demon where the fireball has open air to fly through
+	var d_off := Vector2(60, 0)
+	for cand in [Vector2(60, 0), Vector2(-60, 0), Vector2(0, 60), Vector2(0, -60)]:
+		if world.is_walkable_at(hero.global_position + cand) \
+				and world.is_walkable_at(hero.global_position + cand * 1.6):
+			d_off = cand
+			break
+	var d := _ai_spawn("demon", d_off)
 	d._attack_timer = 0.0
 	await get_tree().physics_frame   # wander -> chase
 	await get_tree().physics_frame   # chase  -> ranged windup
@@ -979,7 +986,7 @@ func _check_ai() -> void:
 	var balls := 0
 	for i in 24:
 		# re-assert every frame: slow machines let the demon drift or cool down
-		d.global_position = hero.global_position + Vector2(90, 0)
+		d.global_position = hero.global_position + d_off.normalized() * 90.0
 		d.velocity = Vector2.ZERO
 		d.state = Enemy.State.WINDUP
 		d._windup_timer = 0.0
@@ -1267,10 +1274,16 @@ func _check_bestiary() -> void:
 			break
 	var sh := _ai_spawn("shaman", sh_off)
 	sh._attack_timer = 9.0
+	sh._heal_timer = 999.0   # the healer channel roots it; not what we test here
 	var d0 := sh.global_position.distance_to(hero.global_position)
 	for i in 20:
 		await get_tree().physics_frame
 	var d1 := sh.global_position.distance_to(hero.global_position)
+	if not (d1 > d0 or sh.velocity.length() > 1.0):
+		print("  DIAG shaman: game_state=", Game.state, " sh_state=", sh.state,
+			" hero_valid=", is_instance_valid(sh._hero), " hp=", Stats.hp,
+			" stagger=", sh._stagger_timer, " pos=", sh.global_position,
+			" walk=", world.is_walkable_at(sh.global_position + sh_off.normalized() * 24))
 	_ok(d1 > d0 or sh.velocity.length() > 1.0,
 		"shaman keeps its distance (%0.0f -> %0.0f, v=%0.0f)" % [d0, d1, sh.velocity.length()])
 	# healer: a wounded packmate gets knit back together
