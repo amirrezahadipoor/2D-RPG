@@ -39,8 +39,10 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 
 - ✅ Phase 3: Combat core implemented with stamina-gated actions (movement/attack/dodge), attack cooldowns, critical hit system with AGI scaling, dodge mechanics with stamina cost and AGI-based chance, enemy AI with patrol/chase/attack/die states, damage calculation using STR/AGI/DEF stats, and hardcore balance (limited stamina, no attack spam, stamina regeneration out of combat).
 
+- ✅ Phase 4: Leveling/talents implemented with branching talent tree (5 primary trees: Strength, Agility, Defense, Luck, Vitality), talent points granted on level-up (1 point per level, total 100 points at level 100), non-linear XP curve (XP_required = 100 * level^1.5), 5 talent tiers per tree with choices, and permanent stat increases (STR, AGI, DEF, LUCK, MAX HP, MAX Stamina). Each talent choice provides passive abilities with increasing power per tier.
+
 ### Next Phase Start
-Proceed to Phase 4: Leveling/talents
+Proceed to Phase 5: Items/inventory
 
 ---
 
