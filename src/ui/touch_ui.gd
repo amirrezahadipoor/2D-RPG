@@ -44,7 +44,9 @@ func _ready() -> void:
 	bg.owner_ui = self
 	_root.add_child(bg)
 	visible = false
-	if DisplayServer.is_touchscreen_available() or OS.has_feature("mobile"):
+	# auto-enable only on real mobile builds: desktop touchscreens and X
+	# servers without pads report phantom touch devices
+	if OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile"):
 		set_enabled(true)
 
 func set_enabled(on: bool) -> void:
