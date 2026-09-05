@@ -918,6 +918,31 @@ func _check_secrets() -> void:
 # ------------------------------------------------------------ monster AI ----
 var _ai_made: Array = []
 
+## A 15x15-tile fully walkable clearing, so AI movement checks never depend on
+## whether a random world happened to put a tree inside the test corridor
+## (the demon pin stands 90px out, i.e. 6 tiles, plus margin).
+func _clear_enemies_now() -> void:
+	for node in get_tree().get_nodes_in_group("enemy"):
+		node.queue_free()
+	for i in 2:
+		await get_tree().physics_frame
+
+func _open_arena() -> Vector2:
+	for attempt in 400:
+		var p := Vector2(float(30 + randi() % (Overworld.WORLD_W - 60)) * 16.0 + 8.0,
+			float(30 + randi() % (Overworld.WORLD_H - 60)) * 16.0 + 8.0)
+		var open := true
+		for dx in range(-7, 8):
+			for dy in range(-7, 8):
+				if not world.is_walkable_at(p + Vector2(float(dx * 16), float(dy * 16))):
+					open = false
+					break
+			if not open:
+				break
+		if open:
+			return p
+	return Vector2(2000, 2000)
+
 func _ai_spawn(type: String, off: Vector2) -> Enemy:
 	var e := Enemy.new()
 	world.actors.add_child(e)
@@ -932,7 +957,7 @@ func _check_ai() -> void:
 	var prev_state := Game.state
 	Game.state = Game.State.PLAYING
 	var hero := world.hero
-	hero.global_position = Vector2(2000, 2000)
+	hero.global_position = _open_arena()
 	await get_tree().physics_frame
 
 	_ai_made = []
@@ -974,27 +999,39 @@ func _check_ai() -> void:
 	# stand the demon where the fireball has open air to fly through
 	var d_off := Vector2(60, 0)
 	for cand in [Vector2(60, 0), Vector2(-60, 0), Vector2(0, 60), Vector2(0, -60)]:
-		if world.is_walkable_at(hero.global_position + cand) \
-				and world.is_walkable_at(hero.global_position + cand * 1.6):
+		# the fireball pops on solid tiles: the whole flight corridor must be
+		# open, INCLUDING the 10px-above-the-caster spawn offset
+		if world.is_walkable_at(hero.global_position + cand * 0.5) \
+				and world.is_walkable_at(hero.global_position + cand) \
+				and world.is_walkable_at(hero.global_position + cand * 1.5) \
+				and world.is_walkable_at(hero.global_position + cand * 1.5 + Vector2(0, -10)):
 			d_off = cand
 			break
+	_clear_enemies_now()
+	await get_tree().physics_frame
 	var d := _ai_spawn("demon", d_off)
 	d._attack_timer = 0.0
 	await get_tree().physics_frame   # wander -> chase
 	await get_tree().physics_frame   # chase  -> ranged windup
 	_ok(d.state == Enemy.State.WINDUP, "demon winds up a ranged cast")
 	var balls := 0
-	for i in 24:
-		# re-assert every frame: slow machines let the demon drift or cool down
-		d.global_position = hero.global_position + d_off.normalized() * 90.0
-		d.velocity = Vector2.ZERO
-		d.state = Enemy.State.WINDUP
-		d._windup_timer = 0.0
-		d._attack_timer = 0.0
-		await get_tree().physics_frame
-		balls = get_tree().get_nodes_in_group("projectile").size()
+	for attempt in 2:
+		for i in 24:
+			# re-assert every frame: slow machines let the demon drift or cool down
+			d.global_position = hero.global_position + d_off.normalized() * 90.0
+			d.velocity = Vector2.ZERO
+			d.state = Enemy.State.WINDUP
+			d._windup_timer = 0.0
+			d._attack_timer = 0.0
+			await get_tree().physics_frame
+			balls = get_tree().get_nodes_in_group("projectile").size()
+			if balls > 0:
+				break
 		if balls > 0:
 			break
+		print("  DIAG fireball retry: off=", d_off, " walk90=",
+			world.is_walkable_at(hero.global_position + d_off.normalized() * 90.0),
+			" state=", d.state, " hp=", d.hp)
 	_ok(balls > 0, "fireball spawned")
 
 	# boss phases: the dragon enrages below half health
@@ -1272,6 +1309,8 @@ func _check_bestiary() -> void:
 		if world.is_walkable_at(hero.global_position + cand * 3.0):
 			sh_off = cand
 			break
+	_clear_enemies_now()   # stray bodies crowd the shaman and block its retreat
+	await get_tree().physics_frame
 	var sh := _ai_spawn("shaman", sh_off)
 	sh._attack_timer = 9.0
 	sh._heal_timer = 999.0   # the healer channel roots it; not what we test here
