@@ -72,6 +72,8 @@ func build(seed_value: int) -> void:
 func apply_quality() -> void:
 	if shade_layer != null:
 		shade_layer.visible = Settings.quality != "low"
+	if decals != null:
+		decals.visible = Settings.quality != "low"
 	for entry in _lights:
 		entry["light"].visible = Settings.quality == "high"
 	Juice.register_world(actors)

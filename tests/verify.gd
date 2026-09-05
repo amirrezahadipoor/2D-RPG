@@ -381,6 +381,7 @@ func _check_death() -> void:
 	var save_text := FileAccess.get_file_as_string(Game.SAVE_PATH)
 	var reparsed: Variant = JSON.parse_string(save_text)
 	_ok(typeof(reparsed) == TYPE_DICTIONARY, "save file is valid JSON")
+	_ok((reparsed as Dictionary).has("dungeon_depth"), "save carries a dungeon_depth field")
 	Stats.gold = 0
 	Stats.level = 1
 	Inventory.bag.clear()
@@ -396,6 +397,16 @@ func _check_death() -> void:
 	_ok(QuestLog.active.size() == 1 and int(QuestLog.active[0].get("progress", 0)) == 2, "active quest progress survives")
 	_ok(QuestLog.completed_side.has("side_done"), "completed side quests survive")
 	_ok(Game.saved_world_seed == 987654, "world seed survives the round trip")
+	# dungeon depth rides along in the save so revive/continue re-enters it
+	var rt_text := FileAccess.get_file_as_string(Game.SAVE_PATH)
+	var rt_edit: Dictionary = JSON.parse_string(rt_text)
+	rt_edit["dungeon_depth"] = 4
+	var rt_f := FileAccess.open(Game.SAVE_PATH, FileAccess.WRITE)
+	rt_f.store_string(JSON.stringify(rt_edit))
+	rt_f.close()
+	Game.load_run()
+	_ok(Game.saved_dungeon_depth == 4, "dungeon depth survives the round trip")
+	Game.load_run()
 	_ok(Game.saved_hero_pos.distance_to(rt_pos + Vector2(3, 0)) < 1.0, "hero position survives the round trip")
 	rt_hero.global_position = rt_pos
 	world.world_seed = rt_seed
@@ -955,6 +966,8 @@ func _ai_spawn(type: String, off: Vector2) -> Enemy:
 func _check_ai() -> void:
 	print("== monster ai ==")
 	var prev_state := Game.state
+	var prev_spawn := world.spawner.spawn_enabled
+	world.spawner.spawn_enabled = false   # no fresh bodies crowding the arena
 	Game.state = Game.State.PLAYING
 	var hero := world.hero
 	hero.global_position = _open_arena()
@@ -1047,6 +1060,7 @@ func _check_ai() -> void:
 		pr.queue_free()
 	await get_tree().physics_frame
 	Game.state = prev_state
+	world.spawner.spawn_enabled = prev_spawn
 
 # ------------------------------------------------------- combat style -------
 func _check_combat_style() -> void:
@@ -1491,10 +1505,12 @@ func _check_touch_quality() -> void:
 	# quality tiers flip lights / shade / vignette
 	Settings.set_quality("low")
 	_ok(world.shade_layer.visible == false, "low quality drops contact shadows")
+	_ok(world.decals.visible == false, "low quality drops ground decals")
 	_ok(world._lights.size() > 0 and (world._lights[0]["light"] as PointLight2D).visible == false,
 		"low quality drops torch glows")
 	Settings.set_quality("medium")
 	_ok(world.shade_layer.visible, "medium keeps the shadow pass")
+	_ok(world.decals.visible, "medium keeps the ground decals")
 	_ok((world._lights[0]["light"] as PointLight2D).visible == false, "medium still skips lights")
 	Settings.set_quality("high")
 	_ok((world._lights[0]["light"] as PointLight2D).visible, "high turns the torch glows on")

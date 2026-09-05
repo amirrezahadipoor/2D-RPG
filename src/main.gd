@@ -15,16 +15,16 @@ var touch: TouchUI = null
 var _overworld_hero_pos := Vector2.ZERO
 
 func _ready() -> void:
+	var loading := Game.pending_load
 	world = Overworld.new()
 	world.name = "Overworld"
-	if Game.pending_load:
+	if loading:
 		Game.load_run()
 		world.forced_seed = Game.saved_world_seed
 	add_child(world)
-	if Game.pending_load and Game.saved_hero_pos != Vector2.ZERO \
+	if loading and Game.saved_hero_pos != Vector2.ZERO \
 			and world.is_walkable_at(Game.saved_hero_pos):
 		world.hero.global_position = Game.saved_hero_pos
-	Game.pending_load = false
 
 	_hook_autosave()
 
@@ -88,6 +88,12 @@ func _ready() -> void:
 
 	Stats.died.connect(_on_player_died)
 	Game.state_changed.connect(_on_game_state)
+
+	# a save taken inside a dungeon must drop you back into that depth
+	if Game.pending_load and Game.saved_dungeon_depth > 0:
+		enter_dungeon(Game.saved_dungeon_depth)
+		Game.pending_load = false
+	Game.pending_load = false
 
 	if Game.seen_intro:
 		Game.change_state(Game.State.PLAYING)

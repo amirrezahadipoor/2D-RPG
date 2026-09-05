@@ -14,13 +14,19 @@ const BUTTONS := {
 	"interact": {"pos": Vector2(452, 184), "r": 12.0, "glyph": "E"},
 	"use_potion": {"pos": Vector2(376, 216), "r": 11.0, "glyph": "H"},
 	"pause":    {"pos": Vector2(468, 12), "r": 9.0, "glyph": "="},
+	"inventory": {"pos": Vector2(24, 152), "r": 9.0, "glyph": "B"},
+	"quests":   {"pos": Vector2(48, 152), "r": 9.0, "glyph": "J"},
+	"talents":  {"pos": Vector2(72, 152), "r": 9.0, "glyph": "T"},
 }
+## toggle actions release themselves a beat after the tap
+const TOGGLE_ACTIONS := {"inventory": 1, "quests": 1, "talents": 1, "pause": 1}
 
 var enabled := false
 var _root: Control
 var _stick_id := -1
 var _stick_vec := Vector2.ZERO
 var _button_ids := {}           # action -> touch index
+var _auto_release := {}         # action -> seconds left
 var _move_state := {"move_left": false, "move_right": false,
 	"move_up": false, "move_down": false}
 
@@ -58,6 +64,14 @@ func _release_all() -> void:
 	_stick_id = -1
 	_stick_vec = Vector2.ZERO
 
+func _process(delta: float) -> void:
+	for action in _auto_release.keys():
+		_auto_release[action] = float(_auto_release[action]) - delta
+		if _auto_release[action] <= 0.0:
+			_emit_action(action, false)
+			_button_ids.erase(action)
+			_auto_release.erase(action)
+
 func _input(event: InputEvent) -> void:
 	if not enabled:
 		return
@@ -83,6 +97,8 @@ func _press(pos: Vector2, index: int) -> void:
 		if pos.distance_to(b["pos"]) < b["r"] + 6.0:
 			_button_ids[action] = index
 			_emit_action(action, true)
+			if TOGGLE_ACTIONS.has(action):
+				_auto_release[action] = 0.12
 			Sfx.play("click", -16.0, 0.02)
 			return
 

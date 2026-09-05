@@ -27,6 +27,7 @@ var game_minutes: float = 8.0 * 60.0
 var seen_intro: bool = false
 var saved_world_seed: int = -1
 var saved_hero_pos := Vector2.ZERO
+var saved_dungeon_depth := 0
 var pending_load := false
 
 func hour() -> int:
@@ -119,6 +120,9 @@ func save_run() -> bool:
 		"inventory": Inventory.serialize(),
 		"quests": QuestLog.serialize(),
 	}
+	var dun := get_tree().root.find_child("Dungeon", true, false)
+	var dv: Variant = dun.get("depth") if dun != null else null
+	payload["dungeon_depth"] = int(dv) if dv != null else 0
 	var world := _find_world()
 	if world != null:
 		payload["world_seed"] = int(world.get("world_seed"))
@@ -153,6 +157,7 @@ func load_run() -> bool:
 	Inventory.deserialize(parsed.get("inventory", {}))
 	QuestLog.deserialize(parsed.get("quests", {}))
 	saved_world_seed = int(parsed.get("world_seed", -1))
+	saved_dungeon_depth = int(parsed.get("dungeon_depth", 0))
 	var hp: Array = parsed.get("hero_pos", [])
 	saved_hero_pos = Vector2(float(hp[0]), float(hp[1])) if hp.size() == 2 else Vector2.ZERO
 	return true

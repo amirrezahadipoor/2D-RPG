@@ -319,6 +319,14 @@ func run() -> void:
 	for i in 30:
 		await get_tree().process_frame
 	await _grab("20_menu")
+	# ---- 20b: the same menu in Persian (RTL) ----
+	I18N.set_locale("fa")
+	for i in 12:
+		await get_tree().process_frame
+	await _grab("24_menu_fa")
+	I18N.set_locale("en")
+	for i in 6:
+		await get_tree().process_frame
 	# ---- 21: settings overlay on top of the menu ----
 	mm._open_settings()
 	for i in 10:
