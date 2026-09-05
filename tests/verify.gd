@@ -978,8 +978,12 @@ func _check_ai() -> void:
 	_ok(d.state == Enemy.State.WINDUP, "demon winds up a ranged cast")
 	var balls := 0
 	for i in 24:
-		d.state = Enemy.State.WINDUP   # re-assert: slow machines can drift out
+		# re-assert every frame: slow machines let the demon drift or cool down
+		d.global_position = hero.global_position + Vector2(90, 0)
+		d.velocity = Vector2.ZERO
+		d.state = Enemy.State.WINDUP
 		d._windup_timer = 0.0
+		d._attack_timer = 0.0
 		await get_tree().physics_frame
 		balls = get_tree().get_nodes_in_group("projectile").size()
 		if balls > 0:
