@@ -38,6 +38,7 @@ func run() -> void:
 	await _check_anim()
 	await _check_bestiary()
 	await _check_audio()
+	await _check_menus()
 
 	print("")
 	if _failures.is_empty():
@@ -1344,3 +1345,41 @@ func _check_audio() -> void:
 	Settings.set_music(0.8)
 	Settings.load_settings()
 	_ok(I18N.locale in ["en", "fa"], "locale setting still loads alongside audio settings")
+
+# ------------------------------------------------------------------ menus ----
+func _check_menus() -> void:
+	print("== menus ==")
+	var prev_state := Game.state
+	var mm := MainMenu.new()
+	add_child(mm)
+	await get_tree().process_frame
+	_ok(mm._items.size() == 5, "main menu lists continue / 2 runs / settings / quit")
+	_ok(bool(mm._items[0]["enabled"]) == Game.has_save(), "continue entry mirrors has_save()")
+	mm.queue_free()
+	var pm := PauseMenu.new()
+	add_child(pm)
+	await get_tree().process_frame
+	_ok(not pm.visible, "pause menu is hidden while playing")
+	Game.change_state(Game.State.PAUSED)
+	await get_tree().process_frame
+	_ok(pm.visible, "PAUSED shows the pause menu")
+	_ok(pm._items.size() == 3, "pause menu offers resume / settings / save-quit")
+	Game.change_state(Game.State.PLAYING)
+	await get_tree().process_frame
+	_ok(not pm.visible, "leaving PAUSED hides the pause menu")
+	pm.queue_free()
+	var su := SettingsUI.new()
+	add_child(su)
+	await get_tree().process_frame
+	Settings.set_master(0.5)
+	var m0 := Settings.master
+	su._sel = SettingsUI.Row.MASTER
+	su._adjust(1)
+	_ok(Settings.master > m0, "settings row raises the master volume")
+	su._sel = SettingsUI.Row.MASTER
+	su._adjust(-1)
+	_ok(absf(Settings.master - m0) < 0.001, "and lowers it back")
+	su.queue_free()
+	Settings.load_settings()
+	Settings.apply()
+	Game.change_state(prev_state if prev_state == Game.State.PLAYING else Game.State.PLAYING)

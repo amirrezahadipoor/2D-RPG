@@ -53,6 +53,10 @@ func _ready() -> void:
 	dialogue.name = "DialogueUI"
 	add_child(dialogue)
 
+	var pause_menu := PauseMenu.new()
+	pause_menu.name = "PauseMenu"
+	add_child(pause_menu)
+
 	cutscene = Cutscene.new()
 	cutscene.name = "Cutscene"
 	add_child(cutscene)

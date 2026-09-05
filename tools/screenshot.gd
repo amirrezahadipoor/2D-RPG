@@ -310,6 +310,33 @@ func run() -> void:
 		for i in 6:
 			await get_tree().physics_frame
 
+	# ---- 20: main menu (night sky, title, entries) ----
+	var mm := MainMenu.new()
+	mm.name = "MainMenuShot"
+	get_tree().root.add_child.call_deferred(mm)
+	for i in 4:
+		await get_tree().process_frame
+	for i in 30:
+		await get_tree().process_frame
+	await _grab("20_menu")
+	# ---- 21: settings overlay on top of the menu ----
+	mm._open_settings()
+	for i in 10:
+		await get_tree().process_frame
+	await _grab("21_settings")
+	mm.settings_ui.close()
+	mm.queue_free()
+	for i in 6:
+		await get_tree().process_frame
+	# ---- 22: pause menu over the live game ----
+	Game.change_state(Game.State.PLAYING)
+	await get_tree().physics_frame
+	Game.change_state(Game.State.PAUSED)
+	for i in 6:
+		await get_tree().process_frame
+	await _grab("22_pause")
+	Game.change_state(Game.State.PLAYING)
+
 	print("[screenshot] done")
 	get_tree().quit(0)
 

@@ -181,5 +181,19 @@
  "toast.parried": "Parried!",
  "toast.perfect": "Perfect dodge!",
  "death.revive": "Wake at last checkpoint",
- "death.abandon": "Abandon run"
+ "death.abandon": "Abandon run",
+ "menu.subtitle": "A hardcore pixel-art adventure — offline, bilingual",
+ "menu.hint": "W/S or arrows to choose · Enter/Space to confirm · L for language",
+ "menu.paused": "Paused",
+ "menu.resume": "Resume",
+ "menu.save_quit": "Save & Quit to Menu",
+ "menu.done": "Done",
+ "settings.master": "Master Volume",
+ "settings.music": "Music Volume",
+ "settings.sfx": "SFX Volume",
+ "settings.quality": "Quality",
+ "settings.language": "Language",
+ "quality.low": "Low",
+ "quality.medium": "Medium",
+ "quality.high": "High"
 }

@@ -181,5 +181,19 @@
  "toast.parried": "دفع شد!",
  "toast.perfect": "جاخالی کامل!",
  "death.revive": "بیداری در آخرین نقطهٔ ذخیره",
- "death.abandon": "رها کردن این سفر"
+ "death.abandon": "رها کردن این سفر",
+ "menu.subtitle": "یک ماجراجویی پیکسلی هاردکور — آفلاین و دوزبانه",
+ "menu.hint": "W/S یا کلیدهای جهت برای انتخاب · Enter/Space برای تأیید · L برای زبان",
+ "menu.paused": "مکث",
+ "menu.resume": "ادامه بازی",
+ "menu.save_quit": "ذخیره و خروج به منو",
+ "menu.done": "بستن",
+ "settings.master": "صدای کلی",
+ "settings.music": "صدای موسیقی",
+ "settings.sfx": "صدای افکت‌ها",
+ "settings.quality": "کیفیت گرافیک",
+ "settings.language": "زبان",
+ "quality.low": "کم",
+ "quality.medium": "متوسط",
+ "quality.high": "زیاد"
 }
