@@ -35,11 +35,10 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 - ✅ Repository "2D-RPG" exists on GitHub with initial commit
 - ✅ CI workflows push successfully on every commit
 - ✅ Android build workflow triggers on `main` push
-- ✅ All docs present and version-controlled
-- ✅ Phase 1: Core movement/camera implemented with player KinematicBody2D, 8-direction movement, Camera2D zoom bounds, minimum 64px hero size enforcement, GDScript input handling
+- ✅ Phase 2: Art pipeline implemented with procedural palette generator (5 material tiers), 10 silhouette templates, 5 pattern variants (solid, horizontal stripes, vertical stripes, marbled, trimmed), and data-driven item generator producing 1000+ distinct items per ITEMS.md scheme (templates × materials × patterns × affixes). All art programmatic - no pre-made assets.
 
 ### Next Phase Start
-Proceed to Phase 2: Art pipeline
+Proceed to Phase 3: Combat core
 
 ---
 
