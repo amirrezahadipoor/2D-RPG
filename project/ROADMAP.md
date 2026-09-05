@@ -43,8 +43,10 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 
 - ✅ Phase 5: Items/inventory implemented with data-driven 1000+ item generator (templates × materials × patterns × affixes per ITEMS.md), 6 equipment slots (weapon, helmet, chest, legs, boots, accessories), weight-based inventory (30 slots, 50 unit limit), treasure chests (small/medium/large/boss) with rarity-appropriate loot tables, procedural chest loot scaling with monster level, and full equipment bonus system (STR/AGI/DEF/LUCK stat modifications from material tiers + affixes). All items programmatic - no pre-made art assets.
 
+- ✅ Phase 6: Open world implemented with 7 biome types (Forest, Desert, Snow, Swamp, Caves, Village, Town) each with unique tile variants, enemy types, ambient music, and color palettes. Procedural world generation (200x200 tile map) with biome distribution based on world coordinates, village/town placement, dungeon cave entrances, entity placement (enemies, chests, NPCs), and player start position selection. NPC dialogue system with biome-specific quests (6+ quest types per biome), quest tracking and progression, and trader interactions. All world data programmatic - no pre-made maps or assets.
+
 ### Next Phase Start
-Proceed to Phase 6: Open world
+Proceed to Phase 7: Dungeons
 
 ---
 
