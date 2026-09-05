@@ -33,6 +33,7 @@ func run() -> void:
 	_check_secrets()
 	await _check_ai()
 	await _check_combat_style()
+	_check_balance()
 
 	print("")
 	if _failures.is_empty():
@@ -1017,3 +1018,51 @@ func _check_combat_style() -> void:
 	Stats.reset_run()
 	dummy.queue_free()
 	await get_tree().physics_frame
+
+# -------------------------------------------------------- deep balance ------
+## The numbers are data, but the *relationships* between them are the game.
+## These checks pin the relationships so any future tweak stays honest.
+func _check_balance() -> void:
+	print("== deep balance ==")
+	var weapons := {1: "iron_sword", 3: "steel_blade", 5: "steel_blade",
+		7: "golden_sword", 9: "golden_sword"}
+	for L: int in [1, 3, 5, 7, 9]:
+		var w: Dictionary = WeaponDB.stats_for(weapons[L])
+		var hero_dmg := int(w["damage"]) + WeaponDB.attack_power(weapons[L]) + (L - 1)
+		var hero_hp := 40 + 5 * (L - 1)
+		var worst_hits := 0
+		var worst_type := ""
+		for type in ["slime", "goblin", "skeleton", "orc", "demon"]:
+			var st: Dictionary = EnemyDB.stats_for(type, L)
+			var hits := ceili(float(st["hp"]) / float(hero_dmg))
+			if hits > worst_hits:
+				worst_hits = hits
+				worst_type = type
+			_ok(hits >= 2 and hits <= 8,
+				"L%d %s dies in %d hits (band 2-8)" % [L, type, hits])
+			var survive := ceili(float(hero_hp) / float(st["damage"]))
+			_ok(survive >= 3, "L%d hero survives %d hits of %s (>=3)" % [L, survive, type])
+		_ok(worst_hits <= 8, "L%d worst case %s stays killable (%d hits)" % [L, worst_type, worst_hits])
+		# xp: a level should be ~one quest plus a dungeon sweep, not a grind
+		var xp_need := int(100.0 * pow(L, 1.3))
+		var quest_est := 27 * L + 54
+		var xp_tier := "goblin" if L <= 2 else ("skeleton" if L <= 4 else ("orc" if L <= 6 else "demon"))
+		var sk: Dictionary = EnemyDB.stats_for(xp_tier, L)
+		var kills := maxi(2, ceili(float(xp_need - quest_est) / float(sk["xp"])))
+		_ok(kills >= 2 and kills <= 16,
+			"L%d needs ~%d %s kills + a quest (band 2-16)" % [L, kills, xp_tier])
+	# potion math: one drink must out-heal two hits of a fair enemy
+	for L: int in [1, 5, 9]:
+		var hero_hp := 40 + 5 * (L - 1)
+		var st: Dictionary = EnemyDB.stats_for("skeleton", L)
+		var healed := int(round(0.45 * float(hero_hp)))
+		_ok(healed >= 2 * st["damage"], "L%d potion out-heals 2 skeleton hits (%d >= %d)"
+			% [L, healed, 2 * st["damage"]])
+	# economy: potions cost a few kills, not a farm session
+	for L: int in [1, 3, 5, 9]:
+		var tier := "goblin" if L <= 2 else ("skeleton" if L <= 4 else "orc")
+		var st: Dictionary = EnemyDB.stats_for(tier, L)
+		var price := 25 + 8 * (L - 1)
+		var per := float(price) / float(st["gold"])
+		_ok(per >= 1.2 and per <= 10.0,
+			"L%d potion costs %.1f kills of %s (band 1.2-10)" % [L, per, tier])

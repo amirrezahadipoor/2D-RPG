@@ -122,7 +122,7 @@ func add_xp(amount: int) -> void:
 	while xp >= xp_next:
 		xp -= xp_next
 		level += 1
-		xp_next = int(100.0 * pow(level, 1.5))
+		xp_next = int(100.0 * pow(level, 1.3))
 		max_hp += 5
 		hp = max_hp
 		talent_points += 1

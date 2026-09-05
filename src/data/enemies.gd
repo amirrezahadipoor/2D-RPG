@@ -13,7 +13,7 @@ const TYPES := {
 	             "detect": 80,  "attack_range": 16, "attack_cd": 1.2, "scale": 1.0},
 	"orc":      {"hp": 60,  "damage": 12, "speed": 30, "xp": 40,  "gold": 25,
 	             "detect": 75,  "attack_range": 18, "attack_cd": 1.5, "scale": 1.2},
-	"demon":    {"hp": 90,  "damage": 16, "speed": 42, "xp": 70,  "gold": 45,
+	"demon":    {"hp": 78,  "damage": 16, "speed": 42, "xp": 70,  "gold": 45,
 	             "detect": 100, "attack_range": 16, "attack_cd": 1.0, "scale": 1.2},
 	"dragon":   {"hp": 260, "damage": 26, "speed": 36, "xp": 250, "gold": 200,
 	             "detect": 130, "attack_range": 24, "attack_cd": 1.6, "scale": 1.6},
@@ -34,13 +34,18 @@ const BASE_ELITE_CHANCE := 0.12   # harder than a casual default on purpose
 
 static func stats_for(type: String, level: int) -> Dictionary:
 	var base: Dictionary = TYPES.get(type, TYPES["slime"])
-	var mult := 1.0 + 0.22 * float(level - 1)
+	# separate curves on purpose: health grows slower than hero damage so
+	# time-to-kill stays in the 2-8 hit band; xp/gold grow faster so deeper
+	# floors stay worth diving (see docs/BALANCE.md)
+	var hp_mult := 1.0 + 0.18 * float(level - 1)
+	var xp_mult := 1.0 + 0.25 * float(level - 1)
+	var gold_mult := 1.0 + 0.22 * float(level - 1)
 	return {
-		"hp": int(round(base["hp"] * mult)),
+		"hp": int(round(base["hp"] * hp_mult)),
 		"damage": int(round(base["damage"] * (1.0 + 0.15 * float(level - 1)))),
 		"speed": base["speed"],
-		"xp": int(round(base["xp"] * mult)),
-		"gold": int(round(base["gold"] * mult)),
+		"xp": int(round(base["xp"] * xp_mult)),
+		"gold": int(round(base["gold"] * gold_mult)),
 		"detect": base["detect"],
 		"attack_range": base["attack_range"],
 		"attack_cd": base["attack_cd"],

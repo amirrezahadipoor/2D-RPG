@@ -149,14 +149,16 @@ func _make_shop() -> void:
 	_shop_sel = 0
 	var rng := RandomNumberGenerator.new()
 	rng.seed = npc.npc_index * 131 + Game.day() * 17
+	var lvl := maxi(1, Stats.level)
 	_shop_offers.append({"entry": {"id": "health_potion", "slot": "", "rarity": 0,
 		"prefix": "", "suffix": "", "dmg": 0, "armor": 0, "weight": 1, "qty": 1},
-		"price": 25, "sold": false})
+		"price": 25 + 8 * (lvl - 1), "sold": false})
 	_shop_offers.append({"entry": {"id": "greater_health_potion", "slot": "", "rarity": 0,
 		"prefix": "", "suffix": "", "dmg": 0, "armor": 0, "weight": 1, "qty": 1},
-		"price": 60, "sold": false})
+		"price": 60 + 16 * (lvl - 1), "sold": false})
 	var entry: Dictionary = Inventory.roll_entry(ItemGen.random_id(rng), 0.25)
-	_shop_offers.append({"entry": entry, "price": 40 * (int(entry["rarity"]) + 1), "sold": false})
+	_shop_offers.append({"entry": entry,
+		"price": 40 * (int(entry["rarity"]) + 1) + 15 * (lvl - 1), "sold": false})
 
 func _shop_text() -> String:
 	var lines := []

@@ -111,7 +111,8 @@ Evidence: `tests/verify.tscn` (125 checks), `docs/screenshots/10_story_intro.png
 - [x] Smarter monsters: pack alerts, tactics per species, telegraphs, boss phases
 - [x] Non-repetitive hero combat: 3-hit combo + finisher, held heavy cleave,
       parry, perfect-dodge counter window
-- [ ] Deep balance pass: economy, drops, XP and quest curves (docs/BALANCE.md)
+- [x] Deep balance pass: separate hp/xp/gold curves, level-scaled shop,
+      45%/80% potions, docs/BALANCE.md, 67 balance checks in verify
 
 ## M5 — Progression, talents & save
 

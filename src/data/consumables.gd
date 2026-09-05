@@ -2,8 +2,8 @@
 class_name Consumables
 
 const ITEMS := {
-	"health_potion":         {"heal_pct": 0.35, "stamina_pct": 0.0},
-	"greater_health_potion": {"heal_pct": 0.75, "stamina_pct": 0.0},
+	"health_potion":         {"heal_pct": 0.45, "stamina_pct": 0.0},
+	"greater_health_potion": {"heal_pct": 0.8, "stamina_pct": 0.0},
 	"stamina_potion":        {"heal_pct": 0.0,  "stamina_pct": 1.0},
 }
 
