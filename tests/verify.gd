@@ -261,7 +261,9 @@ func _check_combat() -> void:
 	var slime := world.spawner.spawn("slime", hero.global_position + _open_offset(), 1)
 	await get_tree().physics_frame
 	_ok(slime != null and slime.is_in_group("enemy"), "enemy spawns and joins the enemy group")
-	_ok(slime.max_hp == EnemyDB.stats_for("slime", 1)["hp"], "enemy hp comes from EnemyDB")
+	var slime_base: Dictionary = EnemyDB.stats_for("slime", 1)
+	_ok(slime.max_hp == slime_base["hp"] or (slime.elite and slime.max_hp > slime_base["hp"]),
+		"enemy hp comes from EnemyDB (elites buffed)")
 
 	# --- AI: a close enemy switches to chase and closes distance ---
 	var start_dist := slime.global_position.distance_to(hero.global_position)
@@ -1034,7 +1036,7 @@ func _check_balance() -> void:
 		var hero_hp := 40 + 5 * (L - 1)
 		var worst_hits := 0
 		var worst_type := ""
-		for type in ["slime", "goblin", "skeleton", "orc", "demon"]:
+		for type in ["slime", "goblin", "skeleton", "orc", "demon", "wolf", "shaman"]:
 			var st: Dictionary = EnemyDB.stats_for(type, L)
 			var hits := ceili(float(st["hp"]) / float(hero_dmg))
 			if hits > worst_hits:
@@ -1045,6 +1047,10 @@ func _check_balance() -> void:
 			var survive := ceili(float(hero_hp) / float(st["damage"]))
 			_ok(survive >= 3, "L%d hero survives %d hits of %s (>=3)" % [L, survive, type])
 		_ok(worst_hits <= 8, "L%d worst case %s stays killable (%d hits)" % [L, worst_type, worst_hits])
+		var go: Dictionary = EnemyDB.stats_for("golem", L)
+		var go_hits := ceili(float(go["hp"]) / 0.75 / float(hero_dmg))
+		_ok(go_hits >= 8 and go_hits <= 16 and go["speed"] <= 20,
+			"L%d golem is a slow tank (%d hits, speed %d)" % [L, go_hits, int(go["speed"])])
 		# xp: a level should be ~one quest plus a dungeon sweep, not a grind
 		var xp_need := int(100.0 * pow(L, 1.3))
 		var quest_est := 27 * L + 54
@@ -1194,7 +1200,7 @@ func _check_bestiary() -> void:
 	g.detect = 0.0
 	var hp0 := g.hp
 	g.take_damage(10)
-	_ok(hp0 - g.hp == 7, "golem armor soaks 30%% (10 -> %d)" % (hp0 - g.hp))
+	_ok(hp0 - g.hp == 8, "golem armor soaks 25%% (10 -> %d)" % (hp0 - g.hp))
 	# keep distance: a shaman backs away when you close in
 	var sh := _ai_spawn("shaman", Vector2(20, 0))
 	sh._attack_timer = 9.0

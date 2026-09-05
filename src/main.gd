@@ -117,7 +117,7 @@ func enter_dungeon(raw_depth: int) -> void:
 		if node is Stairs:
 			node.used.connect(_on_stairs)
 	dungeon.secret_opened.connect(_on_secret)
-	hud.set_biome("dungeon")
+	hud.set_biome_text("%s %s" % [I18N.tr_str("biome.dungeon"), I18N.num(depth_value)])
 	hud.show_toast(I18N.tr_str("toast.depth") % I18N.num(depth_value))
 
 func exit_dungeon() -> void:

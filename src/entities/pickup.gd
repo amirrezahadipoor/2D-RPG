@@ -20,6 +20,13 @@ var _hero: Node2D = null
 var freeze := false
 
 func setup(item_entry: Dictionary) -> void:
+	if int(item_entry.get("rarity", 0)) >= 4:
+		var glow := Sprite2D.new()
+		glow.texture = load("res://assets/sprites/fx/glow.png")
+		glow.modulate = Color(1.0, 0.85, 0.35, 0.6)
+		glow.scale = Vector2(1.1, 1.1)
+		glow.z_index = -1
+		add_child(glow)
 	entry = item_entry
 
 	_glow = ColorRect.new()

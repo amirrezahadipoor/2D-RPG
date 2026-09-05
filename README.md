@@ -106,3 +106,13 @@ rooms and corridors, lit only by torches and your lantern; depth 3 ends in a
 dragon. Merchants now open a shop page in dialogue (W/S to select, E to buy,
 K to leave): health potions 25 G, greater potions 60 G, and one seeded
 equipment piece priced by rarity.
+
+### Feel & bestiary addendum
+- Chunky pixel zoom (2.5x) over the integer-scaled 1080p pipeline: big crisp
+  pixels, contact shadows under props and dungeon walls, shimmering lakes,
+  biome ground dressing, animated torch flames and an ambient vignette.
+- Combat reads: per-tier slash arcs, a charge ring under held heavies, dodge
+  streaks, walk bounce, hit tilt and a topple-and-fade death.
+- New monsters: wolf (fast pack hunter), shaman (ranged caster that heals its
+  pack and keeps distance), golem (armored slow tank). 10% of spawns are
+  elites: bigger, richer, with a golden glow. Relic pickups glow too.

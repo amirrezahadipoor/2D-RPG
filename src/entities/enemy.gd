@@ -371,7 +371,7 @@ func take_damage(amount: int, knock_dir: Vector2 = Vector2.ZERO, crit: bool = fa
 	if state == State.DEAD:
 		return 0
 	if _tactic("armored"):
-		amount = int(roundf(float(amount) * 0.7))   # rock skin shrugs off blows
+		amount = int(roundf(float(amount) * 0.75))  # rock skin shrugs off blows
 	var taken := mini(amount, hp)
 	hp -= taken
 	_flash_timer = 0.12

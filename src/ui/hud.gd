@@ -249,6 +249,10 @@ func _on_gold(gold: int) -> void:
 	_gold_label.text = "%s: %s" % [I18N.tr_str("hud.gold"), I18N.num(gold)]
 	I18N.tag(_gold_label)
 
+func set_biome_text(text: String) -> void:
+	_biome_label.text = text
+	I18N.tag(_biome_label)
+
 func set_biome(biome: String) -> void:
 	_last_biome = biome
 	_biome_label.text = I18N.tr_str("biome." + biome)

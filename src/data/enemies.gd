@@ -19,7 +19,7 @@ const TYPES := {
 	             "detect": 95,  "attack_range": 12, "attack_cd": 0.9, "scale": 1.0},
 	"shaman":   {"hp": 30,  "damage": 9,  "speed": 30, "xp": 26,  "gold": 14,
 	             "detect": 90,  "attack_range": 14, "attack_cd": 1.3, "scale": 1.0},
-	"golem":    {"hp": 140, "damage": 20, "speed": 18, "xp": 60,  "gold": 35,
+	"golem":    {"hp": 90,  "damage": 20, "speed": 18, "xp": 60,  "gold": 35,
 	             "detect": 60,  "attack_range": 20, "attack_cd": 2.0, "scale": 1.4},
 	"dragon":   {"hp": 260, "damage": 26, "speed": 36, "xp": 250, "gold": 200,
 	             "detect": 130, "attack_range": 24, "attack_cd": 1.6, "scale": 1.6},
