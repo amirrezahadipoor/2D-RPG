@@ -49,6 +49,8 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 
 - ✅ Phase 8: Quests/story/localization implemented with complete quest journal system (main story line of 12 quests + 21 side quests across 7 biomes), quest types (kill, collect, deliver, explore, talk, boss, escort), bilingual localization (English + Persian with RTL support and Persian numeral display option), quest tracking and progression, trader interactions, and quest journal UI. All quest data programmatic with externalized locale files.
 
+- ✅ Phase 9: Equipment system implemented with 6 equip slots (weapon, helmet, chest, legs, boots, accessories), visual hero sprite updates per equipment, indie-style art design with appealing color schemes from material tiers + patterns, and full stat bonuses (STR/AGI/DEF/LUCK). Equipment integrates with hero appearance and combat stats. All equipment data programmatic - no pre-made art assets.
+
 ### Next Phase Start
 Proceed to Phase 9: Bosses/hardcore balance
 
