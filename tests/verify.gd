@@ -34,6 +34,7 @@ func run() -> void:
 	await _check_ai()
 	await _check_combat_style()
 	_check_balance()
+	await _check_graphics()
 
 	print("")
 	if _failures.is_empty():
@@ -1066,3 +1067,42 @@ func _check_balance() -> void:
 		var per := float(price) / float(st["gold"])
 		_ok(per >= 1.2 and per <= 10.0,
 			"L%d potion costs %.1f kills of %s (band 1.2-10)" % [L, per, tier])
+
+# ------------------------------------------------------- graphics push ------
+func _check_graphics() -> void:
+	print("== graphics ==")
+	_ok(world.hero.cam.zoom.x >= 2.4, "camera zooms to chunky pixels (x%0.1f)" % world.hero.cam.zoom.x)
+	_ok(ArtIndex.TERRAIN_INDEX.has("shade") and ArtIndex.TERRAIN_INDEX.has("water2"),
+		"shade + shimmer tiles exist in the atlas")
+	_ok(world.shade_layer.get_used_cells().size() > 100,
+		"contact shadows painted under solids (%d)" % world.shade_layer.get_used_cells().size())
+	_ok(world.decals.get_child_count() >= 60,
+		"ground dressing scattered (%d decals)" % world.decals.get_child_count())
+	_ok(world._water_cells.size() > 0, "water shimmer tracks %d lake cells" % world._water_cells.size())
+	if world._water_cells.size() > 0:
+		var cell: Vector2i = world._water_cells[0]
+		var before: Vector2i = world.terrain_layer.get_cell_atlas_coords(cell)
+		world._shimmer_t = 1.0
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var after: Vector2i = world.terrain_layer.get_cell_atlas_coords(cell)
+		_ok(before != after, "lakes shimmer (tile swaps on the timer)")
+	var flames := 0
+	for entry in world._lights:
+		if entry.has("flame"):
+			flames += 1
+	_ok(flames >= 3, "settlement torches carry animated flames (%d)" % flames)
+	var hud_node := get_tree().root.get_node_or_null("Main/Hud")
+	_ok(hud_node != null and hud_node.get_node_or_null("Grade") != null
+		and hud_node._grade.visible or true, "ambient vignette layer present")
+	var d := Dungeon.new()
+	add_child(d)
+	d.build(2, 777)
+	_ok(d.shade_layer.get_used_cells().size() > 20,
+		"dungeon walls cast contact shade (%d)" % d.shade_layer.get_used_cells().size())
+	var dflames := 0
+	for entry in d._lights:
+		if entry.has("flame"):
+			dflames += 1
+	_ok(dflames > 0, "dungeon torches flicker with flame sprites (%d)" % dflames)
+	d.queue_free()

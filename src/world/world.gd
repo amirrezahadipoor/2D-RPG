@@ -18,6 +18,11 @@ const SOLID_PROPS := {"tree": Rect2(0, 10, 16, 6), "rock": Rect2(0, 6, 16, 10),
 
 var terrain_layer: TileMapLayer
 var props_layer: TileMapLayer
+var shade_layer: TileMapLayer
+var decals: Node2D
+var _water_cells: Array = []
+var _water_phase := 0
+var _shimmer_t := 0.0
 var actors: Node2D
 var hero: Hero
 var spawner: Spawner
@@ -48,6 +53,9 @@ func build(seed_value: int) -> void:
 	_spawn_spawner()
 	_spawn_npcs()
 	_place_chests()
+	_paint_shade()
+	_collect_water()
+	_spawn_decals()
 	_place_lights()
 	ambient = AmbientFX.new()
 	ambient.name = "Ambient"
@@ -201,6 +209,15 @@ func _build_tileset_and_layers() -> void:
 	props_layer.collision_enabled = true
 	props_layer.y_sort_enabled = true
 	add_child(props_layer)
+	shade_layer = TileMapLayer.new()
+	shade_layer.name = "Shade"
+	shade_layer.tile_set = ts
+	shade_layer.collision_enabled = false
+	shade_layer.modulate = Color(1, 1, 1, 0.32)
+	add_child(shade_layer)
+	decals = Node2D.new()
+	decals.name = "Decals"
+	add_child(decals)
 
 func _set_solid(src: TileSetAtlasSource, tile_index: int, rect: Rect2) -> void:
 	var coords := Vector2i(tile_index % 8, tile_index / 8)
@@ -239,6 +256,84 @@ func _paint() -> void:
 			terrain_layer.set_cell(Vector2i(x, y), 0, Vector2i(tidx % 8, tidx / 8))
 			if prop != "":
 				props_layer.set_cell(Vector2i(x, y), 1, Vector2i(ArtIndex.PROP_INDEX[prop] % 8, ArtIndex.PROP_INDEX[prop] / 8))
+
+## Contact shadows under anything solid ground the scene: trees, rocks and
+## walls stop looking like stickers pasted on the grass.
+func _paint_shade() -> void:
+	var shade_atlas := Vector2i(ArtIndex.TERRAIN_INDEX["shade"] % 8,
+		ArtIndex.TERRAIN_INDEX["shade"] / 8)
+	var solid_props := {"tree": 1, "rock": 1, "bush": 1, "tomb": 1,
+		"fence": 1, "well": 1, "sign": 1, "chest": 1}
+	for cell in props_layer.get_used_cells():
+		var atlas: Vector2i = props_layer.get_cell_atlas_coords(cell)
+		var name: String = ""
+		for key in ArtIndex.PROP_INDEX:
+			if ArtIndex.PROP_INDEX[key] == atlas.y * 8 + atlas.x:
+				name = key
+		if name == "" or not solid_props.has(name):
+			continue
+		var below := Vector2i(cell.x, cell.y + 1)
+		if props_layer.get_cell_atlas_coords(below) == Vector2i(-1, -1):
+			shade_layer.set_cell(below, 0, shade_atlas)
+
+func _collect_water() -> void:
+	var water := ArtIndex.TERRAIN_INDEX["water"]
+	for cell in terrain_layer.get_used_cells():
+		var atlas: Vector2i = terrain_layer.get_cell_atlas_coords(cell)
+		if atlas.y * 8 + atlas.x == water:
+			_water_cells.append(cell)
+
+## Sparse ground dressing per biome: flowers, pebbles, puddles, snow drifts.
+func _spawn_decals() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = world_seed ^ 0xDECA
+	var props_tex := load("res://assets/sprites/tiles/props.png")
+	var terrain_tex := load("res://assets/sprites/tiles/terrain.png")
+	var placed := 0
+	var tries := 0
+	while placed < 160 and tries < 4000:
+		tries += 1
+		var t := Vector2i(rng.randi_range(2, WORLD_W - 3), rng.randi_range(2, WORLD_H - 3))
+		var pos := Vector2(t.x * TILE + 8.0, t.y * TILE + 8.0)
+		if not is_walkable_at(pos):
+			continue
+		var biome := biome_at(pos)
+		var spr := Sprite2D.new()
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		spr.centered = true
+		var at := AtlasTexture.new()
+		match biome:
+			"forest", "grass", "village", "town":
+				at.atlas = props_tex
+				at.region = Rect2(Vector2(ArtIndex.PROP_INDEX["flower"] % 8,
+					ArtIndex.PROP_INDEX["flower"] / 8) * 16.0, Vector2(16, 16))
+				spr.modulate = [Color(1, 1, 1), Color(1, 0.85, 0.9),
+					Color(0.9, 0.9, 1), Color(1, 0.95, 0.7)][rng.randi_range(0, 3)]
+			"desert", "caves", "graveyard":
+				at.atlas = props_tex
+				at.region = Rect2(Vector2(ArtIndex.PROP_INDEX["rock"] % 8,
+					ArtIndex.PROP_INDEX["rock"] / 8) * 16.0, Vector2(16, 16))
+				spr.scale = Vector2(0.35, 0.35)
+				spr.modulate = Color(0.8, 0.78, 0.75, 0.8)
+			"swamp":
+				at.atlas = terrain_tex
+				at.region = Rect2(Vector2(ArtIndex.TERRAIN_INDEX["water2"] % 8,
+					ArtIndex.TERRAIN_INDEX["water2"] / 8) * 16.0, Vector2(16, 16))
+				spr.scale = Vector2(0.6, 0.4)
+				spr.modulate = Color(0.7, 0.9, 0.8, 0.5)
+			"snow":
+				at.atlas = terrain_tex
+				at.region = Rect2(Vector2(ArtIndex.TERRAIN_INDEX["snow"] % 8,
+					ArtIndex.TERRAIN_INDEX["snow"] / 8) * 16.0, Vector2(16, 16))
+				spr.scale = Vector2(0.5, 0.25)
+				spr.modulate = Color(1, 1, 1, 0.55)
+			_:
+				spr.free()
+				continue
+		spr.texture = at
+		spr.global_position = pos + Vector2(rng.randf_range(-6, 6), rng.randf_range(-5, 5))
+		decals.add_child(spr)
+		placed += 1
 
 func _settlement_at_tile(t: Vector2i) -> Dictionary:
 	for st in settlements:
@@ -443,6 +538,12 @@ func _place_lights() -> void:
 	for st in settlements:
 		var plaza: Vector2i = st["plaza"]
 		for off in [Vector2(2, 0), Vector2(-2, 0), Vector2(1 - st["rect"].size.x / 2, st["rect"].size.y - 1)]:
+			var flame := Sprite2D.new()
+			flame.texture = load("res://assets/sprites/fx/flame.png")
+			flame.hframes = 2
+			flame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(flame)
+			flame.global_position = Vector2((plaza.x + off.x) * TILE + 8, (plaza.y + off.y) * TILE - 6)
 			var light := PointLight2D.new()
 			light.texture = glow
 			light.color = Color(1.0, 0.75, 0.4)
@@ -450,7 +551,8 @@ func _place_lights() -> void:
 			light.energy = 0.0
 			add_child(light)
 			light.global_position = Vector2((plaza.x + off.x) * TILE + 8, (plaza.y + off.y) * TILE + 4)
-			_lights.append({"light": light, "kind": "torch", "phase": randf() * TAU})
+			_lights.append({"light": light, "kind": "torch", "phase": randf() * TAU,
+				"flame": flame})
 	# cursed green glows over a few graveyard clusters
 	var rng := RandomNumberGenerator.new()
 	rng.seed = world_seed ^ 0xA115
@@ -478,8 +580,19 @@ func _process(delta: float) -> void:
 		entry["phase"] += delta
 		if entry["kind"] == "torch":
 			light.energy = 0.9 + 0.12 * sin(entry["phase"] * 9.0) if Game.is_night() else 0.0
+			var flame: Sprite2D = entry["flame"]
+			flame.frame = int(entry["phase"] * 9.0) % 2
+			flame.visible = Game.is_night() or light.energy > 0.0
 		else:
 			light.energy = (0.3 + 0.2 * sin(entry["phase"] * 2.2)) if Game.is_night() else 0.12
+	_shimmer_t += delta
+	if _shimmer_t >= 0.7 and not _water_cells.is_empty():
+		_shimmer_t = 0.0
+		_water_phase = 1 - _water_phase
+		var atlas := Vector2i(ArtIndex.TERRAIN_INDEX["water" if _water_phase == 0 else "water2"] % 8,
+			ArtIndex.TERRAIN_INDEX["water" if _water_phase == 0 else "water2"] / 8)
+		for cell in _water_cells:
+			terrain_layer.set_cell(cell, 0, atlas)
 	if hero == null or hero.get_parent() != actors:
 		return   # hero is elsewhere (a dungeon): keep its biome label
 	var b := biome_at(hero.global_position)

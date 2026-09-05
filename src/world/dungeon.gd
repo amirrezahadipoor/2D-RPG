@@ -12,6 +12,7 @@ const DEPTH_TYPES := ["skeleton", "skeleton", "orc", "orc", "demon", "demon"]
 
 var depth := 1
 var terrain_layer: TileMapLayer
+var shade_layer: TileMapLayer
 var actors: Node2D
 var hero: Hero = null
 var rooms: Array = []
@@ -176,6 +177,12 @@ func _build_tileset_and_layer() -> void:
 	terrain_layer.tile_set = ts
 	terrain_layer.collision_enabled = true
 	add_child(terrain_layer)
+	shade_layer = TileMapLayer.new()
+	shade_layer.name = "Shade"
+	shade_layer.tile_set = ts
+	shade_layer.collision_enabled = false
+	shade_layer.modulate = Color(1, 1, 1, 0.35)
+	add_child(shade_layer)
 
 func _paint() -> void:
 	for y in H:
@@ -187,6 +194,13 @@ func _paint() -> void:
 			else:
 				idx = ArtIndex.TERRAIN_INDEX["cave" if (x * 3 + y) % 5 != 0 else "stone"]
 			terrain_layer.set_cell(Vector2i(x, y), 0, Vector2i(idx % 8, idx / 8))
+	# contact shade where a wall looms over floor sells the depth
+	var shade_atlas := Vector2i(ArtIndex.TERRAIN_INDEX["shade"] % 8,
+		ArtIndex.TERRAIN_INDEX["shade"] / 8)
+	for y in H:
+		for x in W:
+			if _grid[y * W + x] == 1 and y > 0 and _grid[(y - 1) * W + x] == 0:
+				shade_layer.set_cell(Vector2i(x, y), 0, shade_atlas)
 
 func is_walkable_at(world_pos: Vector2) -> bool:
 	var t := Vector2i(floori(world_pos.x / float(TILE)), floori(world_pos.y / float(TILE)))
@@ -249,7 +263,13 @@ func _place_entities() -> void:
 			light.energy = 0.75
 			add_child(light)
 			light.global_position = tp
-			_lights.append({"light": light, "phase": randf() * TAU})
+			var flame := Sprite2D.new()
+			flame.texture = load("res://assets/sprites/fx/flame.png")
+			flame.hframes = 2
+			flame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			add_child(flame)
+			flame.global_position = tp + Vector2(0, -4)
+			_lights.append({"light": light, "phase": randf() * TAU, "flame": flame})
 		if i > 0 and i % 2 == 0:
 			var chest := Chest.new()
 			actors.add_child(chest)
@@ -263,6 +283,7 @@ func _process(delta: float) -> void:
 	for entry in _lights:
 		entry["phase"] += delta
 		entry["light"].energy = 0.7 + 0.15 * sin(entry["phase"] * 8.0)
+		entry["flame"].frame = int(entry["phase"] * 8.0) % 2
 	_dungeon_spawn(delta)
 
 func _dungeon_spawn(delta: float) -> void:

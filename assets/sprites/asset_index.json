@@ -82,7 +82,9 @@
     "cobble",
     "wood",
     "cave",
-    "roof"
+    "roof",
+    "shade",
+    "water2"
   ],
   "props": [
     "tree",

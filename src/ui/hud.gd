@@ -21,6 +21,7 @@ var _prompts: Label
 var _strip: HBoxContainer
 var _last_biome := ""
 var _root: Control
+var _grade: TextureRect
 var _vignette: ColorRect
 var _toast: Label
 var _last_level := 1
@@ -41,6 +42,17 @@ func _build() -> void:
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
+
+	# --- ambient vignette: soft radial darkening for a cinematic frame ---
+	_grade = TextureRect.new()
+	_grade.name = "Grade"
+	_grade.texture = load("res://assets/sprites/fx/vignette.png")
+	_grade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_grade.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_grade.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_grade.modulate = Color(1, 1, 1, 0.6)
+	_grade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_grade)
 
 	# --- hurt vignette: full-screen red flash, drawn under the rest ---
 	_vignette = ColorRect.new()

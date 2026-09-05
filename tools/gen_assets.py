@@ -157,7 +157,8 @@ class Canvas:
     def to_image(self):
         img = Image.new("RGBA", (self.w, self.h), (0, 0, 0, 0))
         for (x, y), c in self.buf.items():
-            img.putpixel((x, y), (c[0], c[1], c[2], 255))
+            a = c[3] if len(c) > 3 else 255
+            img.putpixel((x, y), (c[0], c[1], c[2], a))
         return img
 
 
@@ -682,6 +683,8 @@ TILE_DEFS = [
     ("wood",     "leath_m", "leath_l", "leath_d"),
     ("cave",     "stone_d", "black", "stone_m"),
     ("roof",     "red_m", "red_d", "red_l"),
+    ("shade",    "black", "black", "black"),
+    ("water2",   "water_m", "water_d", "water_l"),
 ]
 
 
@@ -738,6 +741,23 @@ def _detail(name, x, y, r, c, bc):
             c.px(x, y, PAL["water_l"])
         elif y in (6, 13) and (x + 3) % 8 < 3:
             c.px(x, y, PAL["water_d"])
+    elif name == "water2":
+        # second shimmer phase: ripples shifted so lakes visibly move
+        if y in (5, 11) and (x + 4) % 8 < 4:
+            c.px(x, y, PAL["water_l"])
+        elif y in (2, 8, 14) and (x + 1) % 8 < 3:
+            c.px(x, y, PAL["water_d"])
+        elif y == 6 and x % 5 == 2:
+            c.px(x, y, PAL["water_l"])
+    elif name == "shade":
+        # contact shadow: solid black top rows, dithered falloff. The layer
+        # that paints these runs at ~30% alpha, so this reads as soft depth
+        c.hline(0, 0, 16, (0, 0, 0))
+        c.hline(0, 1, 16, (0, 0, 0))
+        for x2 in range(0, 16, 2):
+            c.px(x2, 2, (0, 0, 0))
+        for x2 in range(1, 16, 4):
+            c.px(x2, 3, (0, 0, 0))
     elif name == "dirt":
         if r > 0.9:
             c.px(x, y, PAL["dirt_d"])
@@ -775,7 +795,8 @@ def make_tileset():
         bx, by = (idx % TILE_COLS) * TILE, (idx // TILE_COLS) * TILE
         bc = PAL[base]
         c = Canvas(TILE, TILE)
-        c.rect(0, 0, TILE, TILE, bc)
+        if name != "shade":   # shade is a transparent tile with a dark crown
+            c.rect(0, 0, TILE, TILE, bc)
         for y in range(TILE):
             for x in range(TILE):
                 _detail(name, x, y, _noise(x, y, idx + 1), c, bc)
@@ -1119,6 +1140,83 @@ def build_icon_sheet(specs):
 
 
 # --------------------------------------------------------------------- fx ----
+def make_slash():
+    """4-frame crescent sweep, 32x32, white core with a warm edge."""
+    frames = []
+    for f in range(4):
+        c = Canvas(32, 32)
+        grow = [6, 10, 13, 15][f]
+        thin = [3, 4, 4, 3][f]
+        import math
+        for i in range(24):
+            t = i / 23.0
+            ang = math.pi * (0.15 + 0.7 * t)
+            r0 = 6 + grow * 0.6
+            for rr in range(thin):
+                rad = r0 + rr - thin // 2 + (grow - 6) * 0.25 * math.sin(t * math.pi)
+                x = int(16 + math.cos(ang) * rad)
+                y = int(16 + math.sin(ang) * rad)
+                col = (246, 246, 246) if rr == thin // 2 else (255, 214, 130)
+                c.px(x, y, col)
+        frames.append(c)
+    return frames
+
+
+def make_ring():
+    c = Canvas(24, 24)
+    import math
+    for i in range(40):
+        ang = i / 40.0 * 2 * math.pi
+        x = int(12 + math.cos(ang) * 9)
+        y = int(12 + math.sin(ang) * 6)
+        c.px(x, y, (255, 214, 130))
+        c.px(x, y + 1, (178, 108, 46))
+    return c
+
+
+def make_streak():
+    c = Canvas(16, 10)
+    for y in range(10):
+        for x in range(16):
+            if (x + y) % 3 == 0 and 2 <= y <= 7:
+                c.px(x, y, (206, 218, 234, 150))
+            elif (x + y) % 5 == 1 and 3 <= y <= 6:
+                c.px(x, y, (246, 246, 246, 200))
+    return c
+
+
+def make_flame():
+    frames = []
+    for f in range(2):
+        c = Canvas(8, 8)
+        h = [5, 6][f]
+        c.rect(3, 8 - h, 2, h, (255, 176, 64))
+        c.px(3, 8 - h, (255, 214, 130))
+        c.px(4, 8 - h + 1, (255, 246, 200))
+        c.px(2, 7, (255, 106, 40))
+        c.px(5, 7, (255, 106, 40))
+        if f == 1:
+            c.px(4, 8 - h - 1, (255, 214, 130))
+        frames.append(c)
+    return frames
+
+
+def make_vignette():
+    """Soft radial darkening, authored small and stretched by the HUD."""
+    import math
+    w, h = 96, 54
+    c = Canvas(w, h)
+    for y in range(h):
+        for x in range(w):
+            dx = (x - w / 2) / (w / 2)
+            dy = (y - h / 2) / (h / 2)
+            d = math.sqrt(dx * dx + dy * dy)
+            if d > 0.72:
+                a = int(min(140, (d - 0.72) * 340))
+                c.px(x, y, (8, 6, 14, a))
+    return c
+
+
 def make_glow():
     """Soft radial falloff used by Light2D (lanterns, torches, wisps)."""
     c = Canvas(64, 64)
@@ -1259,6 +1357,21 @@ def main():
     # --- light glow -----------------------------------------------------
     print("[fx]")
     save(make_glow(), "fx/glow.png")
+    sl = make_slash()
+    sheet = Canvas(4 * 32, 32)
+    for i, fr in enumerate(sl):
+        for (x, y), col in fr.buf.items():
+            sheet.px(i * 32 + x, y, col)
+    save(sheet, "fx/slash.png")
+    save(make_ring(), "fx/ring.png")
+    save(make_streak(), "fx/streak.png")
+    fl = make_flame()
+    fsheet = Canvas(2 * 8, 8)
+    for i, fr in enumerate(fl):
+        for (x, y), col in fr.buf.items():
+            fsheet.px(i * 8 + x, y, col)
+    save(fsheet, "fx/flame.png")
+    save(make_vignette(), "fx/vignette.png")
 
     # --- icon.png (app icon) -------------------------------------------
     print("[app icon]")

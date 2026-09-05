@@ -71,9 +71,10 @@ func _ready() -> void:
 	cam = Camera2D.new()
 	cam.position_smoothing_enabled = true
 	cam.position_smoothing_speed = 8.0
-	# 2x zoom: at the 480x270 native resolution this frames ~15x8 tiles and
-	# keeps the hero comfortably readable on a phone screen.
-	cam.zoom = Vector2(2, 2)
+	# 2.5x zoom: at the 480x270 native resolution (stretched integer to the
+	# window) every art pixel lands as a big crisp block on screen - the
+	# pixel-art reads chunky and deliberate instead of tiny and noisy.
+	cam.zoom = Vector2(2.5, 2.5)
 	add_child(cam)
 	cam.make_current()
 
