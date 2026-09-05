@@ -89,9 +89,18 @@ func _ready() -> void:
 	add_child(cam)
 	cam.make_current()
 
+	_starting_gear_guard()
+	print("[Hero] ready")
+
+## Starting gear only belongs to a FRESH run. On Continue (pending_load) the
+## equipped items were already restored by Game.load_run(); Main re-dresses
+## this doll from Inventory afterwards. Equipping the starter set here would
+## make Inventory.on_hero_gear overwrite (and re-roll) the saved loot.
+func _starting_gear_guard() -> void:
+	if Game.pending_load:
+		return
 	_starting_gear()
 	_on_gear_changed(doll.get_gear())
-	print("[Hero] ready")
 
 func _starting_gear() -> void:
 	doll.equip("chest", "tunic_cloth")

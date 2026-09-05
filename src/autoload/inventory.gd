@@ -53,6 +53,18 @@ func reset_run() -> void:
 	equipment_changed.emit()
 
 # ------------------------------------------------------------- hero sync ----
+## Continue/revive: dress a paper-doll in exactly the equipped entries that
+## were saved, affixes and rarity intact. Because ids now match what
+## on_hero_gear() sees, nothing is re-rolled and nothing is lost — the boot
+## order bug (starting gear overwriting saved loot) is fixed here.
+func restore_doll_from_save(doll: Node) -> void:
+	if doll == null or not doll.has_method("equip"):
+		return
+	for slot: String in ArtIndex.EQUIPMENT_SLOTS:
+		var e = equipped.get(slot, "")
+		var item_id: String = str(e.get("id", "")) if e is Dictionary else ""
+		doll.equip(slot, item_id)
+
 ## Called by Main whenever the paper-doll's gear ids change (equip hotkey,
 ## UI, starting gear). Keeps worn entries in sync with the sprites.
 func on_hero_gear(gear: Dictionary) -> void:

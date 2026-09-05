@@ -84,7 +84,13 @@ func _ready() -> void:
 		hud.set_gear(world.hero.doll.get_gear())
 		world.hero.gear_changed.connect(hud.set_gear)
 		world.hero.gear_changed.connect(Inventory.on_hero_gear)
-		Inventory.on_hero_gear(world.hero.doll.get_gear())
+		if loading:
+			# Continue: dress the doll from the SAVED equipped entries. The
+			# doll's own ids then match the stored entries, so on_hero_gear()
+			# reconciles without re-rolling or discarding the saved loot.
+			Inventory.restore_doll_from_save(world.hero.doll)
+		else:
+			Inventory.on_hero_gear(world.hero.doll.get_gear())
 
 	Stats.died.connect(_on_player_died)
 	Game.state_changed.connect(_on_game_state)

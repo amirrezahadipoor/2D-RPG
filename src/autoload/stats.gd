@@ -142,6 +142,7 @@ func serialize() -> Dictionary:
 		"level": level, "xp": xp, "xp_next": xp_next,
 		"gold": gold, "kills": kills,
 		"talent_points": talent_points, "talents": talents.duplicate(),
+		"armor": armor,
 	}
 
 func deserialize(data: Dictionary) -> void:
@@ -158,6 +159,8 @@ func deserialize(data: Dictionary) -> void:
 	var t: Dictionary = data.get("talents", {})
 	if not t.is_empty():
 		talents = t
+	# armor was never serialized, so a reload reported the previous value
+	armor = maxi(0, int(data.get("armor", armor)))
 	armor_changed.emit(armor)
 	health_changed.emit(hp, max_hp)
 	stamina_changed.emit(stamina, max_stamina)
