@@ -681,6 +681,7 @@ TILE_DEFS = [
     ("cobble",   "stone_m", "stone_l", "stone_d"),
     ("wood",     "leath_m", "leath_l", "leath_d"),
     ("cave",     "stone_d", "black", "stone_m"),
+    ("roof",     "red_m", "red_d", "red_l"),
 ]
 
 
@@ -704,6 +705,12 @@ def _detail(name, x, y, r, c, bc):
             c.px(x, y - 1, PAL["leaf_d"])
         elif r < 0.06:
             c.px(x, y, PAL["leaf_l"])
+    elif name == "roof":
+        # overlapping shingle rows
+        if y % 4 == 3:
+            c.px(x, y, darken(bc, 0.82))
+        elif (x + (y // 4) % 2) % 4 == 0:
+            c.px(x, y, PAL["red_l"])
     elif name in ("sand", "sand2"):
         if (y % 4 == 2) and (x + y // 4) % 6 < 3:
             c.px(x, y, darken(bc, 0.94))
@@ -779,7 +786,8 @@ def make_tileset():
 
 def make_props():
     """Overlay props drawn on top of terrain."""
-    names = ["tree", "rock", "bush", "flower", "chest", "stairs", "sign", "torch"]
+    names = ["tree", "rock", "bush", "flower", "chest", "stairs", "sign", "torch",
+             "tomb", "fence", "well"]
     sheet = Canvas(len(names) * TILE, TILE)
     for i, name in enumerate(names):
         ox = i * TILE
@@ -866,6 +874,31 @@ def make_props():
             c.rect(6, 3, 4, 5, PAL["ember"])
             c.rect(7, 2, 2, 3, PAL["gold_l"])
             c.px(7, 4, PAL["white"]); c.px(8, 3, PAL["white"])
+        elif name == "tomb":
+            # rounded headstone with a carved cross, cracked base
+            _stamp(c, ["..ssss..", ".ssssss.", ".ssssss.", ".ss.sss.", ".ssssss.", ".ssssss."],
+                   4, 5, {"s": PAL["stone_m"]})
+            c.hline(6, 5, 4, PAL["stone_l"])
+            c.vline(5, 6, 5, PAL["stone_d"]); c.vline(10, 6, 5, PAL["stone_d"])
+            c.vline(8, 7, 3, PAL["stone_d"]); c.hline(7, 8, 3, PAL["stone_d"])
+            c.rect(3, 11, 10, 3, PAL["stone_d"])
+            c.hline(3, 11, 10, PAL["stone_m"])
+            c.px(4, 12, PAL["stone_l"]); c.px(11, 13, PAL["black"])
+        elif name == "fence":
+            c.vline(3, 6, 9, PAL["leath_m"]); c.vline(4, 6, 9, PAL["leath_d"])
+            c.vline(11, 6, 9, PAL["leath_m"]); c.vline(12, 6, 9, PAL["leath_d"])
+            c.hline(3, 8, 10, PAL["leath_m"]); c.hline(3, 9, 10, PAL["leath_d"])
+            c.hline(3, 12, 10, PAL["leath_m"]); c.hline(3, 13, 10, PAL["leath_d"])
+            c.px(3, 5, PAL["leath_l"]); c.px(11, 5, PAL["leath_l"])
+        elif name == "well":
+            c.rect(4, 9, 8, 5, PAL["stone_m"])
+            c.hline(4, 9, 8, PAL["stone_l"]); c.hline(4, 13, 8, PAL["stone_d"])
+            c.px(5, 11, PAL["stone_d"]); c.px(9, 10, PAL["stone_d"])
+            c.rect(5, 8, 6, 1, PAL["black"])
+            c.vline(4, 3, 6, PAL["leath_d"]); c.vline(11, 3, 6, PAL["leath_d"])
+            c.hline(4, 3, 8, PAL["leath_m"])
+            c.rect(6, 4, 4, 3, PAL["leath_m"])
+            c.hline(6, 4, 4, PAL["leath_l"])
         for (x, y), col in c.buf.items():
             sheet.px(ox + x, y, col)
     return sheet, names
@@ -1008,6 +1041,16 @@ def item_icon(kind, mat, trim=None):
             ox = int(round(math.sin(tt * math.pi) * 4))
             c.px(5 + ox, 2 + i, PAL["leath_m"])
         c.vline(5, 3, 10, PAL["white"])
+    elif kind == "potion":
+        # corked flask with glowing liquid; trim = gold band for greater brews
+        c.px(7, 2, PAL["leath_m"]); c.px(8, 2, PAL["leath_m"])
+        c.vline(7, 3, 2, PAL["white"]); c.vline(8, 3, 2, PAL["white"])
+        _stamp(c, [".mmmm.", "mmmmmm", "mmmmmm", "mmmmmm", ".mmmm."], 5, 6,
+               {"m": r["m"]})
+        c.px(6, 7, r["l"]); c.px(7, 7, r["l"]); c.px(6, 8, r["l"])
+        c.hline(5, 11, 6, r["d"])
+        if t:
+            c.hline(6, 5, 4, t["m"])
     elif kind == "helm":
         _stamp(c, ["..mmmm..", ".mmmmmm.", "mmmmmmmm", "mmmmmmmm", "m.dddd.m", "mm....mm"],
                4, 4, {"m": r["m"], "d": r["d"]})
@@ -1163,6 +1206,11 @@ def main():
         icon_specs.append((name, "boots", mat, None))
     for name, _ in equip["accessory"]:
         icon_specs.append((name, "cloak", "red" if "red" in name else "purple" if "royal" in name else "leaf", None))
+    icon_specs += [
+        ("health_potion", "potion", "red", None),
+        ("greater_health_potion", "potion", "red", "gold"),
+        ("stamina_potion", "potion", "leaf", None),
+    ]
     isheet, icon_names = build_icon_sheet(icon_specs)
     save(isheet, "items/equipment_icons.png")
 

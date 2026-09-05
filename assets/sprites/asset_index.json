@@ -81,7 +81,8 @@
     "dirt",
     "cobble",
     "wood",
-    "cave"
+    "cave",
+    "roof"
   ],
   "props": [
     "tree",
@@ -91,7 +92,10 @@
     "chest",
     "stairs",
     "sign",
-    "torch"
+    "torch",
+    "tomb",
+    "fence",
+    "well"
   ],
   "enemies": {
     "slime": {
@@ -163,7 +167,10 @@
     "iron_boots",
     "red_cloak",
     "royal_cloak",
-    "forest_cloak"
+    "forest_cloak",
+    "health_potion",
+    "greater_health_potion",
+    "stamina_potion"
   ],
   "icon_grid": [
     8,
