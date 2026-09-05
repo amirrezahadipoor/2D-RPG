@@ -4,18 +4,19 @@
 Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English + Persian (Farsi) bilingual support.
 
 ## Phase Order
-0. Setup & CI/CD ← **Current Phase**
-1. Core movement/camera
-2. Art pipeline
-3. Combat core
-4. Leveling/talents
-5. Items/inventory (1000-item generator)
-6. Open world
-7. Dungeons
-8. Quests/story/localization
-9. Bosses/hardcore balance
-10. Polish
-11. Release build
+0. Setup & CI/CD ✓
+1. Core movement/camera ✓
+2. Art pipeline ✓
+3. Combat core ✓
+4. Leveling/talents ✓
+5. Items/inventory (1000-item generator) ✓
+6. Open world ✓
+7. Dungeons ✓
+8. Quests/story/localization ✓
+9. Equipment & visuals ✓
+10. Economy & balance ✓
+11. Polish ✓ ← **Current Phase - COMPLETE**
+12. Release build → **Next Phase**
 
 ## Phase 0: Setup & CI/CD
 
@@ -25,11 +26,11 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 - [x] Create ART_BIBLE.md (art style definitions)
 - [x] Create ITEMS.md (item generation scheme)
 - [x] Configure GitHub Actions CI/CD workflows:
-  - `.github/workflows/ci.yml` — GUT (Godot Unit Test) suite
-  - `.github/workflows/build-android.yml` — Android APK/AAB build
+  - `.github/workflows/ci.yml` — GUT (Godot Unit Test) suite + GDScript validation
+  - `.github/workflows/build-android.yml` — Android APK/AAB build (offline compliance check)
 - [x] Set up environment variable `GH_PUSH_TOKEN` for authentication
 - [x] Verify offline-only compliance (no network at runtime)
-- [x] Set up bilingual localization structure (locale files for EN/PA)
+- [x] Set up bilingual localization structure (locale files for EN/FA)
 
 ### Completion Criteria
 - ✅ Repository "2D-RPG" exists on GitHub with initial commit
@@ -53,13 +54,25 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 
 - ✅ Phase 10: Economy & balance implemented with currency system (gold, magic, artifacts), living NPCs with daily routines and dialogue, intro animated cutscene at game start, item upgrading system with risk/reward balance, enemy drop chances scaled by depth and type, item level scaling based on player level, vendor NPCs with buying/selling, distinctive character and enemy designs, and comprehensive economic balancing (gold sinks, reward scaling, vendor pricing). All systems programmatic - no pre-made art assets.
 
+- ✅ Phase 11: Polish implemented — comprehensive game-feel & mobile polish pass:
+  - **PolishManager**: central controller, offline compliance verification (removes HTTPRequest), Android defaults, FPS tracking & auto quality
+  - **JuiceController**: screenshake (damage-scaled), hitstop (critical 0.08s), damage numbers, flash/vignette, pickup bursts, punch tweens
+  - **PerformanceOptimizer**: 3 quality levels (LOW 30fps / MEDIUM 60fps 2xMSAA / HIGH 60fps 4xMSAA), auto device tier detection, object pooling, LOD (400/900px), FPS guard
+  - **VisualEffects**: hit_flash, heal, level_up (golden ring+stars), chest_open, critical, death — all procedural Label/ColorRect + Tween
+  - **AudioManager**: Master/Music/SFX buses, 6-player SFX pool, biome music map (7 biomes + dungeon/boss), crossfade, pitch variation, settings persisted
+  - **SaveManager**: user://savegame.save + backup, autosave 45s, checkpoint saves, hardcore permadeath (deletes save on death)
+  - **GameManager**: state machine (MENU/PLAYING/PAUSED/CUTSCENE/DEAD/VICTORY), playtime with Persian numerals
+  - **UI**: UIManager (safe areas, UI scale), HUD (HP/stamina/XP/gold, procedural fallback), MainMenu (parallax grid, animated title, Continue disabled if no save), PauseMenu (blur + Save Checkpoint), SettingsManager (audio sliders, locale EN/FA, hardcore/touch/polish toggles)
+  - **TouchControls**: virtual joystick (62px, 0.18 deadzone) + 64px action buttons, safe margins, injects Input actions
+  - **Localization**: EN/FA with RTL, locale JSON/CSV loading, Persian numerals (۰-۹), format_with_separator, Vazirmatn font support
+  - **IntroCutscene**: logo reveal + bilingual lore typewriter, skip after 1s, auto-finish 8.5s
+  - **Fixes**: player_movement migrated to CharacterBody2D + stamina + 64px enforcement; palette/pattern/silhouette/item generators bug-fixed (colors.tier_id, _Pattern_ prefix, base_affix_types, etc.)
+  - **Docs**: POLISH.md, updated ART_BIBLE compliance, project.godot with autoloads & input map, export_presets.cfg with offline permissions (internet=false, vibrate=true only), tests for polish, CI workflows fixed with setup-godot@v2
+
 ### Next Phase Start
-Proceed to Phase 11: Polish
+Proceed to Phase 12: Release build — final QA, icon/splash, store metadata, signed AAB, version 1.0
 
 ---
 
 *Last updated: 2026-09-05*
 
----
-
-*Last updated: 2026-09-05*
