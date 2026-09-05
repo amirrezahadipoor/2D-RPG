@@ -38,7 +38,7 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 - ✅ All docs present and version-controlled
 
 ### Next Phase Start
-Proceed to Phase 1: Core movement/camera
+Proceed to Phase 1: Core movement/camera ✅ **IN PROGRESS**
 
 ---
 

@@ -1,0 +1,16 @@
+[gdscenes]
+editors/1/classes/Node2D/name="Main"
+editors/1/classes/Camera2D/name="Camera2D"
+editors/1/classes/KinematicBody2D/name="Player"
+editors/1/classes/Sprite2D/name="Sprite"
+editors/1/classes/CollisionShape2D/name="Collision"
+Main/children=[Camera2D, Player]
+Camera2D/position=[0,0]
+Player/position=[0,0]
+Player/children=[Sprite, Collision]
+Sprite/position=[0,0]
+Collision/position=[0,0]
+# Camera2D setup:
+# - Current: true (follows Player automatically when Player is set as target)
+# - Zoom: 2.0 initial (will ensure minimum 64px hero size on phone)
+# - Limits: set to world bounds

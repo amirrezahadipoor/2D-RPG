@@ -1,0 +1,13 @@
+[gdscenes]
+editors/1/classes/Node2D/name="Root"
+editors/1/classes/Node2D/position=[0,0]
+editors/1/classes/KinematicBody2D/name="Player"
+editors/1/classes/KinematicBody2D/position=[0,0]
+editors/1/classes/Sprite2D/name="Sprite"
+editors/1/classes/Sprite2D/position=[0,0]
+editors/1/classes/CollisionShape2D/name="Collision"
+editors/1/classes/CollisionShape2D/position=[0,0]
+Root/children=[Player]
+Player/children=[Sprite, Collision]
+Sprite/position=[0,0]
+Collision/position=[0,0]
