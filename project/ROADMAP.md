@@ -45,8 +45,10 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 
 - ✅ Phase 6: Open world implemented with 7 biome types (Forest, Desert, Snow, Swamp, Caves, Village, Town) each with unique tile variants, enemy types, ambient music, and color palettes. Procedural world generation (200x200 tile map) with biome distribution based on world coordinates, village/town placement, dungeon cave entrances, entity placement (enemies, chests, NPCs), and player start position selection. NPC dialogue system with biome-specific quests (6+ quest types per biome), quest tracking and progression, and trader interactions. All world data programmatic - no pre-made maps or assets.
 
+- ✅ Phase 7: Dungeons implemented with procedural room-and-corridor layouts (up to 15 rooms per dungeon), 5 room types (start, normal, treasure, boss, checkpoint), randomized corridor styles (straight, L-shape, T-shape, random walk), depth-scaled enemy stats per DUNGEON_DIFFICULTY_SCALING table (1-10 floors with exponential difficulty increase), checkpoint rooms for hardcore saving, boss rooms with min-clear-enemy requirements, and entity placement (enemies, treasure chests, elite monsters). All dungeon data programmatic - no pre-made maps or assets.
+
 ### Next Phase Start
-Proceed to Phase 7: Dungeons
+Proceed to Phase 8: Quests/story/localization
 
 ---
 
