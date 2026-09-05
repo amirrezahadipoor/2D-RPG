@@ -15,6 +15,12 @@ echo
 echo "now set these secrets on the repo (Settings > Secrets and variables > Actions):"
 echo "  ANDROID_KEYSTORE_B64        = $(base64 -w0 "$OUT")"
 echo "  ANDROID_KEYSTORE_PASSWORD   = <the password you just typed>"
-echo "  ANDROID_KEY_ALIAS            = $ALIAS"
-echo "  ANDROID_KEY_ALIAS_PASSWORD   = <same password>"
-echo "or with gh:  gh secret set ANDROID_KEYSTORE_B64 < <(base64 -w0 $OUT)"
+echo "  ANDROID_KEY_ALIAS           = $ALIAS"
+echo
+echo "Godot's non-gradle Android export only asks for ONE password, so the keystore"
+echo "password and the key password MUST be identical (this script already does that)."
+echo
+echo "or with gh:"
+echo "  gh secret set ANDROID_KEYSTORE_B64 < <(base64 -w0 $OUT)"
+echo "  gh secret set ANDROID_KEYSTORE_PASSWORD   # paste when prompted"
+echo "  gh secret set ANDROID_KEY_ALIAS <<< '$ALIAS'"

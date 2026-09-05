@@ -4,28 +4,54 @@ name: android-apk
 # push to main and on demand — shaped for Cafe Bazaar (dev.bazaar.ir), which
 # takes universal APKs, not AABs.
 #
-# Signing:
-#   * Production: set repo secrets ANDROID_KEYSTORE_B64 (base64 of your .jks),
-#     ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_ALIAS_PASSWORD.
-#     tools/make_keystore.sh creates the key and prints the base64 line.
+# Signing (Godot 4 option names, NOT the Godot 3 ones):
+#   Godot reads the release key from the export preset keys
+#     keystore/release, keystore/release_user, keystore/release_password
+#   or, preferred in CI, from these environment variables (this is what the
+#   "Godot 4.2+ CI path" is — no file has to be rewritten, so the committed
+#   export_presets.cfg never carries a machine-specific path):
+#     GODOT_ANDROID_KEYSTORE_RELEASE_PATH
+#     GODOT_ANDROID_KEYSTORE_RELEASE_USER
+#     GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD
+#   Source of truth: platform/android/export/export_plugin.{h,cpp} sign_apk()
+#   + _get_keystore_path(), checked against tag 4.4.1-stable.
+#
+#   * Production: set the repo secrets ANDROID_KEYSTORE_B64 (base64 of the
+#     .jks) + ANDROID_KEYSTORE_PASSWORD + ANDROID_KEY_ALIAS.
+#     tools/make_keystore.sh creates the key and prints the values.
 #   * No secrets yet? The job generates a throwaway CI keystore so the artifact
-#     is always a valid, installable, signed APK (fine for Bazaar test tracks;
-#     never ship the same temp key twice to production).
+#     is always a real signed APK for Bazaar test uploads — and the job summary
+#     shouts about it. Never ship the same temp key to production twice.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      version_name:
+        description: "versionName to stamp (blank = keep the one in export_presets.cfg)"
+        required: false
+        default: ""
+      version_code:
+        description: "versionCode to stamp (blank = keep the one in export_presets.cfg; Bazaar needs it to increase)"
+        required: false
+        default: ""
 
 concurrency:
   group: apk-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   apk:
     name: Universal APK (Cafe Bazaar)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    env:
+      APK: build/android/pixel-realms-universal.apk
+      BUILD_TOOLS: 34.0.0
     steps:
       - uses: actions/checkout@v4
 
@@ -33,12 +59,12 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: "17"
 
-      - name: Android SDK (platform 34 + build-tools)
+      - name: Android SDK (platform 34 + build-tools + platform-tools)
         uses: android-actions/setup-android@v3
         with:
-          packages: "platforms;android-34 build-tools;34.0.0"
+          packages: "platforms;android-34 build-tools;${{ env.BUILD_TOOLS }} platform-tools"
 
       - name: Godot 4.4.1 + export templates
         uses: chickensoft-games/setup-godot@v2
@@ -49,72 +75,126 @@ jobs:
 
       - name: Gate — automated checks must pass before shipping
         run: |
+          set -euo pipefail
           godot --headless --path . --import > import.log 2>&1
           if grep -qE "SCRIPT ERROR|Parse Error|^ERROR:" import.log; then
-            echo "::error::import not clean"; exit 1
+            echo "::error::import not clean"
+            tail -40 import.log
+            exit 1
           fi
           godot --headless --path . res://tests/verify.tscn
 
       - name: Prepare signing keystore
+        id: keystore
         env:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KS_ALIAS_PASS: ${{ secrets.ANDROID_KEY_ALIAS_PASSWORD }}
         run: |
-          if [ -n "$KS_B64" ]; then
-            echo "$KS_B64" | base64 -d > /tmp/release.keystore
-            echo "KS_PATH=/tmp/release.keystore" >> $GITHUB_ENV
-            echo "KS_PASSWORD=$KS_PASS" >> $GITHUB_ENV
-            echo "KS_ALIAS_NAME=${KS_ALIAS:-pixel}" >> $GITHUB_ENV
-            echo "KS_ALIAS_PASSWORD=$KS_ALIAS_PASS" >> $GITHUB_ENV
+          set -euo pipefail
+          mkdir -p /tmp/ci-keystore
+          if [ -n "${KS_B64:-}" ]; then
+            printf '%s' "$KS_B64" | base64 -d > /tmp/ci-keystore/release.jks
+            echo "path=/tmp/ci-keystore/release.jks" >> "$GITHUB_OUTPUT"
+            echo "alias=${KS_ALIAS:-pixel}" >> "$GITHUB_OUTPUT"
+            echo "pass=$KS_PASS" >> "$GITHUB_OUTPUT"
+            echo "mode=production" >> "$GITHUB_OUTPUT"
+            # Fail loudly rather than shipping an APK the store will reject.
+            keytool -list -keystore /tmp/ci-keystore/release.jks \
+              -storepass "$KS_PASS" -alias "${KS_ALIAS:-pixel}" > /dev/null
             echo "::notice::signing with the production keystore from secrets"
           else
-            echo "::warning::no keystore secrets set - using a throwaway CI key"
-            keytool -genkeypair -v -keystore /tmp/release.keystore -alias pixel \
+            echo "::warning::no keystore secrets set - signing with a throwaway CI key (test track only)"
+            keytool -genkeypair -v -keystore /tmp/ci-keystore/release.jks -alias pixel \
               -keyalg RSA -keysize 2048 -validity 10000 \
               -storepass ci-temp-pass -keypass ci-temp-pass \
               -dname "CN=Pixel Realms CI, OU=CI, O=hadipoor, C=IR"
-            echo "KS_PATH=/tmp/release.keystore" >> $GITHUB_ENV
-            echo "KS_PASSWORD=ci-temp-pass" >> $GITHUB_ENV
-            echo "KS_ALIAS_NAME=pixel" >> $GITHUB_ENV
-            echo "KS_ALIAS_PASSWORD=ci-temp-pass" >> $GITHUB_ENV
+            echo "path=/tmp/ci-keystore/release.jks" >> "$GITHUB_OUTPUT"
+            echo "alias=pixel" >> "$GITHUB_OUTPUT"
+            echo "pass=ci-temp-pass" >> "$GITHUB_OUTPUT"
+            echo "mode=ci-temp" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Stamp keystore + version into the export preset
+      - name: Optional version stamp (from workflow_dispatch inputs)
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
         run: |
-          python3 - "$KS_PATH" "$KS_PASSWORD" "$KS_ALIAS_NAME" "$KS_ALIAS_PASSWORD" <<'PYEOF'
-          import sys, re
-          path, pw, alias, apw = sys.argv[1:5]
-          p = "export_presets.cfg"
-          s = open(p, encoding="utf-8").read()
-          s = re.sub(r'keystore/release_path=.*', f'keystore/release_path="{path}"', s)
-          s = re.sub(r'keystore/release_password=.*', f'keystore/release_password="{pw}"', s)
-          s = re.sub(r'keystore/release_alias=.*', f'keystore/release_alias="{alias}"', s)
-          s = re.sub(r'keystore/release_alias_password=.*', f'keystore/release_alias_password="{apw}"', s)
-          open(p, "w", encoding="utf-8").write(s)
-          print("preset stamped")
-          PYEOF
+          set -euo pipefail
+          [ -n "${VERSION_NAME:-}" ] || { echo "no version stamp requested"; exit 0; }
+          echo "stamping version_name=${VERSION_NAME} version_code=${VERSION_CODE:-unchanged}"
+          sed -i "s|^version/name=.*|version/name=\"${VERSION_NAME}\"|" export_presets.cfg
+          sed -i "s|^config/version=.*|config/version=\"${VERSION_NAME}\"|" project.godot
+          if [ -n "${VERSION_CODE:-}" ]; then
+            sed -i "s|^version/code=.*|version/code=${VERSION_CODE}|" export_presets.cfg
+          fi
+          grep -E "^version/(name|code)=" export_presets.cfg
 
       - name: Export universal APK
+        env:
+          # Godot's own Android signer (apksigner from the SDK) is used; it is
+          # fed through the official env vars so nothing has to be rewritten
+          # inside export_presets.cfg.
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ steps.keystore.outputs.path }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ steps.keystore.outputs.alias }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ steps.keystore.outputs.pass }}
         run: |
-          mkdir -p build/android
-          godot --headless --path . --export-release "Android" \
-            build/android/pixel-realms-universal.apk
+          set -euo pipefail
+          mkdir -p "$(dirname "$APK")"
+          godot --headless --path . --export-release "Android" "$APK" 2>&1 | tee export.log
+          # Godot only WARNs when it cannot find apksigner and leaves the APK
+          # unsigned; catch that here instead of shipping a dead file.
+          if grep -qE "unable to export|resulting APK is unsigned|Could not find keystore" export.log; then
+            echo "::error::Godot did not sign the APK (see export.log)"
+            exit 1
+          fi
+          grep -E "Signing release APK|Signed" export.log || true
 
       - name: Sanity — signature, alignment, universal ABIs, manifest
         run: |
-          BT=$ANDROID_HOME/build-tools/34.0.0
-          APK=build/android/pixel-realms-universal.apk
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/$BUILD_TOOLS"
           ls -la "$APK"
-          $BT/apksigner verify --print-certs "$APK" | tee sign.log
-          $BT/zipalign -c 4 "$APK" && echo "zipalign: OK"
-          $BT/aapt dump badging "$APK" > badging.txt
+          # Godot's signer and apksigner are the only judges here. Note: the
+          # per-scheme "Verified using vN" lines (and "Verifies") only exist with
+          # --verbose, and a tee'd pipe would hide apksigner's exit code, so the
+          # log is written first and then asserted on.
+          if ! "$BT/apksigner" verify --verbose --print-certs "$APK" > sign.log 2>&1; then
+            echo "apksigner verify exited non-zero"
+          fi
+          cat sign.log
+          grep -q "^Verifies$" sign.log || { echo "::error::APK signature does not verify"; exit 1; }
+          "$BT/zipalign" -c 4 "$APK" > /dev/null && echo "zipalign: OK"
+          "$BT/aapt" dump badging "$APK" > badging.txt
           grep -E "^package|sdkVersion|targetSdkVersion|native-code|launchable-activity" badging.txt
           grep -q "armeabi-v7a" badging.txt && grep -q "arm64-v8a" badging.txt \
             || { echo "::error::APK is not universal (missing an ARM ABI)"; exit 1; }
+          grep -qE "v2 scheme \(APK Signature Scheme v2\): true" sign.log \
+            || { echo "::error::no APK Signature Scheme v2 (Bazaar/Play need it)"; exit 1; }
           grep -q "versionCode=" badging.txt || exit 1
+          sha256sum "$APK" | tee "$APK.sha256"
           echo "UNIVERSAL APK SANITY: PASS"
+
+      - name: Job summary
+        env:
+          SIGNING_MODE: ${{ steps.keystore.outputs.mode }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Pixel Realms — universal APK"
+            echo
+            echo "- file: \`$APK\` ($(du -h "$APK" | cut -f1))"
+            echo "- signing key: **${SIGNING_MODE}**"
+            grep -E "^Signer #1 certificate (DN|SHA-256)" sign.log | sed 's/^/  - /'
+            grep -E "^package|targetSdkVersion|native-code" badging.txt | sed 's/^/  - `/' | sed 's/$/`/'
+            echo
+            if [ "$SIGNING_MODE" = "ci-temp" ]; then
+              echo "> [!WARNING]"
+              echo "> Built with the throwaway CI key. Fine for a Bazaar test track,"
+              echo "> **not** for the production listing: set the four \`ANDROID_*\`"
+              echo "> secrets (see \`tools/make_keystore.sh\`) and re-run."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -124,4 +204,17 @@ jobs:
             build/android/pixel-realms-universal.apk
             badging.txt
             sign.log
+            build/android/pixel-realms-universal.apk.sha256
+          if-no-files-found: error
           retention-days: 30
+
+      - name: Upload export log (only when something broke)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-export-log
+          path: |
+            export.log
+            import.log
+          if-no-files-found: ignore
+          retention-days: 7

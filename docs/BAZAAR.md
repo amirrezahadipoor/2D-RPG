@@ -6,12 +6,17 @@
 
 ## مسیر سریع
 1. کلید انتشار را یک‌بار بسازید: `./tools/make_keystore.sh`
-   (خروجی، مقدار base64 و رمزها را برای سکرت‌ها چاپ می‌کند).
-2. در GitHub: Settings → Secrets and variables → Actions چهار سکرت را بگذارید:
-   `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`,
-   `ANDROID_KEY_ALIAS_PASSWORD`.
+   (خروجی، مقدار base64 و رمز را برای سکرت‌ها چاپ می‌کند).
+2. در GitHub: Settings → Secrets and variables → Actions سه سکرت را بگذارید:
+   `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`.
+   (گادوت در خروجی غیرگریدل فقط یک رمز می‌خواهد؛ رمز کیستور و رمز کلید باید
+   یکی باشند — اسکریپت بالا همین‌طور می‌سازد.) ورک‌فلو این‌ها را به‌صورت
+   متغیر محیطی رسمی گادوت به خروجی می‌دهد:
+   `GODOT_ANDROID_KEYSTORE_RELEASE_PATH/USER/PASSWORD` — هیچ فایلی در ریپو
+   بازنویسی نمی‌شود، پس رمز جایی روی دیسک نمی‌ماند.
    بدون سکرت‌ها هم اکشن با کلید موقت CI یک APK سالم می‌سازد — فقط برای تست؛
-   کلید موقت را هرگز برای انتشار واقعی دوبار استفاده نکنید.
+   کلید موقت را هرگز برای انتشار واقعی دوبار استفاده نکنید (خلاصهٔ job
+   در این حالت هشدار قرمز می‌دهد).
 3. پوش بزنید یا Actions → android-apk → Run workflow.
 4. آرتیفکت را دانلود کنید: `pixel-realms-universal.apk` + `badging.txt` +
    `sign.log` (گواهی امضا و بررسی یونیورسال بودن).

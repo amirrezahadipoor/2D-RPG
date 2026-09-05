@@ -27,3 +27,10 @@ docs/screenshots/*.import
 *.tmp
 .DS_Store
 Thumbs.db
+
+# CI build logs (written by the android-apk workflow / ci_replay)
+/import.log
+/export.log
+/sign.log
+/badging.txt
+*.idsig
