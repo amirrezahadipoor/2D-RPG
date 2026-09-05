@@ -87,7 +87,7 @@ jobs:
         run: |
           godot --headless --path . --import >/dev/null 2>&1
           godot --headless --path . --import >/dev/null 2>&1
-          xvfb-run -a -s "-screen 0 1440x810x24" \
+          xvfb-run -a -s "-screen 0 1920x1080x24" \
             godot --path . res://tools/screenshot.tscn
 
       - name: Upload screenshots

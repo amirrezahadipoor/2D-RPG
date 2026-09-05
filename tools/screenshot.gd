@@ -20,6 +20,11 @@ func run() -> void:
 	for i in 6:
 		await get_tree().process_frame
 
+	# the story intro must not eat the early captures: end it, replay it later
+	var cs0: Cutscene = main.get_node_or_null("Cutscene")
+	if cs0 and cs0.active:
+		cs0._end()
+
 	# deterministic capture: the world is populated by hand further down
 	var world: Overworld = _world()
 	if world and world.spawner:

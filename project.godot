@@ -35,11 +35,14 @@ buses/default_bus_layout="res://assets/audio/bus_layout.tres"
 
 ; Native pixel-art resolution. Everything is authored at 480x270 and
 ; upscaled by an INTEGER factor, so pixels stay perfectly square.
+; Authored space stays 480x270, but the game now RENDERS at up to 4x with
+; stretch mode canvas_items: UI text is rasterized at the final resolution
+; (crisp instead of blocky) while sprites keep nearest-neighbour pixel purity.
 window/size/viewport_width=480
 window/size/viewport_height=270
-window/size/window_width_override=1440
-window/size/window_height_override=810
-window/stretch/mode="viewport"
+window/size/window_width_override=1920
+window/size/window_height_override=1080
+window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/stretch/scale_mode="integer"
 window/handheld/orientation="sensor_landscape"
