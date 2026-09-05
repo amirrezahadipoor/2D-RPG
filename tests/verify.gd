@@ -32,6 +32,7 @@ func run() -> void:
 	await _check_m4()
 	_check_secrets()
 	await _check_ai()
+	await _check_combat_style()
 
 	print("")
 	if _failures.is_empty():
@@ -934,3 +935,85 @@ func _check_ai() -> void:
 		pr.queue_free()
 	await get_tree().physics_frame
 	Game.state = prev_state
+
+# ------------------------------------------------------- combat style -------
+func _check_combat_style() -> void:
+	print("== combat style ==")
+	var hero := world.hero
+	hero.global_position = Vector2(2200, 2000)
+	Stats.reset_run()
+	Stats.stamina = Stats.max_stamina
+	var dummy := Enemy.new()
+	world.actors.add_child(dummy)
+	dummy.setup("orc", 1)
+	dummy.max_hp = 9999
+	dummy.hp = 9999
+	dummy.speed = 0.0
+	dummy.detect = 0.0
+	await get_tree().physics_frame
+
+	# combo chain 0 -> 1 -> 2
+	hero._combo_window = 0.0
+	hero.do_attack(false)
+	var c0 := hero._combo
+	hero._combo_window = 0.5
+	hero.do_attack(false)
+	var c1 := hero._combo
+	hero._combo_window = 0.5
+	hero.do_attack(false)
+	var c2 := hero._combo
+	_ok(c0 == 0 and c1 == 1 and c2 == 2, "three-hit combo chains (%d,%d,%d)" % [c0, c1, c2])
+
+	# finisher hits harder than the opener
+	dummy.global_position = hero.global_position + Vector2(0, 12)
+	await get_tree().physics_frame
+	hero._combo = 0
+	hero._combo_window = 0.5
+	var hp0 := dummy.hp
+	hero.do_attack(false)
+	var d_open := hp0 - dummy.hp
+	hero._combo = 2
+	hero._combo_window = 0.5
+	hp0 = dummy.hp
+	hero.do_attack(false)
+	var d_finish := hp0 - dummy.hp
+	_ok(d_finish > d_open, "finisher out-damages the opener (%d > %d)" % [d_finish, d_open])
+
+	# heavy cleave out-damages the finisher
+	hero._charge = 0.6
+	hp0 = dummy.hp
+	hero.do_attack(true)
+	var d_heavy := hp0 - dummy.hp
+	_ok(d_heavy > d_finish, "held heavy cleave hits hardest (%d > %d)" % [d_heavy, d_finish])
+
+	# parry: swinging as the claw lands staggers the attacker
+	hero._parry_window = 0.2
+	var taken := hero.hurt(10, dummy)
+	_ok(taken == 0 and dummy._stagger_timer > 0.0, "parry negates damage and staggers")
+
+	# perfect dodge banks a counter window
+	hero.act = Hero.Act.DODGE
+	hero.act_timer = Hero.DODGE_TIME - 0.05
+	taken = hero.hurt(10)
+	_ok(taken == 0 and hero._counter_window > 0.9, "perfect dodge banks a counter window")
+
+	# counter window boosts the next swing
+	hero.act = Hero.Act.NONE
+	hero._counter_window = 1.0
+	hero._combo = 0
+	hero._combo_window = 0.5
+	hp0 = dummy.hp
+	hero.do_attack(false)
+	var d_counter := hp0 - dummy.hp
+	_ok(d_counter > d_open, "counter-attack swing is empowered (%d > %d)" % [d_counter, d_open])
+
+	# no stamina, no swing
+	Stats.stamina = 0.0
+	hero._combo = 0
+	hero._combo_window = 0.0
+	hp0 = dummy.hp
+	hero.do_attack(false)
+	_ok(hp0 == dummy.hp, "empty stamina blocks swings")
+	Stats.reset_run()
+	dummy.queue_free()
+	await get_tree().physics_frame

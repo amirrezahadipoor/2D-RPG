@@ -109,7 +109,8 @@ Evidence: `tests/verify.tscn` (125 checks), `docs/screenshots/10_story_intro.png
 - [x] Three unique relics (Amulet of Depths, Idol of Embers, Dragonfang
       Talisman) with their own icons and attack power
 - [x] Smarter monsters: pack alerts, tactics per species, telegraphs, boss phases
-- [ ] Non-repetitive hero combat: combos, heavy swings, parry, perfect dodge
+- [x] Non-repetitive hero combat: 3-hit combo + finisher, held heavy cleave,
+      parry, perfect-dodge counter window
 - [ ] Deep balance pass: economy, drops, XP and quest curves (docs/BALANCE.md)
 
 ## M5 — Progression, talents & save

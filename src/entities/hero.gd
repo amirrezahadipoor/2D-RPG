@@ -33,6 +33,16 @@ var act_timer := 0.0
 var anim_time := 0.0
 var _gear_slot_cursor := 0
 var _attack_cooldown := 0.0
+var _combo := 0
+var _combo_window := 0.0
+var _charge := 0.0
+var _parry_window := 0.0
+var _counter_window := 0.0
+
+const HEAVY_CHARGE := 0.45
+const HEAVY_STAMINA := 18.0
+const COMBO_WINDOW := 0.7
+const PARRY_WINDOW := 0.22
 
 func _ready() -> void:
 	# Collision: a small box at the FEET so the sprite can overhang upward
@@ -144,22 +154,30 @@ func _update_facing(input: Vector2) -> void:
 
 # -------------------------------------------------------------- actions -----
 func _handle_actions(delta: float) -> void:
+	_combo_window = maxf(0.0, _combo_window - delta)
+	_parry_window = maxf(0.0, _parry_window - delta)
+	_counter_window = maxf(0.0, _counter_window - delta)
+	if _combo_window <= 0.0:
+		_combo = 0
+	if Input.is_action_pressed("attack"):
+		_charge += delta
+	else:
+		_charge = 0.0
+	doll.modulate = Color(1.35, 1.2, 0.8) if _charge >= HEAVY_CHARGE else Color.WHITE
+
 	if act != Act.NONE:
 		act_timer -= delta
 		if act_timer <= 0.0:
 			act = Act.NONE
 		return
 
-	if Input.is_action_just_pressed("attack") and _attack_cooldown <= 0.0:
-		var weapon: Dictionary = WeaponDB.stats_for(current_weapon_id())
-		if Stats.spend_stamina(float(weapon["stamina"])):
-			act = Act.ATTACK
-			act_timer = ATTACK_TIME
-			anim_time = 0.0
-			_attack_cooldown = float(weapon["cooldown"])
-			var hits := _sweep_attack(weapon)
-			attack_landed.emit(hits)
-	elif Input.is_action_just_pressed("dodge"):
+	if Input.is_action_just_pressed("attack"):
+		_parry_window = PARRY_WINDOW
+	if _attack_cooldown <= 0.0:
+		var want_heavy := _charge >= HEAVY_CHARGE
+		if Input.is_action_just_pressed("attack") or want_heavy:
+			do_attack(want_heavy)
+	if Input.is_action_just_pressed("dodge"):
 		if Stats.spend_stamina(DODGE_STAMINA):
 			act = Act.DODGE
 			act_timer = DODGE_TIME
@@ -174,6 +192,31 @@ func _handle_actions(delta: float) -> void:
 			Juice.world_text(global_position + Vector2(0, -30),
 				I18N.tr_str("consumable.drink") + "!", Color(0.9, 0.3, 0.35), 8)
 
+## One swing of the blade. `heavy` spends more stamina for a cleave; quick
+## presses chain a three-hit combo whose finisher launches foes.
+func do_attack(heavy: bool) -> void:
+	var weapon: Dictionary = WeaponDB.stats_for(current_weapon_id())
+	var cost := HEAVY_STAMINA if heavy else float(weapon["stamina"])
+	if not Stats.spend_stamina(cost):
+		return
+	if not heavy:
+		_combo = 0 if _combo_window <= 0.0 else _combo + 1
+		if _combo > 2:
+			_combo = 0
+		_combo_window = COMBO_WINDOW
+	else:
+		_combo = 0
+		_combo_window = 0.0
+		_charge = 0.0
+	act = Act.ATTACK
+	act_timer = ATTACK_TIME + (0.1 if heavy or _combo == 2 else 0.0)
+	anim_time = 0.0
+	_attack_cooldown = float(weapon["cooldown"]) + (0.15 if heavy else 0.0)
+	var hits := _sweep_attack(weapon, heavy)
+	attack_landed.emit(hits)
+	if _combo == 2:
+		Juice.world_text(global_position + Vector2(0, -34), "x3!", Color(1.0, 0.8, 0.3), 9)
+
 func _aim_direction() -> Vector2:
 	match facing:
 		"up": return Vector2.UP
@@ -184,16 +227,27 @@ func _aim_direction() -> Vector2:
 ## Melee sweep: a band `reach` long and `arc` wide in the direction the hero
 ## faces. Every enemy inside it takes weapon damage + attack power + level, and
 ## is knocked back along the swing direction. Returns how many were hit.
-func _sweep_attack(weapon: Dictionary) -> int:
+func _sweep_attack(weapon: Dictionary, heavy: bool = false) -> int:
 	var dir := _aim_direction()
 	var side := dir.orthogonal()
-	var reach: float = weapon["reach"]
-	var arc: float = weapon["arc"]
+	var reach: float = weapon["reach"] + (6.0 if heavy else 0.0)
+	var arc: float = weapon["arc"] * (1.8 if heavy else 1.5 if _combo == 2 else 1.15 if _combo == 1 else 1.0)
 	var amount := attack_damage(weapon)
+	if heavy:
+		amount = int(roundf(amount * 2.2))
+	elif _combo == 2:
+		amount = int(roundf(amount * 1.35))
+	elif _combo == 1:
+		amount = int(roundf(amount * 1.1))
+	if _counter_window > 0.0:
+		amount = int(roundf(amount * 1.5))
+		_counter_window = 0.0
 	var crit := randf() < CRIT_CHANCE
 	if crit:
 		amount *= 2
-	var knock := float(weapon["knockback"])
+	var knock := float(weapon["knockback"]) * (2.2 if _combo == 2 or heavy else 1.0)
+	if _combo == 2 or heavy:
+		velocity += dir * 90.0
 	var hits := 0
 	for node in get_tree().get_nodes_in_group("enemy"):
 		var enemy := node as Enemy
@@ -230,12 +284,25 @@ func attack_damage(weapon: Dictionary = {}) -> int:
 	return (int(w["damage"]) + ItemDB.attack_power(doll.get_gear())
 		+ Inventory.attack_bonus() + Stats.might_bonus() + (Stats.level - 1))
 
-## Damage entry point used by enemies. Dodging grants brief invulnerability.
-func hurt(amount: int) -> int:
+## Damage entry point used by enemies. Dodging grants brief invulnerability;
+## dodging at the LAST moment banks a counter-attack bonus, and swinging just
+## as a claw lands parries it outright.
+func hurt(amount: int, from: Node = null) -> int:
 	if Game.state == Game.State.DEAD:
 		return 0
 	if act == Act.DODGE:
 		Juice.miss(global_position + Vector2(0, -30))
+		if act_timer > DODGE_TIME - 0.12:
+			_counter_window = 1.2
+			Juice.world_text(global_position + Vector2(0, -36),
+				I18N.tr_str("toast.perfect"), Color(0.4, 0.9, 1.0), 9)
+		return 0
+	if _parry_window > 0.0 and from != null and from.has_method("stagger"):
+		from.stagger()
+		_parry_window = 0.0
+		Juice.world_text(global_position + Vector2(0, -36),
+			I18N.tr_str("toast.parried"), Color(1.0, 0.9, 0.4), 9)
+		Juice.shake(2.0)
 		return 0
 	return Stats.damage(amount)
 

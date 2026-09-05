@@ -11,7 +11,7 @@
  "hud.level": "Lv",
  "hud.gold": "Gold",
  "hud.gear": "Gear",
- "hud.prompt.attack": "Attack",
+ "hud.prompt.attack": "Attack (hold: heavy)",
  "hud.prompt.dodge": "Dodge",
  "hud.prompt.gear": "Cycle gear",
  "hud.prompt.locale": "Language",
@@ -177,5 +177,7 @@
  "item.amulet_of_depths": "Amulet of Depths",
  "item.idol_of_embers": "Idol of Embers",
  "item.dragonfang_talisman": "Dragonfang Talisman",
- "toast.secret": "A hidden way opens!"
+ "toast.secret": "A hidden way opens!",
+ "toast.parried": "Parried!",
+ "toast.perfect": "Perfect dodge!"
 }

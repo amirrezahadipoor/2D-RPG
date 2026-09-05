@@ -11,7 +11,7 @@
  "hud.level": "سطح",
  "hud.gold": "سکه",
  "hud.gear": "تجهیزات",
- "hud.prompt.attack": "حمله",
+ "hud.prompt.attack": "حمله (نگه‌داشت: سنگین)",
  "hud.prompt.dodge": "جاخالی",
  "hud.prompt.gear": "تعویض تجهیزات",
  "hud.prompt.locale": "زبان",
@@ -177,5 +177,7 @@
  "item.amulet_of_depths": "طلسم ژرفاها",
  "item.idol_of_embers": "بت خاکسترهای",
  "item.dragonfang_talisman": "طلسم دندان اژدها",
- "toast.secret": "راهی پنهان گشوده شد!"
+ "toast.secret": "راهی پنهان گشوده شد!",
+ "toast.parried": "دفع شد!",
+ "toast.perfect": "جاخالی کامل!"
 }

@@ -56,6 +56,7 @@ var _phase := 1
 var _breath_timer := 4.0
 var _summon_timer := 6.0
 var _tele: Label = null
+var _stagger_timer := 0.0
 
 func setup(type: String, lvl: int) -> void:
 	enemy_type = type
@@ -138,8 +139,21 @@ func _alert_pack() -> void:
 		if other.global_position.distance_to(global_position) < 110.0:
 			other.state = State.CHASE
 
+## Parried or caught mid-windup: the monster loses its footing.
+func stagger(seconds: float = 1.2) -> void:
+	_stagger_timer = seconds
+	state = State.CHASE
+	velocity = Vector2.ZERO
+	Juice.puff(global_position + Vector2(0, -12))
+
 func _physics_process(delta: float) -> void:
 	if state == State.DEAD or Game.state != Game.State.PLAYING:
+		return
+	if _stagger_timer > 0.0:
+		_stagger_timer -= delta
+		_spr.modulate = Color(1.3, 1.25, 0.6)
+		velocity = velocity.move_toward(Vector2.ZERO, 600 * delta)
+		move_and_slide()
 		return
 	if _hero == null or not is_instance_valid(_hero):
 		_hero = get_tree().get_first_node_in_group("player") as Node2D
@@ -229,7 +243,7 @@ func _resolve_attack(dist: float, to_hero: Vector2) -> void:
 		var amount := int(roundf(float(damage) * _damage_mult()))
 		var landed := 0
 		if _hero.has_method("hurt"):
-			landed = int(_hero.hurt(amount))
+			landed = int(_hero.hurt(amount, self))
 		else:
 			landed = Stats.damage(amount)
 		if landed > 0:
