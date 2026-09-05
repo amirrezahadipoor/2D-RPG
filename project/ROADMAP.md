@@ -41,8 +41,10 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 
 - ✅ Phase 4: Leveling/talents implemented with branching talent tree (5 primary trees: Strength, Agility, Defense, Luck, Vitality), talent points granted on level-up (1 point per level, total 100 points at level 100), non-linear XP curve (XP_required = 100 * level^1.5), 5 talent tiers per tree with choices, and permanent stat increases (STR, AGI, DEF, LUCK, MAX HP, MAX Stamina). Each talent choice provides passive abilities with increasing power per tier.
 
+- ✅ Phase 5: Items/inventory implemented with data-driven 1000+ item generator (templates × materials × patterns × affixes per ITEMS.md), 6 equipment slots (weapon, helmet, chest, legs, boots, accessories), weight-based inventory (30 slots, 50 unit limit), treasure chests (small/medium/large/boss) with rarity-appropriate loot tables, procedural chest loot scaling with monster level, and full equipment bonus system (STR/AGI/DEF/LUCK stat modifications from material tiers + affixes). All items programmatic - no pre-made art assets.
+
 ### Next Phase Start
-Proceed to Phase 5: Items/inventory
+Proceed to Phase 6: Open world
 
 ---
 
