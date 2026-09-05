@@ -37,8 +37,10 @@ Hardcore, offline, open-world 2D RPG for Android (Godot 4.x, GDScript). English 
 - ✅ Android build workflow triggers on `main` push
 - ✅ Phase 2: Art pipeline implemented with procedural palette generator (5 material tiers), 10 silhouette templates, 5 pattern variants (solid, horizontal stripes, vertical stripes, marbled, trimmed), and data-driven item generator producing 1000+ distinct items per ITEMS.md scheme (templates × materials × patterns × affixes). All art programmatic - no pre-made assets.
 
+- ✅ Phase 3: Combat core implemented with stamina-gated actions (movement/attack/dodge), attack cooldowns, critical hit system with AGI scaling, dodge mechanics with stamina cost and AGI-based chance, enemy AI with patrol/chase/attack/die states, damage calculation using STR/AGI/DEF stats, and hardcore balance (limited stamina, no attack spam, stamina regeneration out of combat).
+
 ### Next Phase Start
-Proceed to Phase 3: Combat core
+Proceed to Phase 4: Leveling/talents
 
 ---
 
