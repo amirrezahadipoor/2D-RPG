@@ -38,6 +38,7 @@ var _combo_window := 0.0
 var _charge := 0.0
 var _parry_window := 0.0
 var _counter_window := 0.0
+var _ring: Sprite2D = null
 
 const HEAVY_CHARGE := 0.45
 const HEAVY_STAMINA := 18.0
@@ -67,6 +68,14 @@ func _ready() -> void:
 	lantern.scale = Vector2(2.1, 2.1)
 	lantern.energy = 0.0
 	add_child(lantern)
+
+	_ring = Sprite2D.new()
+	_ring.texture = load("res://assets/sprites/fx/ring.png")
+	_ring.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_ring.position = Vector2(0, -2)
+	_ring.visible = false
+	_ring.z_index = -1
+	add_child(_ring)
 
 	cam = Camera2D.new()
 	cam.position_smoothing_enabled = true
@@ -164,7 +173,12 @@ func _handle_actions(delta: float) -> void:
 		_charge += delta
 	else:
 		_charge = 0.0
-	doll.modulate = Color(1.35, 1.2, 0.8) if _charge >= HEAVY_CHARGE else Color.WHITE
+	var charging := _charge >= HEAVY_CHARGE
+	doll.modulate = Color(1.35, 1.2, 0.8) if charging else Color.WHITE
+	_ring.visible = charging
+	if charging:
+		_ring.rotation += delta * 6.0
+		_ring.scale = Vector2.ONE * (1.0 + 0.12 * sin(_charge * 14.0))
 
 	if act != Act.NONE:
 		act_timer -= delta
@@ -184,6 +198,7 @@ func _handle_actions(delta: float) -> void:
 			act_timer = DODGE_TIME
 			var dir := _aim_direction()
 			velocity = dir * DASH_SPEED
+			Juice.streak(global_position + Vector2(0, -8), dir)
 
 	if Input.is_action_just_pressed("debug_swap_gear"):
 		cycle_gear()
@@ -215,6 +230,23 @@ func do_attack(heavy: bool) -> void:
 	_attack_cooldown = float(weapon["cooldown"]) + (0.15 if heavy else 0.0)
 	var hits := _sweep_attack(weapon, heavy)
 	attack_landed.emit(hits)
+	var rot := 0.0
+	match facing:
+		"left": rot = 90.0
+		"right": rot = -90.0
+		"up": rot = 180.0
+	var tint := Color(1, 1, 1)
+	var sscale := 1.0
+	if heavy:
+		tint = Color(1.0, 0.55, 0.3)
+		sscale = 1.5
+	elif _combo == 2:
+		tint = Color(1.0, 0.85, 0.4)
+		sscale = 1.25
+	elif _combo == 1:
+		tint = Color(0.95, 0.95, 1.0)
+		sscale = 1.1
+	Juice.slash(global_position + _aim_direction() * 10.0, rot, tint, sscale)
 	if _combo == 2:
 		Juice.world_text(global_position + Vector2(0, -34), "x3!", Color(1.0, 0.8, 0.3), 9)
 
@@ -240,12 +272,12 @@ func _sweep_attack(weapon: Dictionary, heavy: bool = false) -> int:
 		amount = int(roundf(amount * 1.35))
 	elif _combo == 1:
 		amount = int(roundf(amount * 1.1))
-	if _counter_window > 0.0:
-		amount = int(roundf(amount * 1.5))
-		_counter_window = 0.0
 	var crit := randf() < CRIT_CHANCE
 	if crit:
 		amount *= 2
+	if _counter_window > 0.0:
+		amount = int(roundf(amount * 1.5))
+		_counter_window = 0.0
 	var knock := float(weapon["knockback"]) * (2.2 if _combo == 2 or heavy else 1.0)
 	if _combo == 2 or heavy:
 		velocity += dir * 90.0
@@ -282,8 +314,11 @@ func current_weapon_id() -> String:
 ## What a swing from `weapon` deals with the hero's current gear and level.
 func attack_damage(weapon: Dictionary = {}) -> int:
 	var w: Dictionary = weapon if not weapon.is_empty() else WeaponDB.stats_for(current_weapon_id())
-	return (int(w["damage"]) + ItemDB.attack_power(doll.get_gear())
+	var amount := (int(w["damage"]) + ItemDB.attack_power(doll.get_gear())
 		+ Inventory.attack_bonus() + Stats.might_bonus() + (Stats.level - 1))
+	if _counter_window > 0.0:
+		amount = int(roundf(amount * 1.5))
+	return amount
 
 ## Damage entry point used by enemies. Dodging grants brief invulnerability;
 ## dodging at the LAST moment banks a counter-attack bonus, and swinging just
@@ -321,6 +356,14 @@ func equip_visual(slot: String, item_id: String) -> void:
 
 # ------------------------------------------------------------ animation -----
 func _animate(delta: float, input: Vector2) -> void:
+	# walk bounce: the doll hops a pixel per stride so movement has weight
+	var moving := velocity.length() > 4.0
+	if moving and act == Act.NONE:
+		doll.position.y = -absf(sin(anim_time * 1.6)) * 1.4
+	elif act == Act.NONE:
+		doll.position.y = sin(anim_time * 0.9) * 0.5   # idle breathing
+	else:
+		doll.position.y = 0.0
 	var state := "idle"
 	var fps := IDLE_FPS
 	if act == Act.ATTACK:

@@ -109,6 +109,45 @@ func world_text(world_pos: Vector2, text: String, color: Color, size: int = 8) -
 	tween.chain().tween_callback(node.queue_free)
 
 # ----------------------------------------------------------------- puff -----
+## A crescent sweep that sells every swing: 4 frames in ~0.14s.
+func slash(world_pos: Vector2, rot_deg: float, tint: Color, scale: float) -> void:
+	if _world == null:
+		return
+	var spr := Sprite2D.new()
+	spr.texture = load("res://assets/sprites/fx/slash.png")
+	spr.hframes = 4
+	spr.frame = 0
+	spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	spr.modulate = tint
+	spr.scale = Vector2(scale, scale)
+	spr.rotation_degrees = rot_deg
+	spr.global_position = world_pos
+	spr.z_index = 5
+	_world.add_child(spr)
+	var tween := spr.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(spr, "scale", Vector2(scale * 1.25, scale * 1.25), 0.14)
+	tween.tween_property(spr, "modulate:a", 0.0, 0.16)
+	tween.chain().tween_callback(spr.queue_free)
+	var anim := spr.create_tween()
+	anim.tween_method(func(v: int) -> void: spr.frame = v, 0, 3, 0.135)
+
+## Motion smear left behind by a dodge roll.
+func streak(world_pos: Vector2, dir: Vector2) -> void:
+	if _world == null:
+		return
+	for i in 3:
+		var spr := Sprite2D.new()
+		spr.texture = load("res://assets/sprites/fx/streak.png")
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		spr.modulate = Color(0.8, 0.85, 1.0, 0.5 - 0.13 * float(i))
+		spr.rotation = dir.angle()
+		spr.global_position = world_pos - dir * (6.0 + 7.0 * float(i))
+		_world.add_child(spr)
+		var tween := spr.create_tween()
+		tween.tween_property(spr, "modulate:a", 0.0, 0.22 + 0.05 * float(i))
+		tween.tween_callback(spr.queue_free)
+
 func puff(world_pos: Vector2) -> void:
 	if _world == null:
 		return

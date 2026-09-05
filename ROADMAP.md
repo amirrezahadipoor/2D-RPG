@@ -120,8 +120,8 @@ Evidence: `tests/verify.tscn` (125 checks), `docs/screenshots/10_story_intro.png
 - [x] Contact-shadow layer under props/walls, animated lake shimmer,
       biome ground dressing (flowers, pebbles, puddles, snow drifts)
 - [x] Animated torch flames in settlements and dungeons + ambient vignette
-- [ ] Movement & combat animation pass (slash arcs, charge ring, dodge
-      streaks, walk bounce, death tween, hit tilt)
+- [x] Movement - [ ] Movement & combat animation pass (slash arcs, charge ring, dodge combat animation pass (slash arcs, charge ring, dodge
+      streaks, walk bounce, death topple, hit tilt)
 - [ ] Enemy roster expansion (wolf, shaman, golem) with elite glow
 
 ## M5 — Progression, talents & save

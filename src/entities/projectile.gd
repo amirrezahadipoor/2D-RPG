@@ -18,7 +18,7 @@ func setup(dir: Vector2, dmg: int) -> void:
 	add_to_group("projectile")
 	_spr = Sprite2D.new()
 	_spr.texture = load("res://assets/sprites/fx/glow.png")
-	_spr.color = Color(1.0, 0.45, 0.15)
+	_spr.modulate = Color(1.0, 0.45, 0.15)
 	_spr.scale = Vector2(0.45, 0.45)
 	add_child(_spr)
 	_core = ColorRect.new()

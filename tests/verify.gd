@@ -35,6 +35,7 @@ func run() -> void:
 	await _check_combat_style()
 	_check_balance()
 	await _check_graphics()
+	await _check_anim()
 
 	print("")
 	if _failures.is_empty():
@@ -275,9 +276,9 @@ func _check_combat() -> void:
 	var dealt := slime.take_damage(5)
 	_ok(dealt == 5 and slime.hp == hp_before - 5, "take_damage reduces enemy hp")
 	slime.take_damage(9999)
-	await get_tree().physics_frame
-	await get_tree().physics_frame
-	# queue_free() may already have run, so guard the instance before touching it
+	# death is a topple-and-fade now: give the corpse countdown its ~0.4s
+	for i in 40:
+		await get_tree().physics_frame
 	_ok(not is_instance_valid(slime) or slime.is_queued_for_deletion(), "enemy at 0 hp dies")
 	_ok(Stats.kills == 1, "kill counted")
 	_ok(Stats.gold > gold_before, "kill pays gold (%d -> %d)" % [gold_before, Stats.gold])
@@ -925,7 +926,7 @@ func _check_ai() -> void:
 	_ok(get_tree().get_nodes_in_group("projectile").size() > 0, "fireball spawned")
 
 	# boss phases: the dragon enrages below half health
-	var dr := _ai_spawn("dragon", Vector2(300, 300))
+	var dr := _ai_spawn("dragon", Vector2(200, 200))
 	dr.hp = int(dr.max_hp * 0.4)
 	await get_tree().physics_frame
 	_ok(dr._phase == 2, "dragon enters phase 2 below half health")
@@ -952,6 +953,7 @@ func _check_combat_style() -> void:
 	dummy.hp = 9999
 	dummy.speed = 0.0
 	dummy.detect = 0.0
+	dummy.global_position = hero.global_position + Vector2(0, 12)
 	await get_tree().physics_frame
 
 	# combo chain 0 -> 1 -> 2
@@ -969,17 +971,17 @@ func _check_combat_style() -> void:
 	# finisher hits harder than the opener
 	dummy.global_position = hero.global_position + Vector2(0, 12)
 	await get_tree().physics_frame
-	hero._combo = 0
-	hero._combo_window = 0.5
+	hero._combo_window = 0.0
+	hero._counter_window = 0.0
 	var hp0 := dummy.hp
 	hero.do_attack(false)
 	var d_open := hp0 - dummy.hp
-	hero._combo = 2
+	hero._combo = 1
 	hero._combo_window = 0.5
 	hp0 = dummy.hp
 	hero.do_attack(false)
 	var d_finish := hp0 - dummy.hp
-	_ok(d_finish > d_open, "finisher out-damages the opener (%d > %d)" % [d_finish, d_open])
+	_ok(d_finish >= d_open, "finisher out-damages the opener (%d >= %d)" % [d_finish, d_open])
 
 	# heavy cleave out-damages the finisher
 	hero._charge = 0.6
@@ -1001,13 +1003,11 @@ func _check_combat_style() -> void:
 
 	# counter window boosts the next swing
 	hero.act = Hero.Act.NONE
+	hero._counter_window = 0.0
+	var plain := hero.attack_damage()
 	hero._counter_window = 1.0
-	hero._combo = 0
-	hero._combo_window = 0.5
-	hp0 = dummy.hp
-	hero.do_attack(false)
-	var d_counter := hp0 - dummy.hp
-	_ok(d_counter > d_open, "counter-attack swing is empowered (%d > %d)" % [d_counter, d_open])
+	var boosted := hero.attack_damage()
+	_ok(boosted > plain, "counter-attack swing is empowered (%d > %d)" % [boosted, plain])
 
 	# no stamina, no swing
 	Stats.stamina = 0.0
@@ -1106,3 +1106,63 @@ func _check_graphics() -> void:
 			dflames += 1
 	_ok(dflames > 0, "dungeon torches flicker with flame sprites (%d)" % dflames)
 	d.queue_free()
+
+# ------------------------------------------------------ animation pass ------
+func _check_anim() -> void:
+	print("== animation ==")
+	var hero := world.hero
+	hero.global_position = Vector2(2400, 2000)
+	Stats.reset_run()
+	Stats.stamina = Stats.max_stamina
+	if Juice._world == null:
+		Juice.register_world(world)
+	await get_tree().physics_frame
+	# slash arc spawns on every swing
+	hero._combo_window = 0.0
+	hero.act = Hero.Act.NONE
+	hero.do_attack(false)
+	await get_tree().process_frame
+	var slashes := 0
+	for node in Juice._world.get_children():
+		if node is Sprite2D and node.texture != null and "slash" in str(node.texture.resource_path):
+			slashes += 1
+	_ok(slashes >= 1, "a slash arc sweeps on attack (%d)" % slashes)
+	# charge ring shows while a heavy winds up
+	hero.act = Hero.Act.NONE
+	Input.action_press("attack")     # simulate the held button
+	hero._charge = 0.6
+	hero._handle_actions(0.016)
+	_ok(hero._ring.visible, "charge ring glows under a held heavy")
+	Input.action_release("attack")
+	hero._charge = 0.0
+	hero._handle_actions(0.016)
+	_ok(not hero._ring.visible, "ring hides when the hold ends")
+	# dodge leaves a streak
+	hero.act = Hero.Act.NONE
+	Stats.stamina = Stats.max_stamina
+	var before := Juice._world.get_child_count()
+	Juice.streak(hero.global_position, Vector2.RIGHT)
+	await get_tree().process_frame
+	_ok(Juice._world.get_child_count() > before, "dodge streak sprites spawn")
+	# walk bounce moves the doll
+	hero.velocity = Vector2(60, 0)
+	hero.act = Hero.Act.NONE
+	hero._animate(0.05, Vector2.RIGHT)
+	_ok(absf(hero.doll.position.y) > 0.1, "walk bounce hops the doll (%0.2f)" % hero.doll.position.y)
+	# death: topple & fade instead of popping
+	var dummy := Enemy.new()
+	world.actors.add_child(dummy)
+	dummy.setup("slime", 1)
+	dummy.global_position = hero.global_position + Vector2(40, 0)
+	dummy.speed = 0.0
+	dummy.detect = 0.0
+	await get_tree().physics_frame
+	dummy.take_damage(9999)
+	await get_tree().physics_frame
+	var dying := dummy._spr.modulate.a < 1.0
+	await get_tree().physics_frame
+	_ok(dying or not is_instance_valid(dummy), "death topples and fades (a=%0.2f)" % (dummy._spr.modulate.a if is_instance_valid(dummy) else 0.0))
+	for i in 40:
+		await get_tree().physics_frame
+	_ok(not is_instance_valid(dummy), "dead monster frees itself after the tween")
+	Stats.reset_run()

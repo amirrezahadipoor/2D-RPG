@@ -90,7 +90,12 @@ func schedule_target(hour: int) -> Vector2:
 			return plaza                     # guards stay on duty
 	return home
 
+var _bob_t := 0.0
+
 func _physics_process(delta: float) -> void:
+	_bob_t += delta
+	if doll:
+		doll.position.y = sin(_bob_t * 2.2 + float(npc_index)) * 0.6
 	if Game.state != Game.State.PLAYING:
 		return
 	_target = schedule_target(Game.hour())

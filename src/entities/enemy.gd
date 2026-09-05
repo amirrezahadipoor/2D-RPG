@@ -57,6 +57,8 @@ var _breath_timer := 4.0
 var _summon_timer := 6.0
 var _tele: Label = null
 var _stagger_timer := 0.0
+var _tilt := 0.0
+var _death_timer := -1.0
 
 func setup(type: String, lvl: int) -> void:
 	enemy_type = type
@@ -147,8 +149,17 @@ func stagger(seconds: float = 1.2) -> void:
 	Juice.puff(global_position + Vector2(0, -12))
 
 func _physics_process(delta: float) -> void:
-	if state == State.DEAD or Game.state != Game.State.PLAYING:
+	if state == State.DEAD:
+		# corpse countdown: topple tween plays, then the node goes away
+		if _death_timer > 0.0:
+			_death_timer -= delta
+			if _death_timer <= 0.0:
+				queue_free()
 		return
+	if Game.state != Game.State.PLAYING:
+		return
+	_tilt = move_toward(_tilt, 0.0, delta * 1.4)
+	_spr.rotation = _tilt
 	if _stagger_timer > 0.0:
 		_stagger_timer -= delta
 		_spr.modulate = Color(1.3, 1.25, 0.6)
@@ -317,6 +328,7 @@ func take_damage(amount: int, knock_dir: Vector2 = Vector2.ZERO, crit: bool = fa
 	_hp_fill.size.x = 14.0 * clampf(float(hp) / float(max_hp), 0.0, 1.0)
 	if knock_dir.length() > 0.1:
 		velocity += knock_dir
+		_tilt = clampf(knock_dir.x * 0.02, -0.28, 0.28)
 	Juice.damage_number(global_position + Vector2(0, -_frame_h), taken, crit)
 	if hp <= 0:
 		_die()
@@ -365,5 +377,14 @@ func _die() -> void:
 	died.emit(self)
 	_spr.modulate.a = 0.0
 	_hp_bg.visible = false
-	set_physics_process(false)
-	queue_free()
+	_tele.visible = false
+	# topple & fade instead of popping out of existence
+	var spin := 1.0 if randf() < 0.5 else -1.0
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(_spr, "modulate:a", 0.0, 0.38)
+	tween.tween_property(_spr, "rotation", spin * 1.3, 0.38)
+	tween.tween_property(_spr, "position:y", _spr.position.y + 4.0, 0.38)
+	# a plain timer guarantees the corpse is freed even if the tween is
+	# interrupted (scene change, parent freed mid-fade)
+	_death_timer = 0.45
