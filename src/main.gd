@@ -4,6 +4,7 @@ extends Node2D
 var world: Overworld
 var hud: Hud
 var death_screen: DeathScreen
+var inv_screen: InventoryScreen
 
 func _ready() -> void:
 	world = Overworld.new()
@@ -19,6 +20,11 @@ func _ready() -> void:
 	add_child(death_screen)
 	death_screen.retry_pressed.connect(_on_retry)
 
+	inv_screen = InventoryScreen.new()
+	inv_screen.name = "InventoryScreen"
+	add_child(inv_screen)
+	Inventory.denied.connect(func(key): hud.show_toast(I18N.tr_str(key)))
+
 	world.biome_changed.connect(hud.set_biome)
 	world.biome_changed.connect(func(b): print("[Main] biome -> ", b))
 
@@ -30,6 +36,8 @@ func _ready() -> void:
 	if world.hero:
 		hud.set_gear(world.hero.doll.get_gear())
 		world.hero.gear_changed.connect(hud.set_gear)
+		world.hero.gear_changed.connect(Inventory.on_hero_gear)
+		Inventory.on_hero_gear(world.hero.doll.get_gear())
 	Game.change_state(Game.State.PLAYING)
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -37,6 +45,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("pause"):
 		Game.toggle_pause()
+	elif event.is_action_pressed("inventory"):
+		inv_screen.toggle()
 	elif event.is_action_pressed("locale"):
 		I18N.toggle_locale()
 

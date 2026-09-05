@@ -169,6 +169,10 @@ func _flash_hurt() -> void:
 	var tween := create_tween()
 	tween.tween_property(_vignette, "modulate:a", 0.0, 0.35)
 
+## Public entry point so other systems (bag full, quest notes) can toast.
+func show_toast(text: String) -> void:
+	_show_toast(text)
+
 func _show_toast(text: String) -> void:
 	if _toast == null:
 		return

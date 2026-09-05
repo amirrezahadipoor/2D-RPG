@@ -36,6 +36,7 @@ func build(seed_value: int) -> void:
 	_spawn_actors_root()
 	_spawn_hero()
 	_spawn_spawner()
+	_place_chests()
 	Juice.register_camera(hero.cam)
 	Juice.register_world(actors)
 	print("[World] seed=%d size=%dx%d" % [world_seed, WORLD_W, WORLD_H])
@@ -218,6 +219,26 @@ func _spawn_spawner() -> void:
 	spawner.name = "Spawner"
 	add_child(spawner)
 	spawner.world = self
+
+## Scatter a handful of chests on walkable ground away from the spawn point.
+func _place_chests() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = world_seed ^ 0x51ED
+	var placed := 0
+	var tries := 0
+	while placed < 10 and tries < 400:
+		tries += 1
+		var t := Vector2i(rng.randi_range(4, WORLD_W - 5), rng.randi_range(4, WORLD_H - 5))
+		var pos := Vector2(t.x * TILE + 8.0, t.y * TILE + 8.0)
+		if not is_walkable_at(pos):
+			continue
+		if pos.distance_to(hero.global_position) < 70.0:
+			continue
+		var chest := Chest.new()
+		chest.name = "Chest_%d" % placed
+		actors.add_child(chest)
+		chest.global_position = pos
+		placed += 1
 
 func _spawn_hero() -> void:
 	hero = Hero.new()

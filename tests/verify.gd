@@ -393,11 +393,17 @@ func _check_spawner() -> void:
 	_ok(live > 0, "spawner populates the world on its own (%d live)" % live)
 	_ok(live <= Spawner.CAP, "spawner respects its cap (%d <= %d)" % [live, Spawner.CAP])
 
-	var all_walkable := true
-	for node in get_tree().get_nodes_in_group("enemy"):
-		if not world.is_walkable_at(node.global_position):
-			all_walkable = false
-	_ok(all_walkable, "no enemy spawned on an unwalkable tile")
+	# Spawn positions must be walkable. Checked immediately after each spawn
+	# attempt (same frame): a chasing enemy may later stand under a canopy,
+	# which is physically walk-through but not a legal SPAWN tile.
+	await _clear_enemies_call()
+	var spawn_tiles_ok := true
+	for i in 12:
+		world.spawner._try_spawn()
+		for node in get_tree().get_nodes_in_group("enemy"):
+			if not world.is_walkable_at(node.global_position):
+				spawn_tiles_ok = false
+	_ok(spawn_tiles_ok, "spawner only uses walkable spawn tiles")
 
 	# far-away enemies are culled instead of accumulating forever
 	var far := world.spawner.spawn("slime", world.hero.global_position + Vector2(Spawner.DESPAWN_DIST + 60, 0), 1)

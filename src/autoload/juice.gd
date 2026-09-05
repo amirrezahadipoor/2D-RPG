@@ -83,6 +83,31 @@ func miss(world_pos: Vector2) -> void:
 	tween.tween_property(label, "modulate:a", 0.0, 0.45)
 	tween.chain().tween_callback(node.queue_free)
 
+## Generic floating world-space text (loot names, quest notes, ...).
+func world_text(world_pos: Vector2, text: String, color: Color, size: int = 8) -> void:
+	if _world == null:
+		return
+	var node := Node2D.new()
+	node.global_position = world_pos
+	_world.add_child(node)
+	var label := Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	label.add_theme_constant_override("outline_size", 3)
+	label.position = Vector2(-30, -8)
+	label.size = Vector2(60, 10)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	I18N.tag(label)
+	node.add_child(label)
+	var tween := node.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(node, "position", node.position + Vector2(0, -12), 0.9).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "modulate:a", 0.0, 0.9)
+	tween.chain().tween_callback(node.queue_free)
+
 # ----------------------------------------------------------------- puff -----
 func puff(world_pos: Vector2) -> void:
 	if _world == null:

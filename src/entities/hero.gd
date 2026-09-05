@@ -15,6 +15,7 @@ const ACCEL := 900.0
 const FRICTION := 1100.0
 const DODGE_STAMINA := 22.0
 const ATTACK_TIME := 0.28
+const CRIT_CHANCE := 0.1
 const DODGE_TIME := 0.22
 const WALK_FPS := 9.0
 const IDLE_FPS := 2.5
@@ -46,6 +47,7 @@ func _ready() -> void:
 	doll = PaperDoll.new()
 	doll.gear_changed.connect(_on_gear_changed)
 	add_child(doll)
+	Inventory.equipment_changed.connect(_refresh_stats)
 
 	cam = Camera2D.new()
 	cam.position_smoothing_enabled = true
@@ -68,7 +70,7 @@ func _starting_gear() -> void:
 
 # ------------------------------------------------------------- physics ------
 func _physics_process(delta: float) -> void:
-	if Game.state == Game.State.DEAD:
+	if Game.state == Game.State.DEAD or Inventory.screen_open:
 		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
 		move_and_slide()
 		return
@@ -147,6 +149,9 @@ func _sweep_attack(weapon: Dictionary) -> int:
 	var reach: float = weapon["reach"]
 	var arc: float = weapon["arc"]
 	var amount := attack_damage(weapon)
+	var crit := randf() < CRIT_CHANCE
+	if crit:
+		amount *= 2
 	var knock := float(weapon["knockback"])
 	var hits := 0
 	for node in get_tree().get_nodes_in_group("enemy"):
@@ -159,7 +164,7 @@ func _sweep_attack(weapon: Dictionary) -> int:
 			continue
 		if absf(offset.dot(side)) > arc:
 			continue
-		enemy.take_damage(amount, dir * knock)
+		enemy.take_damage(amount, dir * knock, crit)
 		hits += 1
 	if hits > 0:
 		Juice.shake(1.5)
@@ -171,7 +176,8 @@ func current_weapon_id() -> String:
 ## What a swing from `weapon` deals with the hero's current gear and level.
 func attack_damage(weapon: Dictionary = {}) -> int:
 	var w: Dictionary = weapon if not weapon.is_empty() else WeaponDB.stats_for(current_weapon_id())
-	return int(w["damage"]) + ItemDB.attack_power(doll.get_gear()) + (Stats.level - 1)
+	return (int(w["damage"]) + ItemDB.attack_power(doll.get_gear())
+		+ Inventory.attack_bonus() + (Stats.level - 1))
 
 ## Damage entry point used by enemies. Dodging grants brief invulnerability.
 func hurt(amount: int) -> int:
@@ -183,8 +189,16 @@ func hurt(amount: int) -> int:
 	return Stats.damage(amount)
 
 func _on_gear_changed(gear: Dictionary) -> void:
-	Stats.set_armor(ItemDB.armor_total(gear))
+	_refresh_stats()
 	gear_changed.emit(gear)
+
+## Armor = base of what is worn + affix/rarity bonuses of the worn entries.
+func _refresh_stats() -> void:
+	Stats.set_armor(ItemDB.armor_total(doll.get_gear()) + Inventory.armor_bonus())
+
+## Sprite-side equip, used by the Inventory autoload.
+func equip_visual(slot: String, item_id: String) -> void:
+	doll.equip(slot, item_id)
 
 # ------------------------------------------------------------ animation -----
 func _animate(delta: float, input: Vector2) -> void:

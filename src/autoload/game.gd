@@ -72,6 +72,7 @@ func start_new_run(hardcore: bool = true) -> void:
 	is_hardcore = hardcore
 	playtime = 0.0
 	Stats.reset_run()
+	Inventory.reset_run()
 	change_state(State.PLAYING)
 
 # ----------------------------------------------------------------- save -----

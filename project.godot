@@ -24,6 +24,7 @@ I18N="*res://src/autoload/i18n.gd"
 Game="*res://src/autoload/game.gd"
 Stats="*res://src/autoload/stats.gd"
 Juice="*res://src/autoload/juice.gd"
+Inventory="*res://src/autoload/inventory.gd"
 
 [audio]
 

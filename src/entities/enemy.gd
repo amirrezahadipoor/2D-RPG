@@ -143,7 +143,7 @@ func _set_frame(i: int) -> void:
 	_spr.region_rect = Rect2(i * _frame_w, 0, _frame_w, _frame_h)
 
 # ---------------------------------------------------------------- combat ----
-func take_damage(amount: int, knock_dir: Vector2 = Vector2.ZERO) -> int:
+func take_damage(amount: int, knock_dir: Vector2 = Vector2.ZERO, crit: bool = false) -> int:
 	if state == State.DEAD:
 		return 0
 	var taken := mini(amount, hp)
@@ -153,10 +153,25 @@ func take_damage(amount: int, knock_dir: Vector2 = Vector2.ZERO) -> int:
 	_hp_fill.size.x = 14.0 * clampf(float(hp) / float(max_hp), 0.0, 1.0)
 	if knock_dir.length() > 0.1:
 		velocity += knock_dir
-	Juice.damage_number(global_position + Vector2(0, -_frame_h), taken, false)
+	Juice.damage_number(global_position + Vector2(0, -_frame_h), taken, crit)
 	if hp <= 0:
 		_die()
 	return taken
+
+## 35% chance to leave an item behind; tougher enemies roll better rarity.
+func _maybe_drop_loot() -> void:
+	var drop_rng := RandomNumberGenerator.new()
+	drop_rng.randomize()
+	if drop_rng.randf() > 0.35:
+		return
+	var parent := get_parent()
+	if parent == null:
+		return
+	var pickup := Pickup.new()
+	parent.add_child(pickup)
+	var entry: Dictionary = Inventory.roll_entry(ItemGen.random_id(drop_rng), minf(0.15, 0.03 * level))
+	pickup.setup(entry)
+	pickup.global_position = global_position
 
 func _apply_flash() -> void:
 	if _flash_timer > 0.0:
@@ -169,6 +184,7 @@ func _die() -> void:
 	velocity = Vector2.ZERO
 	Stats.add_xp(xp_value)
 	Stats.add_gold(gold_value)
+	_maybe_drop_loot()
 	Juice.shake(2.0)
 	Juice.puff(global_position)
 	died.emit(self)
