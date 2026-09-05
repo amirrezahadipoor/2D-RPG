@@ -20,7 +20,21 @@ func _ready() -> void:
 	rng.randomize()
 	reset_run()
 
+var artifacts_found: Array = []
+
+## Next relic the hero has not claimed yet (secret chests and the dragon).
+func claim_artifact() -> Dictionary:
+	for aid in ItemDB.ARTIFACTS:
+		if not artifacts_found.has(aid):
+			artifacts_found.append(aid)
+			return {"id": aid, "slot": "accessory", "rarity": 4, "prefix": "",
+				"suffix": "", "dmg": 0, "armor": ItemDB.armor_of(aid),
+				"weight": ItemDB.weight_of(aid), "qty": 1}
+	return {"id": "greater_health_potion", "slot": "", "rarity": 0, "prefix": "",
+		"suffix": "", "dmg": 0, "armor": 0, "weight": 1, "qty": 1}
+
 func reset_run() -> void:
+	artifacts_found = []
 	bag.clear()
 	equipped.clear()
 	for slot: String in ArtIndex.EQUIPMENT_SLOTS:

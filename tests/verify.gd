@@ -30,6 +30,7 @@ func run() -> void:
 	await _check_potions_talents()
 	_check_i18n()
 	await _check_m4()
+	_check_secrets()
 
 	print("")
 	if _failures.is_empty():
@@ -729,8 +730,8 @@ func _check_m4() -> void:
 	# --- depth 3 ends in the dragon boss ---
 	var d3 := Dungeon.new()
 	add_child(d3)
-	d3.build(3, 20260905)
-	_ok(d3.boss != null and d3.boss.enemy_type == "dragon", "depth 3 boss is a dragon")
+	d3.build(Dungeon.MAX_DEPTH, 20260905)
+	_ok(d3.boss != null and d3.boss.enemy_type == "dragon", "the final depth boss is a dragon")
 	_ok(d3.stairs_down == Vector2.ZERO, "no stairs below the last depth")
 	d3.queue_free()
 
@@ -789,3 +790,67 @@ func _check_m4() -> void:
 	merchant.free()
 	Inventory.reset_run()
 	Stats.reset_run()
+
+# ------------------------------------------------- secrets & deeper depths ---
+func _check_secrets() -> void:
+	print("== secrets & depth ==")
+	_ok(Dungeon.MAX_DEPTH == 6, "dungeons run six depths deep")
+	var d6 := Dungeon.new()
+	add_child(d6)
+	d6.build(6, 4242)
+	_ok(d6.boss != null and d6.boss.enemy_type == "dragon", "depth 6 still ends in the dragon")
+	d6.queue_free()
+
+	var d := Dungeon.new()
+	add_child(d)
+	d.build(3, 4242)
+	_ok(d.secret_walls.size() >= 1, "depth 3 hides %d cracked wall(s)" % d.secret_walls.size())
+	_ok(d.is_walkable_at(d._pos_of(d.secret_walls[0])) == false, "the cracked wall still blocks the way")
+	var wall_tile: Vector2i = d.secret_walls[0]
+	var chamber: Rect2i = d.secret_rooms[0]
+	# sealed: BFS must not reach the chamber before the wall shatters
+	var start := d.tile_at(d.stairs_up)
+	var seen := {}
+	var queue: Array = [start]
+	seen[start] = true
+	while not queue.is_empty():
+		var t: Vector2i = queue.pop_front()
+		for nb in [t + Vector2i.UP, t + Vector2i.DOWN, t + Vector2i.LEFT, t + Vector2i.RIGHT]:
+			if nb.x >= 0 and nb.y >= 0 and nb.x < Dungeon.W and nb.y < Dungeon.H \
+					and not seen.has(nb) and d._grid[nb.y * Dungeon.W + nb.x] == 1:
+				seen[nb] = true
+				queue.append(nb)
+	var cc := d._center(chamber)
+	_ok(not seen.has(cc), "hidden chamber is sealed off (%d tiles seen)" % seen.size())
+	d.open_secret(wall_tile)
+	var seen2 := {}
+	var queue2: Array = [start]
+	seen2[start] = true
+	while not queue2.is_empty():
+		var t2: Vector2i = queue2.pop_front()
+		for nb in [t2 + Vector2i.UP, t2 + Vector2i.DOWN, t2 + Vector2i.LEFT, t2 + Vector2i.RIGHT]:
+			if nb.x >= 0 and nb.y >= 0 and nb.x < Dungeon.W and nb.y < Dungeon.H \
+					and not seen2.has(nb) and d._grid[nb.y * Dungeon.W + nb.x] == 1:
+				seen2[nb] = true
+				queue2.append(nb)
+	_ok(seen2.has(cc), "shattering the cracked wall opens the way")
+	var secret_chest := 0
+	for c in d.actors.get_children():
+		if c is Chest and c.secret:
+			secret_chest += 1
+	_ok(secret_chest == d.secret_rooms.size(), "every hidden chamber holds a secret chest")
+	d.queue_free()
+
+	# relics: unique claims + real power
+	Inventory.reset_run()
+	var ids := []
+	for i in 3:
+		ids.append(str(Inventory.claim_artifact()["id"]))
+	_ok(ids == ItemDB.ARTIFACTS, "three unique relics, claimed once each")
+	var fourth := Inventory.claim_artifact()
+	_ok(str(fourth["id"]) == "greater_health_potion", "no fourth relic: fallback brew")
+	var gear := {"weapon": "iron_sword", "accessory": "amulet_of_depths"}
+	var plain := {"weapon": "iron_sword", "accessory": "red_cloak"}
+	_ok(ItemDB.attack_power(gear) == ItemDB.attack_power(plain) + 3 - 0
+		or ItemDB.attack_power(gear) > ItemDB.attack_power(plain), "relics carry attack power")
+	Inventory.reset_run()

@@ -6,8 +6,9 @@ extends Node2D
 const TILE := 16
 const W := 72
 const H := 54
-const MAX_DEPTH := 3
+const MAX_DEPTH := 6
 const SPAWN_CAP := 6
+const DEPTH_TYPES := ["skeleton", "skeleton", "orc", "orc", "demon", "demon"]
 
 var depth := 1
 var terrain_layer: TileMapLayer
@@ -23,6 +24,10 @@ var _lights: Array = []
 var _spawn_timer := 0.0
 var _rng := RandomNumberGenerator.new()
 var _seed := 0
+var secret_walls: Array = []   # Vector2i cracked-wall tiles
+var secret_rooms: Array = []   # Rect2i hidden chambers
+
+signal secret_opened()
 
 func is_dungeon() -> bool:
 	return true
@@ -65,15 +70,72 @@ func _gen_rooms() -> void:
 			if rect.grow(2).intersects(other):
 				ok = false
 				break
+		if ok and secret_rooms.size() < 2:
+			for other in secret_rooms:
+				if rect.grow(2).intersects(other):
+					ok = false
+					break
 		if ok:
 			rooms.append(rect)
-	# corridors chain the rooms in order
-	for i in range(1, rooms.size()):
-		_carve_corridor(_center(rooms[i - 1]), _center(rooms[i]))
+	# room floors first, then corridors chain the rooms in order
 	for r in rooms:
 		for y in range(r.position.y, r.end.y):
 			for x in range(r.position.x, r.end.x):
 				_grid[y * W + x] = 1
+	for i in range(1, rooms.size()):
+		_carve_corridor(_center(rooms[i - 1]), _center(rooms[i]))
+	# hidden chambers go wherever the rock ring is still untouched
+	var order: Array = range(0, rooms.size())
+	for i in range(order.size() - 1, 0, -1):
+		var j := _rng.randi_range(0, i)
+		var tmp = order[i]
+		order[i] = order[j]
+		order[j] = tmp
+	for ri in order:
+		if secret_rooms.size() >= 2:
+			break
+		_try_secret_twin(rooms[ri])
+
+## Hidden chambers: a sealed room reserved right next to its host while the
+## map is still being placed, joined by a single cracked wall row. Corridors
+## are carved afterwards, so any chamber a corridor nicked is dropped.
+func _try_secret_twin(r: Rect2i) -> void:
+	if rooms.size() < 2 or secret_rooms.size() >= 2:
+		return
+	var ch_w := clampi(r.size.x - 2, 4, 8)
+	var ch_h := clampi(r.size.y - 2, 3, 5)
+	var cx := clampi(r.position.x + 1, 1, W - ch_w - 2)
+	var options := []
+	if r.position.y - ch_h - 1 >= 1:
+		options.append(Rect2i(cx, r.position.y - ch_h - 1, ch_w, ch_h))
+	if r.end.y + ch_h + 1 < H - 1:
+		options.append(Rect2i(cx, r.end.y + 1, ch_w, ch_h))
+	for chamber in options:
+		# every tile of the chamber AND its one-tile ring must still be raw
+		# rock: the ring is what seals it (the host-side ring row is exactly
+		# the single cracked wall row)
+		var clear := true
+		for y in range(chamber.position.y - 1, chamber.end.y + 1):
+			for x in range(chamber.position.x - 1, chamber.end.x + 1):
+				if y < 0 or y >= H or x < 0 or x >= W or _grid[y * W + x] != 0:
+					clear = false
+		if not clear:
+			continue
+		for y in range(chamber.position.y, chamber.end.y):
+			for x in range(chamber.position.x, chamber.end.x):
+				_grid[y * W + x] = 1
+		secret_rooms.append(chamber)
+		var wall_row := r.position.y - 1 if chamber.position.y < r.position.y else r.end.y
+		secret_walls.append(Vector2i(cx + ch_w / 2, wall_row))
+		return
+
+func open_secret(tile: Vector2i) -> void:
+	if tile.x < 0 or tile.y < 0 or tile.x >= W or tile.y >= H:
+		return
+	_grid[tile.y * W + tile.x] = 1
+	var idx: int = ArtIndex.TERRAIN_INDEX["stone"]
+	terrain_layer.set_cell(tile, 0, Vector2i(idx % 8, idx / 8))
+	secret_opened.emit()
 
 func _center(r: Rect2i) -> Vector2i:
 	return r.position + r.size / 2
@@ -162,6 +224,19 @@ func _place_entities() -> void:
 	actors.add_child(up)
 	up.global_position = stairs_up
 
+	# cracked walls + the treasure they hide
+	for i in secret_walls.size():
+		var sw := SecretWall.new()
+		actors.add_child(sw)
+		sw.tile = secret_walls[i]
+		sw.global_position = _pos_of(secret_walls[i])
+		sw.broken.connect(open_secret)
+		var ch: Rect2i = secret_rooms[i]
+		var chest := Chest.new()
+		chest.secret = true
+		actors.add_child(chest)
+		chest.global_position = _pos_of(_center(ch))
+
 	# torches on room edges + chests inside rooms
 	for i in rooms.size():
 		var r: Rect2i = rooms[i]
@@ -211,7 +286,7 @@ func _dungeon_spawn(delta: float) -> void:
 			continue
 		var enemy := Enemy.new()
 		actors.add_child(enemy)
-		var type: String = ["skeleton", "orc", "demon"][clampi(depth - 1, 0, 2)]
+		var type: String = DEPTH_TYPES[clampi(depth - 1, 0, DEPTH_TYPES.size() - 1)]
 		enemy.setup(type, maxi(1, Stats.level + depth - 1))
 		enemy.global_position = pos
 		enemy.died.connect(_on_enemy_died)

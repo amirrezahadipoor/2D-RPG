@@ -90,7 +90,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		I18N.toggle_locale()
 
 # -------------------------------------------------------------- dungeons ----
-func enter_dungeon(depth_value: int) -> void:
+func enter_dungeon(raw_depth: int) -> void:
+	var depth_value := clampi(raw_depth, 1, Dungeon.MAX_DEPTH)
 	if dungeon == null:
 		_overworld_hero_pos = world.hero.global_position
 		world.spawner.spawn_enabled = false
@@ -115,6 +116,7 @@ func enter_dungeon(depth_value: int) -> void:
 	for node in dungeon.actors.get_children():
 		if node is Stairs:
 			node.used.connect(_on_stairs)
+	dungeon.secret_opened.connect(_on_secret)
 	hud.set_biome("dungeon")
 	hud.show_toast(I18N.tr_str("toast.depth") % I18N.num(depth_value))
 
@@ -132,6 +134,9 @@ func exit_dungeon() -> void:
 	world.spawner.spawn_enabled = true
 	world.ambient.set_process(true)
 	hud.set_biome(world.biome_at(hero.global_position))
+
+func _on_secret() -> void:
+	hud.show_toast(I18N.tr_str("toast.secret"))
 
 func _on_stairs(direction: int) -> void:
 	if direction > 0:

@@ -207,6 +207,16 @@ func _sweep_attack(weapon: Dictionary) -> int:
 			continue
 		enemy.take_damage(amount, dir * knock, crit)
 		hits += 1
+	for node in get_tree().get_nodes_in_group("breakable"):
+		var offset: Vector2 = node.global_position - global_position
+		var along := offset.dot(dir)
+		if along < -6.0 or along > reach:
+			continue
+		if absf(offset.dot(side)) > arc:
+			continue
+		if node.has_method("break_open"):
+			node.break_open()
+			hits += 1
 	if hits > 0:
 		Juice.shake(1.5)
 	return hits

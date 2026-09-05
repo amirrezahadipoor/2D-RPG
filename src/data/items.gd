@@ -9,7 +9,15 @@ const ARMOR := {
 	"cloth_pants": 1, "leather_pants": 2, "iron_greaves": 4,
 	"cloth_shoes": 0, "leather_boots": 1, "iron_boots": 3,
 	"red_cloak": 1, "royal_cloak": 2, "forest_cloak": 1,
+	"amulet_of_depths": 2, "idol_of_embers": 5, "dragonfang_talisman": 3,
 }
+
+## Hidden relics: found only behind cracked walls and in the dragon's hoard.
+const ARTIFACTS := ["amulet_of_depths", "idol_of_embers", "dragonfang_talisman"]
+
+## Relics carry raw attack power beyond any normal accessory.
+const RELIC_POWER := {"amulet_of_depths": 3, "idol_of_embers": 1,
+	"dragonfang_talisman": 4}
 
 const WEIGHT := {
 	"tunic_cloth": 2, "leather_vest": 4, "iron_plate": 9, "royal_plate": 11, "mage_robe": 3,
@@ -19,6 +27,7 @@ const WEIGHT := {
 	"red_cloak": 1, "royal_cloak": 2, "forest_cloak": 1,
 	"iron_sword": 4, "steel_blade": 5, "golden_sword": 6, "rusty_dagger": 2,
 	"battle_axe": 8, "oak_staff": 3, "hunter_bow": 3,
+	"amulet_of_depths": 1, "idol_of_embers": 4, "dragonfang_talisman": 2,
 }
 
 const CARRY_LIMIT := 40
@@ -37,7 +46,8 @@ static func armor_total(gear: Dictionary) -> int:
 	return total
 
 static func attack_power(gear: Dictionary) -> int:
-	return WeaponDB.attack_power(str(gear.get("weapon", "")))
+	return (WeaponDB.attack_power(str(gear.get("weapon", "")))
+		+ int(RELIC_POWER.get(str(gear.get("accessory", "")), 0)))
 
 static func name_of(item_id: String) -> String:
 	if item_id == "":

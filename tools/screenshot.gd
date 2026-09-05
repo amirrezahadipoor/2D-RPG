@@ -262,6 +262,29 @@ func run() -> void:
 			await _grab("17_shop")
 			dlg2.close()
 
+	# ---- hidden chamber: cracked wall shattered, relic chest glowing ----
+	if main_node and main_node.dungeon == null and hero:
+		main_node.enter_dungeon(3)
+		for i in 10:
+			await get_tree().physics_frame
+		var dg: Dungeon = main_node.dungeon
+		if dg and dg.secret_rooms.size() > 0:
+			for node in dg.actors.get_children():
+				if node is SecretWall:
+					node.break_open()
+			for i in 8:
+				await get_tree().process_frame
+			var ch: Rect2i = dg.secret_rooms[0]
+			var dh2: Hero = dg.hero
+			if dh2:
+				dh2.global_position = dg._pos_of(Vector2i(ch.position.x + 1, ch.end.y - 1))
+			for i in 30:
+				await get_tree().physics_frame
+			await _grab("18_secret")
+		main_node.exit_dungeon()
+		for i in 6:
+			await get_tree().physics_frame
+
 	print("[screenshot] done")
 	get_tree().quit(0)
 

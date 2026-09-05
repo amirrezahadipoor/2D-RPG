@@ -102,6 +102,16 @@ Evidence: `tests/verify.tscn` (125 checks), `docs/screenshots/10_story_intro.png
 - [x] Merchant shop page inside dialogue: potions + rarity-priced seeded
       equipment, W/S select, E buy (gold-checked), K leave
 
+## M4+ — Hidden depths (secrets, deeper dungeons, smarter foes, combat style)
+
+- [x] Six dungeon depths (was three); depth-scaled monster table per depth
+- [x] Cracked walls → sealed hidden chambers with secret relic chests
+- [x] Three unique relics (Amulet of Depths, Idol of Embers, Dragonfang
+      Talisman) with their own icons and attack power
+- [ ] Smarter monsters: pack alerts, tactics per species, telegraphs, boss phases
+- [ ] Non-repetitive hero combat: combos, heavy swings, parry, perfect dodge
+- [ ] Deep balance pass: economy, drops, XP and quest curves (docs/BALANCE.md)
+
 ## M5 — Progression, talents & save
 
 - [x] Talent tracks (might/vigor/swift) + point economy from levels/chapters

@@ -5,6 +5,7 @@ extends Node2D
 const INTERACT_DIST := 20.0
 
 var opened := bool(false)
+var secret := false
 
 var _spr: Sprite2D
 var _prompt: Label
@@ -52,8 +53,16 @@ func open() -> void:
 	_spr.modulate = Color(0.6, 0.55, 0.5)
 	Juice.puff(global_position + Vector2(0, -8))
 	Juice.shake(1.5)
-	Stats.add_gold(_rng.randi_range(8, 25))
+	Stats.add_gold(_rng.randi_range(8, 25) + (30 if secret else 0))
 	var parent := get_parent()
+	if secret:
+		var relic := Inventory.claim_artifact()
+		var rp := Pickup.new()
+		parent.add_child(rp)
+		rp.setup(relic)
+		rp.global_position = global_position + Vector2(0, -14)
+		Juice.world_text(global_position + Vector2(0, -34),
+			ItemDB.name_of(relic["id"]), Color(1.0, 0.85, 0.3), 9)
 	if parent == null:
 		return
 	for i in _rng.randi_range(2, 3):

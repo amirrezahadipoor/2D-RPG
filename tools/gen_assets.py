@@ -1079,6 +1079,24 @@ def item_icon(kind, mat, trim=None):
     elif kind == "boots":
         _stamp(c, ["mm.mm", "mm.mm", "mm.mm", "mmmmm", "mmmmm"], 5, 6, {"m": r["m"]})
         c.hline(5, 10, 5, r["l"]); c.hline(5, 11, 5, r["d"])
+    elif kind == "amulet":
+        # chain loop with a hanging cut gem
+        c.px(6, 2, PAL["gold_m"]); c.px(9, 2, PAL["gold_m"])
+        c.px(5, 3, PAL["gold_d"]); c.px(10, 3, PAL["gold_d"])
+        c.px(5, 4, PAL["gold_m"]); c.px(10, 4, PAL["gold_m"])
+        c.px(6, 5, PAL["gold_d"]); c.px(9, 5, PAL["gold_d"])
+        _stamp(c, [".mm.", "mmmm", "mmmm", ".mm."], 6, 6, {"m": r["m"]})
+        c.px(7, 7, r["l"]); c.px(7, 6, PAL["white"])
+    elif kind == "idol":
+        _stamp(c, ["..mm..", ".mmmm.", ".mmmm.", "..mm..", ".mmmm.", "mmmmmm"],
+               5, 3, {"m": r["m"]})
+        c.px(7, 4, PAL["ember"]); c.px(8, 4, PAL["ember"])
+        c.hline(6, 6, 4, r["l"])
+    elif kind == "fang":
+        _stamp(c, ["..mm..", "..mm..", ".mmm..", ".mm...", "mm...."], 6, 3,
+               {"m": r["m"]})
+        c.px(7, 4, r["l"])
+        c.px(6, 8, PAL["red_m"]); c.px(5, 9, PAL["red_d"])
     elif kind == "cloak":
         _stamp(c, [".mmmmmm.", "mmmmmmmm", "mmmmmmmm", "mmmmmmmm", ".mmmmmm.", ".mm..mm."],
                4, 4, {"m": r["m"]})
@@ -1228,6 +1246,9 @@ def main():
     for name, _ in equip["accessory"]:
         icon_specs.append((name, "cloak", "red" if "red" in name else "purple" if "royal" in name else "leaf", None))
     icon_specs += [
+        ("amulet_of_depths", "amulet", "purple", "gold"),
+        ("idol_of_embers", "idol", "gold", None),
+        ("dragonfang_talisman", "fang", "stone", None),
         ("health_potion", "potion", "red", None),
         ("greater_health_potion", "potion", "red", "gold"),
         ("stamina_potion", "potion", "leaf", None),
