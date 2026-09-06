@@ -48,6 +48,7 @@ func run() -> void:
 	_check_product()
 	await _check_bosses()
 	await _check_music_loops()
+	_check_camera()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -1134,6 +1135,17 @@ func _check_music_loops() -> void:
 		_ok(m._desired() == "music_night", "night swaps the bed")
 		Game.game_minutes = keep
 		m._tick = 9.0
+
+func _check_camera() -> void:
+	print("== camera D3 ==")
+	var h := world.hero
+	h.velocity = Vector2(120.0, 0.0)
+	h.apply_lookahead(0.6)
+	_ok(h.cam.position.x > 5.0, "camera leans into the walk direction")
+	h.velocity = Vector2.ZERO
+	h.apply_lookahead(1.0)
+	_ok(h.cam.position.length() < h.cam.position.length() + 1.0, "and settles back when idle")
+	h.cam.position = Vector2.ZERO
 
 func _check_people() -> void:
 	print("== people ==")

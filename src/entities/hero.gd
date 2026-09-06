@@ -144,6 +144,7 @@ func _physics_process(delta: float) -> void:
 		_has_move_to = false
 		_enemy_target = null
 	_touch_think(delta)
+	apply_lookahead(delta)
 	var drive := input if input.length() > 0.1 else _touch_dir()
 	if act == Act.DODGE:
 		# dash keeps its launch velocity, no steering
@@ -291,6 +292,14 @@ func _touch_think(delta: float) -> void:
 		_wiggle = 0.45
 		var cur := _touch_dir()
 		_wiggle_dir = cur.rotated(PI * 0.5) if cur.length() > 0.1 else Vector2(1, 0)
+
+## Phase D3: the camera leans where you are heading, so you see what
+## is coming instead of staring at your own back.
+func apply_lookahead(delta: float) -> void:
+	var look := Vector2.ZERO
+	if velocity.length() > 24.0:
+		look = velocity.normalized() * 22.0
+	cam.position = cam.position.move_toward(look, 60.0 * delta)
 
 func _release_interact() -> void:
 	Input.action_release("interact")
