@@ -288,5 +288,12 @@
  "place.4": "Eastwatch",
  "place.5": "Ferngrace",
  "place.6": "Galecrest",
- "place.7": "Hollowmere"
+ "place.7": "Hollowmere",
+ "map.legend.town": "town",
+ "map.legend.village": "village",
+ "map.legend.shrine": "shrine (tap: travel)",
+ "map.legend.camp": "camp",
+ "map.legend.ruin": "ruin",
+ "map.legend.you": "you",
+ "toast.shrine_travel": "The shrine hums: you stand before it."
 }

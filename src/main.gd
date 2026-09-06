@@ -71,6 +71,7 @@ func _ready() -> void:
 	world_map.name = "MapOverlay"
 	add_child(world_map)
 	world_map.travel_requested.connect(_on_map_travel)
+	world_map.shrine_travel_requested.connect(_on_map_shrine_travel)
 
 	inv_screen = InventoryScreen.new()
 	inv_screen.name = "InventoryScreen"
@@ -320,6 +321,18 @@ func close_map() -> void:
 	get_tree().paused = false
 
 ## Fast travel: the hero walks out of the realm and into another town.
+## Phase B3: tap a discovered shrine on the map to stand before it.
+func _on_map_shrine_travel(poi_index: int) -> void:
+	close_map()
+	if dungeon != null or world == null or poi_index >= world.pois.size():
+		return
+	var pos: Vector2 = world.pois[poi_index]["pos"] + Vector2(0, 24.0)
+	world.hero.global_position = pos
+	world.hero.cam.reset_smoothing()
+	hud.set_biome(world.biome_at(pos))
+	Sfx.play("stairs")
+	hud.show_toast(I18N.tr_str("toast.shrine_travel"))
+
 func _on_map_travel(settlement_index: int) -> void:
 	close_map()
 	if dungeon != null or _house_id >= 0 or world == null:

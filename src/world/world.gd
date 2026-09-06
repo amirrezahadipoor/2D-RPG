@@ -66,6 +66,12 @@ func build(seed_value: int) -> void:
 	_place_chests()
 	_place_landmarks()
 	_place_pois()
+	poi_seen.clear()
+	for i in pois.size():
+		poi_seen.append(false)
+	seen_cells.clear()
+	for i in int(WORLD_W / 32) * int(WORLD_H / 32):
+		seen_cells.append(false)
 	discovered.clear()
 	for i in settlements.size():
 		discovered.append(false)
@@ -634,12 +640,21 @@ func _discover_tick(delta: float) -> void:
 	for i in settlements.size():
 		if discovered[i]:
 			continue
+		var ci: int = (ht.x / 32) + (ht.y / 32) * int(WORLD_W / 32)
+		if ci >= 0 and ci < seen_cells.size():
+			seen_cells[ci] = true
 		var r: Rect2i = settlements[i]["rect"]
 		if r.grow(5).has_point(ht):
 			discovered[i] = true
 			var hud := get_tree().get_first_node_in_group("hud")
 			if hud != null and hud.has_method("show_toast"):
 				hud.show_toast(I18N.tr_str("toast.discovered") % I18N.tr_str(settlements[i]["name_key"]))
+	for pi in pois.size():
+		if poi_seen[pi]:
+			continue
+		var pp: Vector2 = pois[pi]["pos"]
+		if (pp - hero.global_position).length() < 48.0:
+			poi_seen[pi] = true
 
 func _paint_roof_edges() -> void:
 	edge_painter.edges.clear()
@@ -791,6 +806,8 @@ const SOLID_TERRAIN := ["water", "roof", "roof_ridge", "facade", "facade_door",
 		"facade_win", "facade_win_lit"]
 var _win_lit := false
 var _discover_t := 0.0
+var seen_cells: Array = []   # 12x8 fog-of-war grid (32-tile cells)
+var poi_seen: Array = []     # per-POI bool: hero has stood near it
 
 ## Hand-composed set pieces, one per biome where the seed allows (Phase A2):
 ## a ruined tower, lakeside pier, crypt, obelisk, stone circle, witch hut.

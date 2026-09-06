@@ -43,6 +43,7 @@ func run() -> void:
 	_check_night_grade()
 	_check_dungeon_art()
 	_check_weather()
+	await _check_map_fog()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -1045,6 +1046,39 @@ func _check_weather() -> void:
 		"rainy days bring rain (%s)" % world.weather.mode)
 	Game.game_minutes = keep
 	world._tick_weather()
+
+func _check_map_fog() -> void:
+	print("== map fog & shrine travel B1/B3 ==")
+	var mo := MapOverlay.new()
+	add_child(mo)
+	await get_tree().process_frame
+	mo.show_map(world)
+	await get_tree().process_frame
+	var unseen := 0
+	for c in world.seen_cells:
+		if not c:
+			unseen += 1
+	_ok(mo._fog.size() == unseen and unseen > 10,
+		"fog veils exactly the unseen cells (%d)" % mo._fog.size())
+	_ok(mo._legend.size() == 6, "map carries a six-row legend")
+	var si := -1
+	for pi in world.pois.size():
+		if world.pois[pi]["type"] == "shrine":
+			si = pi
+			break
+	if si >= 0:
+		world.poi_seen[si] = true
+		var fired := [-1]
+		mo.shrine_travel_requested.connect(func(i: int) -> void: fired[0] = i)
+		var mk := Vector2(-1, -1)
+		for m in mo._markers:
+			if int(m[0]) == -2 and (m[2] as Vector2).distance_to(mo._to_local(world.pois[si]["pos"])) < 0.5:
+				mk = (m[2] as Vector2) * mo.zoom - mo._off + MapOverlay.PANEL_POS
+		if mk.x >= 0:
+			mo._tap_at(mk + Vector2(1, 1))
+		_ok(fired[0] == si, "tapping a discovered shrine asks Main to travel")
+	mo.hide_map()
+	mo.queue_free()
 
 func _check_people() -> void:
 	print("== people ==")

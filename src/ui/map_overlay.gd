@@ -9,6 +9,7 @@ class_name MapOverlay
 extends CanvasLayer
 
 signal travel_requested(settlement_index: int)
+signal shrine_travel_requested(poi_index: int)
 
 const MAP_PX := Vector2(240, 160)
 const PANEL_POS := Vector2(120, 55)
@@ -25,6 +26,8 @@ var _hero_dot: ColorRect
 var _obj_dot: ColorRect
 var _markers: Array = []          # [sett_index, ColorRect, map_local]
 var _name_lbls: Array = []        # [sett_index, Label, map_local]
+var _fog: Array = []              # [ColorRect, base_local] per unseen cell
+var _legend: Array = []
 var _hero_local := Vector2.ZERO
 var _obj_local := Vector2.ZERO
 var _baked_seed := -1
@@ -179,6 +182,55 @@ func _clamp_off() -> void:
 	_off.x = clampf(_off.x, 0.0, maxf(0.0, max_off.x))
 	_off.y = clampf(_off.y, 0.0, maxf(0.0, max_off.y))
 
+## Fog of war (Phase B1): unseen 32-tile cells stay under a dark veil.
+func _build_fog() -> void:
+	for f in _fog:
+		if is_instance_valid(f[0]):
+			f[0].free()
+	_fog.clear()
+	if world == null:
+		return
+	var cw := 32 * 16.0
+	for cy in int(Overworld.WORLD_H / 32):
+		for cx in int(Overworld.WORLD_W / 32):
+			var ci := cx + cy * int(Overworld.WORLD_W / 32)
+			if ci < world.seen_cells.size() and world.seen_cells[ci]:
+				continue
+			var r := ColorRect.new()
+			r.color = Color(0, 0, 0, 0.55)
+			var a := _to_local(Vector2(cx * cw, cy * cw))
+			var b := _to_local(Vector2((cx + 1) * cw, (cy + 1) * cw))
+			r.size = b - a
+			r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			_clip.add_child(r)
+			_fog.append([r, a])
+
+## Tiny legend so every dot on the map reads at a glance (Phase B1).
+func _build_legend() -> void:
+	for l in _legend:
+		if is_instance_valid(l[0]):
+			l[0].free()
+		if is_instance_valid(l[1]):
+			l[1].free()
+	_legend.clear()
+	var rows := [
+		[Color(0.95, 0.85, 0.45), "map.legend.town"],
+		[Color(0.9, 0.8, 0.6), "map.legend.village"],
+		[Color(0.4, 0.95, 1.0), "map.legend.shrine"],
+		[Color(0.95, 0.35, 0.3), "map.legend.camp"],
+		[Color(1.0, 0.82, 0.3), "map.legend.ruin"],
+		[Color(1, 1, 1), "map.legend.you"],
+	]
+	for i in rows.size():
+		var d := _dot(rows[i][0], 3)
+		d.get_parent().remove_child(d)   # legend lives above the pan clip
+		_root.add_child(d)
+		d.position = PANEL_POS + Vector2(3.0, MAP_PX.y - 44.0 + i * 7.0)
+		var lb := _label(Vector2(8.0, MAP_PX.y - 46.0 + i * 7.0), Color(0.85, 0.85, 0.8), 6)
+		lb.text = I18N.tr_str(rows[i][1])
+		lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		_legend.append([d, lb])
+
 func _apply_view() -> void:
 	_map_tex.position = -_off
 	_map_tex.size = MAP_PX * zoom
@@ -188,6 +240,9 @@ func _apply_view() -> void:
 	for m in _markers:
 		if is_instance_valid(m[1]):
 			(m[1] as ColorRect).position = (m[2] as Vector2) * zoom - _off - (m[1] as ColorRect).size * 0.5
+	for f in _fog:
+		if is_instance_valid(f[0]):
+			(f[0] as ColorRect).position = (f[1] as Vector2) * zoom - _off
 	for nl in _name_lbls:
 		if is_instance_valid(nl[1]):
 			var li: int = int(nl[0])
@@ -241,6 +296,16 @@ func _place_markers() -> void:
 		if is_instance_valid(nl[1]):
 			nl[1].free()
 	_name_lbls.clear()
+	for f in _fog:
+		if is_instance_valid(f[0]):
+			f[0].free()
+	_fog.clear()
+	for l in _legend:
+		if is_instance_valid(l[0]):
+			l[0].free()
+		if is_instance_valid(l[1]):
+			l[1].free()
+	_legend.clear()
 	for st in world.settlements:
 		var col := Color(0.95, 0.85, 0.45) if st["type"] == "town" else Color(0.9, 0.8, 0.6)
 		var d := _dot(col, 3 if st["type"] == "village" else 5)
@@ -256,6 +321,8 @@ func _place_markers() -> void:
 		lb.text = I18N.tr_str(st.get("name_key", "place.0"))
 		_clip.add_child(lb)
 		_name_lbls.append([int(st["index"]), lb, _to_local(plaza)])
+	_build_fog()
+	_build_legend()
 	for lm in world.landmarks:
 		var d := _dot(Color(1.0, 0.82, 0.3), 4)
 		_markers.append([-3, d, _to_local(Vector2(lm["pos"].x * 16.0 + 8.0, lm["pos"].y * 16.0 + 8.0))])
@@ -388,12 +455,28 @@ func _tap_at(p: Vector2) -> void:
 		close_request()   # tapped the dark outside: dismiss
 		return
 	# a settlement marker? travel there
+	var q := _root.get_canvas_transform() * p
 	for m in _markers:
 		if int(m[0]) >= 0 and is_instance_valid(m[1]):
 			var r: Rect2 = (m[1] as ColorRect).get_global_rect()
-			var q := _root.get_canvas_transform() * p
 			if r.grow(3.0).has_point(q):
 				travel_requested.emit(int(m[0]))
+				return
+	# a discovered shrine? pray there instantly (Phase B3)
+	for mi in _markers.size():
+		var m: Array = _markers[mi]
+		if int(m[0]) != -2 or not is_instance_valid(m[1]):
+			continue
+		var r: Rect2 = (m[1] as ColorRect).get_global_rect()
+		if not r.grow(3.0).has_point(q):
+			continue
+		for pi in world.pois.size():
+			if world.pois[pi]["type"] != "shrine":
+				continue
+			var ml: Vector2 = m[2]
+			var pl := _to_local(world.pois[pi]["pos"])
+			if (ml - pl).length() < 0.5 and pi < world.poi_seen.size() and world.poi_seen[pi]:
+				shrine_travel_requested.emit(pi)
 				return
 	close_request()
 

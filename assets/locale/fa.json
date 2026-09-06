@@ -288,5 +288,12 @@
  "place.4": "ایست‌واچ",
  "place.5": "فرن‌گریس",
  "place.6": "گیل‌کرست",
- "place.7": "هالومیر"
+ "place.7": "هالومیر",
+ "map.legend.town": "شهر",
+ "map.legend.village": "آبادی",
+ "map.legend.shrine": "محراب (تپ: سفر)",
+ "map.legend.camp": "اردوگاه",
+ "map.legend.ruin": "ویرانه",
+ "map.legend.you": "شما",
+ "toast.shrine_travel": "محراب زمزمه می‌کند: پیش آن ایستاده‌ای."
 }
