@@ -52,27 +52,46 @@ func hurt() -> void:
 	hurt_taken.emit()
 
 # -------------------------------------------------------- damage numbers ----
+## Phase F1: damage numbers come from a pool — mid-fight churn never
+## allocates, so weak phones keep their 60 fps.
+var _dn_pool: Array = []
+
 func damage_number(world_pos: Vector2, amount: int, crit: bool) -> void:
 	if _world == null:
 		return
 	Sfx.play("crit" if crit else "hit", -5.0)
-	var node := Node2D.new()
+	var node: Node2D
+	var label: Label
+	if _dn_pool.is_empty():
+		node = Node2D.new()
+		label = Label.new()
+		label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+		label.add_theme_constant_override("outline_size", 3)
+		label.position = Vector2(-8, -10)
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		node.add_child(label)
+		_world.add_child(node)
+	else:
+		node = _dn_pool.pop_back()
+		label = node.get_child(0) as Label
+		node.visible = true
+		label.modulate.a = 1.0
 	node.global_position = world_pos + Vector2(randf_range(-3, 3), 0)
-	_world.add_child(node)
-	var label := Label.new()
 	label.text = I18N.num(amount) + ("!" if crit else "")
 	label.add_theme_font_size_override("font_size", 9 if crit else 8)
 	label.add_theme_color_override("font_color", Color(1.0, 0.82, 0.2) if crit else Color(1, 1, 1))
-	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
-	label.add_theme_constant_override("outline_size", 3)
-	label.position = Vector2(-8, -10)
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	node.add_child(label)
 	var tween := node.create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(node, "position", node.position + Vector2(0, -14), 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(label, "modulate:a", 0.0, 0.6)
-	tween.chain().tween_callback(node.queue_free)
+	tween.chain().tween_callback(_recycle_dn.bind(node))
+
+func _recycle_dn(node: Node2D) -> void:
+	node.visible = false
+	if _dn_pool.size() < 24:
+		_dn_pool.append(node)
+	else:
+		node.queue_free()
 
 ## Floating "miss" when a hit is dodged.
 func miss(world_pos: Vector2) -> void:

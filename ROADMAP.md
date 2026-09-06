@@ -36,6 +36,6 @@ locally فقط import/verify سریع با تایم‌اوت کوتاه.
 - [x] E3 دسترس‌پذیری: scale UI، کنتراست اعداد damage
 
 ## فاز F — کارایی و انتشار
-- [ ] F1 ۶۰fps میان‌رده: pool کردن VFX، cull، atlas واحد
+- [x] F1 ۶۰fps میان‌رده: pool کردن VFX، cull، atlas واحد
 - [ ] F2 AAB/APK امضاشده در CI + manifest آمادهٔ استور
 - [ ] F3 assets استور: اسکرین‌شات، گرافیک ویژه، توضیح EN/FA
