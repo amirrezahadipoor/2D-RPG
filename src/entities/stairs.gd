@@ -5,6 +5,7 @@ extends Node2D
 signal used(direction: int)
 
 var direction := 1
+var locked := false   # Phase C1: boss of the depth still lives
 
 var _spr: Sprite2D
 var _prompt: Label
@@ -36,9 +37,14 @@ func _ready() -> void:
 func interact() -> void:
 	if Game.state == Game.State.PLAYING:
 		_prompt.visible = false
+		if locked:
+			return
 		used.emit(direction)
 
 func _process(_delta: float) -> void:
+	if locked and _prompt != null:
+		_prompt.text = I18N.tr_str("stairs.sealed")
+		_prompt.add_theme_color_override("font_color", Color(1, 0.5, 0.4))
 	if _hero == null or not is_instance_valid(_hero):
 		_hero = get_tree().get_first_node_in_group("player") as Node2D
 		return
@@ -51,4 +57,6 @@ func _process(_delta: float) -> void:
 	if near and not modal and Game.state == Game.State.PLAYING:
 		if Input.is_action_just_pressed("interact"):
 			_prompt.visible = false
+			if locked:
+				return
 			used.emit(direction)

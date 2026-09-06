@@ -297,5 +297,9 @@
  "map.legend.you": "شما",
  "toast.shrine_travel": "محراب زمزمه می‌کند: پیش آن ایستاده‌ای.",
  "enemy.wolf": "گرگ",
- "settings.fps": "نرخ فریم"
+ "settings.fps": "نرخ فریم",
+ "enemy.ghoul_king": "شاه غول",
+ "enemy.frost_warden": "نگهبان یخ",
+ "stairs.sealed": "مهر شده — نخست باس را بکش",
+ "toast.boss_down": "باس فرو افتاد! راه پایین گشوده شد."
 }

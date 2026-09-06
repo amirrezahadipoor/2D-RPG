@@ -21,6 +21,10 @@ const TYPES := {
 	             "detect": 90,  "attack_range": 14, "attack_cd": 1.3, "scale": 1.0},
 	"golem":    {"hp": 90,  "damage": 20, "speed": 18, "xp": 60,  "gold": 35,
 	             "detect": 60,  "attack_range": 20, "attack_cd": 2.0, "scale": 1.4},
+	"ghoul_king": {"hp": 140, "damage": 12, "speed": 55, "xp": 90,  "gold": 45,
+	             "detect": 120, "attack_range": 20, "attack_cd": 1.2, "scale": 1.8},
+	"frost_warden": {"hp": 200, "damage": 16, "speed": 50, "xp": 150, "gold": 80,
+	             "detect": 120, "attack_range": 22, "attack_cd": 1.4, "scale": 1.8},
 	"dragon":   {"hp": 260, "damage": 26, "speed": 36, "xp": 250, "gold": 200,
 	             "detect": 130, "attack_range": 24, "attack_cd": 1.6, "scale": 1.6},
 }

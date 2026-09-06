@@ -311,6 +311,14 @@ func run() -> void:
 			for i in 6:
 				await get_tree().process_frame
 			await _grab("16_dungeon")
+
+		# ---- boss of the depth + boss bar (Phase C1) ----
+		var dun: Node = get_tree().root.find_child("Dungeon", true, false)
+		if dun != null and dun.boss != null:
+			hero.global_position = dun.boss.global_position + Vector2(0, 70.0)
+			for i in 45:
+				await get_tree().physics_frame
+			await _grab("16b_boss")
 		main_node.exit_dungeon()
 		for i in 6:
 			await get_tree().physics_frame

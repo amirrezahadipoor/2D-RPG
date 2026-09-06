@@ -166,6 +166,18 @@
       "frames": 4,
       "cols": 4
     },
+    "ghoul_king": {
+      "w": 24,
+      "h": 24,
+      "frames": 4,
+      "cols": 4
+    },
+    "frost_warden": {
+      "w": 24,
+      "h": 24,
+      "frames": 4,
+      "cols": 4
+    },
     "dragon": {
       "w": 32,
       "h": 32,

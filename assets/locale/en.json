@@ -297,5 +297,9 @@
  "map.legend.you": "you",
  "toast.shrine_travel": "The shrine hums: you stand before it.",
  "enemy.wolf": "Wolf",
- "settings.fps": "Frame rate"
+ "settings.fps": "Frame rate",
+ "enemy.ghoul_king": "Ghoul King",
+ "enemy.frost_warden": "Frost Warden",
+ "stairs.sealed": "Sealed — slay the boss first",
+ "toast.boss_down": "The boss falls! The way down opens."
 }

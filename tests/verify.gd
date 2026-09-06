@@ -46,6 +46,7 @@ func run() -> void:
 	await _check_map_fog()
 	await _check_feel()
 	_check_product()
+	await _check_bosses()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -1102,6 +1103,20 @@ func _check_product() -> void:
 	_ok(Engine.max_fps == 60, "and restore it")
 	var f := FileAccess.open("res://assets/icon.png", FileAccess.READ)
 	_ok(f != null and f.get_length() > 900, "store icon is a real emblem, not the default (%db)" % f.get_length())
+
+func _check_bosses() -> void:
+	print("== bosses C1 ==")
+	var d1 := Dungeon.new()   # off-tree: Main reaps stray dungeons in the live tree
+	d1.build(1, 4242)
+	_ok(d1.boss != null and d1.boss.enemy_type == "ghoul_king", "depth 1 crowns the Ghoul King")
+	_ok(d1._stairs_down_node != null and d1._stairs_down_node.locked, "the way down is sealed while the boss lives")
+	d1.boss.take_damage(99999)
+	_ok(d1._stairs_down_node != null and not d1._stairs_down_node.locked, "slaying the boss unseals the stairs")
+	var d2 := Dungeon.new()
+	d2.build(2, 777)
+	_ok(d2.boss != null and d2.boss.enemy_type == "frost_warden", "depth 2 keeps the Frost Warden")
+	d1.free()
+	d2.free()
 
 func _check_people() -> void:
 	print("== people ==")

@@ -20,6 +20,7 @@ var rooms: Array = []
 var stairs_up := Vector2.ZERO
 var stairs_down := Vector2.ZERO
 var boss: Enemy = null
+var _stairs_down_node: Stairs = null
 
 var _grid: PackedByteArray = PackedByteArray()
 var _lights: Array = []
@@ -248,23 +249,23 @@ func _place_entities() -> void:
 	var up_room: Rect2i = rooms[0]
 	var last_room: Rect2i = rooms[rooms.size() - 1]
 	stairs_up = _pos_of(_center(up_room))
+	var boss_types := {1: "ghoul_king", 2: "frost_warden", 3: "dragon"}
 	if depth < MAX_DEPTH:
-		stairs_down = _pos_of(_center(last_room))
+		stairs_down = _pos_of(_center(last_room)) + Vector2(0, 28.0)
 		var down := Stairs.new()
 		down.direction = 1
+		down.locked = true
+		_stairs_down_node = down
 		actors.add_child(down)
 		down.global_position = stairs_down
-	else:
-		var boss_type := "dragon" if depth == MAX_DEPTH else "demon"
-		boss = Enemy.new()
-		actors.add_child(boss)
-		boss.setup(boss_type, Stats.level + depth)
+	boss = Enemy.new()
+	actors.add_child(boss)
+	boss.setup(boss_types.get(depth, "dragon"), Stats.level + depth)
 		# the boss is spawned here, NOT by _dungeon_spawn(), so it used to miss
-		# the died hook entirely: no XP/kill/quest progress for slaying the
-		# dragon at the bottom of the world
-		boss.died.connect(_on_enemy_died)
-		boss.global_position = _pos_of(_center(last_room))
-		stairs_down = Vector2.ZERO
+	# the died hook entirely: no XP/kill/quest progress for slaying the
+	# dragon at the bottom of the world
+	boss.died.connect(_on_enemy_died)
+	boss.global_position = _pos_of(_center(last_room))
 	var up := Stairs.new()
 	up.direction = -1
 	actors.add_child(up)
@@ -312,11 +313,31 @@ func _pos_of(t: Vector2i) -> Vector2:
 
 # ---------------------------------------------------------------- loop ------
 func _process(delta: float) -> void:
+	_update_boss_bar()
 	for entry in _lights:
 		entry["phase"] += delta
 		entry["light"].energy = 0.7 + 0.15 * sin(entry["phase"] * 8.0)
 		entry["flame"].frame = int(entry["phase"] * 8.0) % 2
 	_dungeon_spawn(delta)
+
+## Phase C1: a boss health bar while the king of the depth still breathes.
+func _update_boss_bar() -> void:
+	var hud := get_tree().get_first_node_in_group("hud")
+	if hud == null or not hud.has_method("set_boss"):
+		return
+	if boss == null or not is_instance_valid(boss) or boss.state == boss.State.DEAD:
+		hud.set_boss("", 0.0, false)
+		return
+	var hero := get_tree().get_first_node_in_group("player")
+	var near: bool = hero != null and (hero.global_position - boss.global_position).length() < 220.0
+	hud.set_boss(I18N.tr_str("enemy." + boss.enemy_type), float(boss.hp) / float(boss.max_hp), near)
+
+func _on_boss_down() -> void:
+	if _stairs_down_node != null and is_instance_valid(_stairs_down_node):
+		_stairs_down_node.locked = false
+	var hud := get_tree().get_first_node_in_group("hud")
+	if hud != null and hud.has_method("show_toast"):
+		hud.show_toast(I18N.tr_str("toast.boss_down"))
 
 func _dungeon_spawn(delta: float) -> void:
 	if Game.state != Game.State.PLAYING or hero == null:
@@ -348,6 +369,8 @@ func _dungeon_spawn(delta: float) -> void:
 		return
 
 func _on_enemy_died(enemy: Enemy) -> void:
+	if enemy == boss:
+		_on_boss_down()
 	Stats.add_kill()
 	QuestLog.on_kill(enemy.enemy_type, "caves")
 

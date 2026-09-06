@@ -1516,6 +1516,8 @@ def main():
         ("wolf",     enemy_wolf(), 24, 24),
         ("shaman",   enemy_shaman(), 24, 24),
         ("golem",    enemy_golem(), 24, 24),
+        ("ghoul_king", enemy_humanoid("leaf", "leath", horns=True), 24, 24),
+        ("frost_warden", enemy_humanoid("water", "snow", horns=True), 24, 24),
         ("dragon",   enemy_dragon(), 32, 32),
     ]
     enemy_index = {}
@@ -1597,8 +1599,12 @@ def main():
             for sx in range(2):
                 for sy in range(2):
                     app.px(20 + x * 2 + sx - 4, 12 + y * 2 + sy - 16, col)
-    app.to_image().save(os.path.join(ROOT, "assets", "icon.png"))
-    print("  wrote assets/icon.png (64x64)")
+    icon_path = os.path.join(ROOT, "assets", "icon.png")
+    if not os.path.exists(icon_path) or os.path.getsize(icon_path) < 900:
+        app.to_image().save(icon_path)
+        print("  wrote assets/icon.png (64x64)")
+    else:
+        print("  kept custom assets/icon.png")
 
     # --- machine-readable index for GDScript ---------------------------
     import json

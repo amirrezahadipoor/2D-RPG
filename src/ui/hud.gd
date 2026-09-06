@@ -411,6 +411,38 @@ func _on_gold(gold: int) -> void:
 	_gold_label.text = "%s: %s" % [I18N.tr_str("hud.gold"), I18N.num(gold)]
 	I18N.tag(_gold_label)
 
+var _boss_bg: ColorRect = null
+var _boss_fill: ColorRect = null
+var _boss_lbl: Label = null
+
+## Phase C1: top-centre boss bar, only while the king is near.
+func set_boss(boss_name: String, ratio: float, show: bool) -> void:
+	if _boss_bg == null:
+		_boss_bg = ColorRect.new()
+		_boss_bg.color = Color(0, 0, 0, 0.65)
+		_boss_bg.size = Vector2(200, 7)
+		_boss_bg.position = Vector2(140, 6)
+		add_child(_boss_bg)
+		_boss_fill = ColorRect.new()
+		_boss_fill.color = Color(0.85, 0.2, 0.2)
+		_boss_fill.size = Vector2(196, 3)
+		_boss_fill.position = Vector2(142, 8)
+		add_child(_boss_fill)
+		_boss_lbl = Label.new()
+		_boss_lbl.add_theme_font_size_override("font_size", 7)
+		_boss_lbl.add_theme_font_override("font", load(I18N.FONT_REGULAR_PATH))
+		_boss_lbl.add_theme_color_override("font_color", Color(1, 0.8, 0.7))
+		_boss_lbl.position = Vector2(0, 13)
+		_boss_lbl.size = Vector2(480, 10)
+		_boss_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		add_child(_boss_lbl)
+	_boss_bg.visible = show
+	_boss_fill.visible = show
+	_boss_lbl.visible = show
+	if show:
+		_boss_fill.size.x = 196.0 * clampf(ratio, 0.0, 1.0)
+		_boss_lbl.text = boss_name
+
 func set_biome_text(text: String) -> void:
 	_biome_label.text = text
 	I18N.tag(_biome_label)

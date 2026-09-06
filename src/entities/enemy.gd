@@ -24,6 +24,8 @@ const TACTICS := {
 	"shaman": {"ranged": true, "keep_distance": true, "healer": true},
 	"golem": {"armored": true},
 	"dragon": {"ranged": true, "boss": true},
+	"ghoul_king": {"boss": true},
+	"frost_warden": {"boss": true, "ranged": true},
 }
 
 var enemy_type := "slime"
@@ -65,6 +67,10 @@ var _death_timer := -1.0
 var elite := false
 var _heal_timer := 5.0
 var _glow: Sprite2D = null
+var _pat := ""
+var _pat_t := 3.0
+var _dash_dir := Vector2.ZERO
+var _ring: TeleRing = null
 
 func setup(type: String, lvl: int) -> void:
 	enemy_type = type
@@ -328,6 +334,61 @@ func _cast_fireball(dir: Vector2) -> void:
 func _boss_brain(delta: float, dist: float, to_hero: Vector2) -> void:
 	if not _tactic("boss") or state == State.DEAD:
 		return
+	# telegraphed pattern cycle (Phase C1): every boss tells you before it hurts
+	_pat_t -= delta
+	match _pat:
+		"charge_wind":
+			modulate = Color(1.5, 0.6, 0.6) if int(_pat_t * 10.0) % 2 == 0 else Color(1, 1, 1)
+			if _pat_t <= 0.0:
+				_pat = "charge_dash"
+				_pat_t = 0.35
+				_dash_dir = to_hero.normalized()
+				modulate = Color(1, 1, 1)
+			return
+		"charge_dash":
+			global_position += _dash_dir * 260.0 * delta
+			if _pat_t <= 0.0:
+				_pat = ""
+				_pat_t = randf_range(2.5, 4.0)
+			return
+		"slam_wind":
+			if _ring == null:
+				_ring = TeleRing.new()
+				_ring.radius = 44.0
+				add_child(_ring)
+			if _pat_t <= 0.0:
+				if _ring != null:
+					_ring.queue_free()
+					_ring = null
+				var hero := get_tree().get_first_node_in_group("player")
+				if hero != null and (hero.global_position - global_position).length() < 44.0:
+					hero.hurt(damage)
+				Juice.shake(3.0)
+				Juice.puff(global_position)
+				_pat = ""
+				_pat_t = randf_range(2.5, 4.0)
+			return
+		_:
+			if _pat_t <= 0.0 and dist < 150.0:
+				var r := randf()
+				if r < 0.4:
+					_pat = "charge_wind"
+					_pat_t = 0.6
+					Juice.world_text(global_position + Vector2(0, -34), "!", Color(1, 0.4, 0.3), 10)
+				elif r < 0.75:
+					_pat = "slam_wind"
+					_pat_t = 0.7
+				else:
+					_pat_t = randf_range(3.0, 5.0)
+					var parent := get_parent()
+					if parent != null:
+						for i in 2:
+							var min_e := Enemy.new()
+							parent.add_child(min_e)
+							min_e.setup("skeleton", maxi(1, level - 1))
+							min_e.global_position = global_position + Vector2(randf_range(-24, 24), randf_range(-24, 24))
+	if _tactic("boss") and _spr != null and _spr.scale == Vector2.ONE:
+		_spr.scale = Vector2(1.8, 1.8)
 	if _phase == 1 and hp < max_hp * 0.5:
 		_phase = 2
 		Juice.shake(4.0)
@@ -384,7 +445,8 @@ func take_damage(amount: int, knock_dir: Vector2 = Vector2.ZERO, crit: bool = fa
 	if knock_dir.length() > 0.1:
 		velocity += knock_dir
 		_tilt = clampf(knock_dir.x * 0.02, -0.28, 0.28)
-	Juice.damage_number(global_position + Vector2(0, -_frame_h), taken, crit)
+	if is_inside_tree():
+		Juice.damage_number(global_position + Vector2(0, -_frame_h), taken, crit)
 	if hp <= 0:
 		_die()
 	return taken
