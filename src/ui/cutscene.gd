@@ -128,16 +128,28 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed("interact") or event.is_action_pressed("attack"):
-		var full: String = I18N.tr_str(_slides[_slide]["text"])
-		if _reveal < len(full):
-			_reveal = 300.0
-		else:
-			_slide += 1
-			if _slide >= _slides.size():
-				_end()
-			else:
-				_apply_slide()
+		_advance()
 		get_viewport().set_input_as_handled()
+		return
+	# Touch parity: a tap advances the story; a tap in the top-right corner
+	# skips the whole cutscene (the Esc equivalent on a phone).
+	if event is InputEventScreenTouch and event.pressed:
+		if event.position.x > 400.0 and event.position.y < 54.0:
+			_end()
+		else:
+			_advance()
+		get_viewport().set_input_as_handled()
+
+func _advance() -> void:
+	var full: String = I18N.tr_str(_slides[_slide]["text"])
+	if _reveal < len(full):
+		_reveal = 300.0
+	else:
+		_slide += 1
+		if _slide >= _slides.size():
+			_end()
+		else:
+			_apply_slide()
 
 func _end() -> void:
 	active = false

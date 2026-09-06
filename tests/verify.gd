@@ -55,6 +55,7 @@ func run() -> void:
 	_check_perf()
 	_check_gphase()
 	await _check_people()
+	await _check_touch_story()
 	_check_quests()
 	await _check_endgame()
 	await _check_potions_talents()
@@ -3135,3 +3136,23 @@ func _check_act_card() -> void:
 	ac.queue_free()
 	QuestLog.reset_run()
 	Stats.reset_run()
+
+func _check_touch_story() -> void:
+	print("== touch story ==")
+	var cs := Cutscene.new()
+	add_child(cs)
+	await get_tree().process_frame
+	cs.play()
+	await get_tree().process_frame
+	_ok(cs.visible and cs._slides.size() > 0, "the intro cutscene plays")
+	var ev := InputEventScreenTouch.new()
+	ev.pressed = true
+	ev.position = Vector2(240, 200)
+	cs._unhandled_input(ev)
+	_ok(cs._reveal >= 300.0 or cs._slide > 0, "a raw screen tap advances the story")
+	ev.position = Vector2(460, 20)
+	cs._unhandled_input(ev)
+	_ok(not cs.visible, "and a corner tap skips the cutscene")
+	cs.queue_free()
+	await get_tree().process_frame
+

@@ -186,16 +186,11 @@ func _build() -> void:
 		bg.size = Vector2(22, 22)
 		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		chip.add_child(bg)
-		var gl := Label.new()
-		gl.text = String(d[1])
-		gl.add_theme_font_override("font", load(I18N.FONT_REGULAR_PATH))
-		gl.add_theme_font_size_override("font_size", 8)
-		gl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.8))
-		gl.position = Vector2(0, 6)
-		gl.size = Vector2(24, 12)
-		gl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		gl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		chip.add_child(gl)
+		var gi := ChipIcon.new()
+		gi.kind = String(d[0])
+		gi.size = Vector2(24, 24)
+		gi.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(gi)
 		chip.gui_input.connect(_on_chip_gui.bind(String(d[0])))
 		_root.add_child(chip)
 		_chips.append(chip)
@@ -490,3 +485,32 @@ func _refresh_text() -> void:
 	]
 	I18N.tag(_prompts)
 	I18N.tag(_biome_label)
+
+
+## Tiny drawn pixel icons for the quick chips — no keyboard glyphs on screen.
+class ChipIcon extends Control:
+	var kind := ""
+
+	func _draw() -> void:
+		match kind:
+			"use_potion":
+				draw_rect(Rect2(9, 6, 6, 3), Color(0.7, 0.62, 0.5))
+				draw_rect(Rect2(8, 9, 8, 9), Color(0.85, 0.2, 0.25))
+				draw_rect(Rect2(9, 11, 6, 2), Color(0.98, 0.45, 0.45))
+			"inventory":
+				draw_rect(Rect2(9, 6, 6, 4), Color(0.42, 0.28, 0.16))
+				draw_rect(Rect2(7, 9, 10, 9), Color(0.55, 0.38, 0.22))
+				draw_rect(Rect2(11, 12, 2, 4), Color(0.85, 0.7, 0.4))
+			"quests":
+				draw_rect(Rect2(8, 6, 8, 12), Color(0.88, 0.82, 0.66))
+				draw_rect(Rect2(9, 9, 6, 1), Color(0.35, 0.3, 0.25))
+				draw_rect(Rect2(9, 12, 6, 1), Color(0.35, 0.3, 0.25))
+				draw_rect(Rect2(9, 15, 4, 1), Color(0.35, 0.3, 0.25))
+			"map":
+				draw_rect(Rect2(6, 8, 4, 9), Color(0.33, 0.52, 0.43))
+				draw_rect(Rect2(10, 7, 4, 10), Color(0.5, 0.7, 0.55))
+				draw_rect(Rect2(14, 8, 4, 9), Color(0.33, 0.52, 0.43))
+				draw_rect(Rect2(11, 10, 2, 2), Color(0.92, 0.85, 0.6))
+			"pause":
+				draw_rect(Rect2(9, 7, 3, 10), Color(0.9, 0.9, 0.92))
+				draw_rect(Rect2(13, 7, 3, 10), Color(0.9, 0.9, 0.92))
