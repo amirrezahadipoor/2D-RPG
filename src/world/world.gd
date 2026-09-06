@@ -20,6 +20,7 @@ var terrain_layer: TileMapLayer
 var props_layer: TileMapLayer
 var shade_layer: TileMapLayer
 var edge_painter: EdgePainter
+var shadow_layer: EntityShadows
 var decals: Node2D
 var _water_cells: Array = []
 var _water_phase := 0
@@ -83,6 +84,8 @@ func apply_quality() -> void:
 		shade_layer.visible = Settings.quality != "low"
 	if decals != null:
 		decals.visible = Settings.quality != "low"
+	if shadow_layer:
+		shadow_layer.visible = Settings.quality != "low"
 	for entry in _lights:
 		entry["light"].visible = Settings.quality == "high"
 	Juice.register_world(actors)
@@ -244,6 +247,9 @@ func _build_tileset_and_layers() -> void:
 	edge_painter = EdgePainter.new()
 	edge_painter.name = "RoofEdges"
 	add_child(edge_painter)
+	shadow_layer = EntityShadows.new()
+	shadow_layer.name = "EntityShadows"
+	add_child(shadow_layer)
 	decals = Node2D.new()
 	decals.name = "Decals"
 	add_child(decals)
@@ -885,6 +891,13 @@ func _place_lights() -> void:
 
 func _process(delta: float) -> void:
 	_discover_tick(delta)
+	if shadow_layer and shadow_layer.visible:
+		var pts: Array = []
+		for g in ["player", "npc", "enemy"]:
+			for n in get_tree().get_nodes_in_group(g):
+				pts.append(n.global_position + Vector2(0, -7))
+		shadow_layer.pts = pts
+		shadow_layer.queue_redraw()
 	for entry in _lights:
 		var light: PointLight2D = entry["light"]
 		entry["phase"] += delta

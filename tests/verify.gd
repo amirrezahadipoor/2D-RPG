@@ -37,6 +37,7 @@ func run() -> void:
 	_check_edges()
 	_check_places()
 	_check_houses_art()
+	_check_shadows()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -949,6 +950,13 @@ func _check_houses_art() -> void:
 	var at_w: Vector2i = world.terrain_layer.get_cell_atlas_coords(world.window_cells[0])
 	_ok(at_w.x + at_w.y * 8 == wl, "windows glow warm at night")
 	world.set_windows_lit(false)
+
+func _check_shadows() -> void:
+	print("== entity shadows A4 ==")
+	_ok(world.shadow_layer != null, "world owns an entity-shadow layer")
+	await get_tree().process_frame
+	_ok(world.shadow_layer.pts.size() >= 2,
+		"actors cast soft ground shadows (%d)" % world.shadow_layer.pts.size())
 
 func _check_people() -> void:
 	print("== people ==")
