@@ -1,5 +1,4 @@
-# First-run touch tutorial: three swipe/tap slides that teach the gesture
-# language before the world lets go of your hand. Shown once (Settings flag).
+# First-run touch tutorial — responsive, touch-native.
 class_name Tutorial
 extends CanvasLayer
 
@@ -16,6 +15,7 @@ var _page: Label
 var _dots: Array[ColorRect] = []
 var _slide := 0
 var _open_ms := 0
+var _auto := false
 
 func _ready() -> void:
 	layer = 45
@@ -23,6 +23,7 @@ func _ready() -> void:
 	add_to_group("modal_ui")
 	_build()
 	visible = false
+	Settings.settings_changed.connect(_layout)
 
 func _build() -> void:
 	_root = Control.new()
@@ -45,21 +46,20 @@ func _build() -> void:
 	_title = _mk_label(12, Color(1, 0.86, 0.4))
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_root.add_child(_title)
-	_body = _mk_label(8, Color(0.82, 0.85, 0.95))
+	_body = _mk_label(9, Color(0.82, 0.85, 0.95))
 	_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_root.add_child(_body)
 	for i in SLIDES:
 		var d := ColorRect.new()
-		d.size = Vector2(4, 4)
+		d.size = Vector2(6, 6)
 		d.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_root.add_child(d)
 		_dots.append(d)
-	_page = _mk_label(7, Color(0.6, 0.63, 0.72))
+	_page = _mk_label(9, Color(0.6, 0.63, 0.72))
 	_page.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_root.add_child(_page)
 	_layout()
-	get_viewport().size_changed.connect(_layout)
 	I18N.locale_changed.connect(func(_l): if visible: _apply())
 
 func _mk_label(size: int, col: Color) -> Label:
@@ -67,27 +67,37 @@ func _mk_label(size: int, col: Color) -> Label:
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_font_override("font", load(I18N.FONT_REGULAR_PATH))
 	l.add_theme_color_override("font_color", col)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	l.add_theme_constant_override("outline_size", 2)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
 
 func _layout() -> void:
-	var vp := get_viewport().get_visible_rect().size
-	_panel.position = Vector2(vp.x * 0.5 - 150, vp.y * 0.5 - 90)
-	_panel.size = Vector2(300, 180)
-	_glyph.position = Vector2(vp.x * 0.5 - 40, vp.y * 0.5 - 78)
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var safe := SafeArea.get_safe_margins(vp)
+	var bars := SafeArea.get_bars(vp)
+	var base_w := 480.0
+	var base_h := 270.0
+	var usable_w := base_w - safe.x - safe.z - bars.x - bars.y
+	var pw := minf(320.0, usable_w - 20.0)
+	var ph := 180.0
+	var px := safe.x + bars.x + (usable_w - pw) * 0.5
+	var py := safe.y + (base_h - safe.y - safe.w - ph) * 0.5
+	_panel.position = Vector2(px, py)
+	_panel.size = Vector2(pw, ph)
+	_glyph.position = Vector2(px + pw * 0.5 - 40, py + 12)
 	_glyph.size = Vector2(80, 46)
-	_title.position = Vector2(vp.x * 0.5 - 140, vp.y * 0.5 - 24)
-	_title.size = Vector2(280, 16)
-	_body.position = Vector2(vp.x * 0.5 - 130, vp.y * 0.5 - 4)
-	_body.size = Vector2(260, 58)
+	_title.position = Vector2(px + 10, py + 66)
+	_title.size = Vector2(pw - 20, 16)
+	_body.position = Vector2(px + 16, py + 86)
+	_body.size = Vector2(pw - 32, 58)
 	for i in SLIDES:
-		_dots[i].position = Vector2(vp.x * 0.5 - float(SLIDES) * 4.0 + float(i) * 9.0, vp.y * 0.5 + 60)
-	_page.position = Vector2(vp.x * 0.5 - 100, vp.y * 0.5 + 70)
-	_page.size = Vector2(200, 10)
+		_dots[i].position = Vector2(px + pw * 0.5 - float(SLIDES) * 5.0 + float(i) * 11.0, py + ph - 22)
+	_page.position = Vector2(px + 10, py + ph - 14)
+	_page.size = Vector2(pw - 20, 12)
 
-var _auto := false
-
-## Open by itself as soon as the intro cutscene and any modal are done.
 func request_auto_open() -> void:
 	_auto = true
 
@@ -109,6 +119,7 @@ func open() -> void:
 	_slide = 0
 	_open_ms = Time.get_ticks_msec()
 	visible = true
+	_layout()
 	_apply()
 
 func close() -> void:
@@ -130,7 +141,6 @@ func _apply() -> void:
 		_dots[i].color = Color(1, 0.86, 0.4) if i == _slide else Color(0.35, 0.36, 0.45)
 	_draw_glyph()
 
-## Tiny vector vignettes: a finger, a swipe, a crossed sword - no art needed.
 func _draw_glyph() -> void:
 	for c in _glyph.get_children():
 		c.queue_free()
@@ -145,21 +155,21 @@ func _draw_glyph() -> void:
 	var gold := Color(1, 0.86, 0.4)
 	var grey := Color(0.7, 0.73, 0.85)
 	match _slide:
-		0:  # tap: a finger over a ring
+		0:
 			put.call(Rect2(24, 18, 32, 4), grey)
 			put.call(Rect2(38, 4, 4, 14), grey)
 			put.call(Rect2(24, 4, 4, 14), grey)
 			put.call(Rect2(24, 4, 32, 4), grey)
 			put.call(Rect2(36, 24, 8, 16), skin)
 			put.call(Rect2(34, 38, 12, 6), skin)
-		1:  # drag + flick: an arrow with a speed tail
+		1:
 			put.call(Rect2(8, 22, 44, 4), grey)
 			put.call(Rect2(52, 16, 4, 16), grey)
 			put.call(Rect2(48, 18, 4, 4), grey)
 			put.call(Rect2(56, 18, 4, 4), grey)
 			put.call(Rect2(10, 34, 10, 3), gold)
 			put.call(Rect2(24, 34, 16, 3), gold)
-		2:  # auto-combat: two crossed blades
+		2:
 			for i in 8:
 				put.call(Rect2(20 + i * 5, 8 + i * 4, 5, 4), grey)
 				put.call(Rect2(55 - i * 5, 8 + i * 4, 5, 4), grey)
@@ -167,7 +177,6 @@ func _draw_glyph() -> void:
 			put.call(Rect2(56, 40, 8, 6), gold)
 
 func advance() -> void:
-	# the tap that opens the tutorial must not instantly skip slide one
 	if Time.get_ticks_msec() - _open_ms < 250:
 		return
 	Sfx.play("click")
@@ -191,6 +200,7 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
+	# touch-only hint, keyboard kept for desktop testing only
 	if event.is_action_pressed("interact") or event.is_action_pressed("attack"):
 		advance()
 		get_viewport().set_input_as_handled()

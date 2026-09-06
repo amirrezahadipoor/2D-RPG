@@ -1,5 +1,4 @@
-# Settings overlay: master/music/sfx volumes, quality tier, language.
-# Shared by the main menu and the pause menu; values persist via Settings.
+# Settings overlay — touch-native, responsive.
 class_name SettingsUI
 extends CanvasLayer
 
@@ -9,9 +8,11 @@ enum Row { MASTER, MUSIC, SFX, QUALITY, PANSPEED, TAPRADIUS, AUTOCOMBAT, FPS, UI
 
 var _sel: int = Row.MASTER
 var _root: Control
-var _rows: Dictionary = {}      # Row -> {label: Label, value: Label}
+var _rows: Dictionary = {}
 var _panel: ColorRect
 var _handled_touch_frame := -1
+var _title: Label
+var _ver: Label
 
 func _ready() -> void:
 	layer = 40
@@ -19,9 +20,8 @@ func _ready() -> void:
 	add_to_group("modal_ui")
 	_build()
 	visible = false
-	# re-translate the rows currently on screen (the panel used to stay in the
-	# old language until reopened)
 	I18N.locale_changed.connect(func(_l): if visible: _refresh())
+	Settings.settings_changed.connect(_layout)
 
 func _build() -> void:
 	_root = Control.new()
@@ -32,14 +32,13 @@ func _build() -> void:
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.7)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(dim)
 	_panel = ColorRect.new()
 	_panel.color = Color(0.08, 0.07, 0.12, 0.97)
-	_panel.position = Vector2(110, 30)
-	_panel.size = Vector2(260, 214)
 	_root.add_child(_panel)
-	var title := _mk_label(Vector2(0, 52), 12, Color(1, 0.86, 0.4))
-	title.text = I18N.tr_str("menu.settings")
+	_title = _mk_label(Vector2.ZERO, 12, Color(1, 0.86, 0.4))
+	_title.text = I18N.tr_str("menu.settings")
 	_add_row(Row.MASTER, "settings.master", 78)
 	_add_row(Row.MUSIC, "settings.music", 96)
 	_add_row(Row.SFX, "settings.sfx", 114)
@@ -49,17 +48,47 @@ func _build() -> void:
 	_add_row(Row.AUTOCOMBAT, "settings.auto_combat", 186)
 	_add_row(Row.FPS, "settings.fps", 204)
 	_add_row(Row.UISCALE, "settings.ui_scale", 222)
-	_add_row(Row.LANGUAGE, "settings.language", 236)
-	_add_row(Row.DONE, "menu.done", 250)
-	var ver := Label.new()
-	ver.text = "v1.0.0-mobile · 2026-09-06"
-	ver.position = Vector2(0, 258)
-	ver.size = Vector2(480, 10)
-	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	ver.add_theme_font_size_override("font_size", 5)
-	ver.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))
-	_root.add_child(ver)
+	_add_row(Row.LANGUAGE, "settings.language", 240)
+	_add_row(Row.DONE, "menu.done", 258)
+	_ver = Label.new()
+	_ver.text = "v1.0.0-mobile · 2026-09-06 fixed-world 20260906"
+	_ver.size = Vector2(480, 10)
+	_ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_ver.add_theme_font_size_override("font_size", 6)
+	_ver.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))
+	_root.add_child(_ver)
+	_layout()
 	_refresh()
+
+func _layout() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var safe := SafeArea.get_safe_margins(vp)
+	var bars := SafeArea.get_bars(vp)
+	var base_w := 480.0
+	var base_h := 270.0
+	var pw := minf(300.0, base_w - safe.x - safe.z - bars.x - bars.y - 20.0)
+	var ph := minf(240.0, base_h - safe.y - safe.w - 16.0)
+	var px := safe.x + bars.x + (base_w - safe.x - safe.z - bars.x - bars.y - pw) * 0.5
+	var py := safe.y + (base_h - safe.y - safe.w - ph) * 0.5
+	_panel.position = Vector2(px, py)
+	_panel.size = Vector2(pw, ph)
+	_title.position = Vector2(px, py + 6)
+	_title.size = Vector2(pw, 14)
+	_ver.position = Vector2(px, py + ph - 10)
+	_ver.size = Vector2(pw, 10)
+	for row in _rows:
+		var r: Dictionary = _rows[row]
+		var base_y: float = float(r["base_y"])
+		# map base_y (78..258) to panel local
+		var rel := (base_y - 52.0) / 220.0
+		var y := py + 22 + rel * (ph - 40)
+		r["y"] = y
+		(r["left"] as Label).position = Vector2(px + 8, y)
+		(r["left"] as Label).size = Vector2(pw * 0.5 - 8, 16)
+		(r["value"] as Label).position = Vector2(px + pw * 0.5 + 4, y)
+		(r["value"] as Label).size = Vector2(pw * 0.5 - 8, 16)
 
 func _mk_label(pos: Vector2, size: int, col: Color) -> Label:
 	var l := Label.new()
@@ -75,11 +104,10 @@ func _mk_label(pos: Vector2, size: int, col: Color) -> Label:
 	_root.add_child(l)
 	return l
 
-func _add_row(row: Row, key: String, y: float) -> void:
+func _add_row(row: Row, key: String, base_y: float) -> void:
 	var left := Label.new()
-	left.position = Vector2(126, y)
-	left.size = Vector2(140, 14)
-	left.add_theme_font_size_override("font_size", 9)
+	left.size = Vector2(140, 16)
+	left.add_theme_font_size_override("font_size", 10)
 	left.add_theme_color_override("font_color", Color(0.85, 0.87, 1.0))
 	left.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	left.add_theme_constant_override("outline_size", 2)
@@ -87,14 +115,22 @@ func _add_row(row: Row, key: String, y: float) -> void:
 	left.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	I18N.tag(left)
 	_root.add_child(left)
-	var right := _mk_label(Vector2(0, y), 9, Color(1, 0.95, 0.7))
-	right.position = Vector2(262, y)
-	right.size = Vector2(96, 14)
-	_rows[row] = {"name": key, "left": left, "value": right, "y": y}
+	var right := Label.new()
+	right.size = Vector2(96, 16)
+	right.add_theme_font_size_override("font_size", 10)
+	right.add_theme_color_override("font_color", Color(1, 0.95, 0.7))
+	right.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+	right.add_theme_constant_override("outline_size", 2)
+	right.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	I18N.tag(right)
+	_root.add_child(right)
+	_rows[row] = {"name": key, "left": left, "value": right, "y": base_y, "base_y": base_y}
 
 func open() -> void:
 	visible = true
 	_sel = Row.MASTER
+	_layout()
 	_refresh()
 
 func close() -> void:
@@ -102,6 +138,7 @@ func close() -> void:
 	closed.emit()
 
 func _refresh() -> void:
+	_title.text = I18N.tr_str("menu.settings")
 	for row in _rows:
 		var r: Dictionary = _rows[row]
 		var value: Label = r["value"]
@@ -131,8 +168,7 @@ func _refresh() -> void:
 				value.text = ""
 		var is_sel := int(row) == _sel
 		var name_text: String = I18N.tr_str(r["name"])
-		left.text = ("« " + name_text + " »") if is_sel and I18N.is_rtl() \
-			else ("> " + name_text if is_sel else name_text)
+		left.text = ("« " + name_text + " »") if is_sel and I18N.is_rtl() else ("> " + name_text if is_sel else name_text)
 		I18N.tag(left)
 		I18N.tag(value)
 		var col: Color = Color(1, 0.95, 0.7) if is_sel else Color(0.75, 0.78, 0.9)
@@ -142,10 +178,6 @@ func _bar(v: float) -> String:
 	var filled := int(round(v * 10.0))
 	return "[" + "|".repeat(filled) + ".".repeat(10 - filled) + "] %d%%" % int(v * 100.0)
 
-# ------------------------------------------------------------ pointer -------
-## Touch/mouse control for the rows: tap a row to select it; tapping the value
-## column scrubs volumes directly, and LANGUAGE / QUALITY / DONE act on tap.
-## (Keyboard arrows keep working for the desktop/gamepad path.)
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
@@ -167,13 +199,13 @@ func _row_at(canvas_y: float) -> int:
 	var best_d := 1e9
 	for row in _rows:
 		var r: Dictionary = _rows[row]
-		var d := absf(float(r["y"]) + 7.0 - canvas_y)
+		var d := absf(float(r["y"]) + 8.0 - canvas_y)
 		if d < best_d:
 			best_d = d
 			best = int(row)
-	# only when the tap actually lands on the panel body
-	if canvas_y < 70.0 or canvas_y > 240.0:
-		return -1
+	if _panel != null:
+		if canvas_y < _panel.position.y + 16 or canvas_y > _panel.position.y + _panel.size.y - 4:
+			return -1
 	return best
 
 func _pointer_press(event_pos: Vector2) -> void:
@@ -183,18 +215,19 @@ func _pointer_press(event_pos: Vector2) -> void:
 		return
 	_sel = row
 	_refresh()
-	# volume rows scrub on the value column; everything else acts on tap
 	if row in [Row.DONE, Row.LANGUAGE, Row.QUALITY, Row.AUTOCOMBAT, Row.FPS, Row.UISCALE]:
 		Sfx.play("click")
 		_activate()
-	elif p.x >= 258.0:
+	elif _panel != null and p.x >= _panel.position.x + _panel.size.x * 0.5:
 		Sfx.play("click", -12.0, 0.02)
 		_scrub_value(p.x)
 	else:
 		Sfx.play("click", -14.0, 0.02)
 
 func _scrub_value(x: float) -> void:
-	var target := clampf((x - 258.0) / 100.0, 0.0, 1.0)
+	if _panel == null:
+		return
+	var target := clampf((x - (_panel.position.x + _panel.size.x * 0.5)) / (_panel.size.x * 0.5), 0.0, 1.0)
 	match _sel:
 		Row.MASTER:
 			Settings.set_master(target)
@@ -256,19 +289,11 @@ func _adjust(dir: int) -> void:
 		Row.FPS:
 			Settings.set_fps_cap(30 if Settings.fps_cap == 60 else 60)
 			Sfx.play("click")
-			_refresh()
 		Row.UISCALE:
 			Settings.set_ui_scale(Settings.ui_scale + 0.15 if Settings.ui_scale < 1.5 else 1.0)
 			Sfx.play("click")
-			_refresh()
 		Row.AUTOCOMBAT:
 			Settings.set_auto_combat(not Settings.auto_combat)
-			Sfx.play("click")
-		Row.FPS:
-			Settings.set_fps_cap(30 if Settings.fps_cap == 60 else 60)
-			Sfx.play("click")
-		Row.UISCALE:
-			Settings.set_ui_scale(1.0 if Settings.ui_scale > 1.2 else 1.3)
 			Sfx.play("click")
 		Row.LANGUAGE:
 			I18N.toggle_locale()
@@ -288,6 +313,14 @@ func _activate() -> void:
 			_refresh()
 		Row.AUTOCOMBAT:
 			Settings.set_auto_combat(not Settings.auto_combat)
+			Sfx.play("click")
+			_refresh()
+		Row.FPS:
+			Settings.set_fps_cap(30 if Settings.fps_cap == 60 else 60)
+			Sfx.play("click")
+			_refresh()
+		Row.UISCALE:
+			Settings.set_ui_scale(1.0 if Settings.ui_scale > 1.2 else 1.3)
 			Sfx.play("click")
 			_refresh()
 		Row.DONE:

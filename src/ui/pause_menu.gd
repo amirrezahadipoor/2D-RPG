@@ -1,10 +1,9 @@
-# Pause overlay (Esc): resume, settings, save & quit to menu.
-# Rides the Game state machine — PAUSED shows it, anything else hides it.
+# Pause overlay — touch-native, responsive.
 class_name PauseMenu
 extends CanvasLayer
 
-const ROW_FIRST_Y := 116.0
-const ROW_STEP_Y := 18.0
+const ROW_FIRST_Y := 110.0
+const ROW_STEP_Y := 28.0
 
 var _sel := 0
 var _root: Control
@@ -21,6 +20,7 @@ func _ready() -> void:
 	visible = false
 	Game.state_changed.connect(_on_state)
 	I18N.locale_changed.connect(func(_l): if visible: _rebuild())
+	Settings.settings_changed.connect(func(): if visible: _rebuild())
 
 func _on_state(next_state: int, _old: int) -> void:
 	var show_it := next_state == Game.State.PAUSED
@@ -48,19 +48,23 @@ func _rebuild() -> void:
 		if child is Label:
 			child.queue_free()
 	_items.clear()
-	var title := _mk_label(Vector2(0, 70), 14, Color(1, 0.86, 0.4))
+	var safe := SafeArea.get_safe_margins(get_viewport()) if get_viewport() != null else Vector4.ZERO
+	var bars := SafeArea.get_bars(get_viewport()) if get_viewport() != null else Vector2.ZERO
+	var base_w := 480.0
+	var usable_w := base_w - safe.x - safe.z - bars.x - bars.y
+	var title := _mk_label(Vector2(safe.x + bars.x, 66 + safe.y), 14, Color(1, 0.86, 0.4), usable_w)
 	title.text = I18N.tr_str("menu.paused")
-	_clock = _mk_label(Vector2(0, 92), 8, Color(0.7, 0.75, 0.95))
+	_clock = _mk_label(Vector2(safe.x + bars.x, 88 + safe.y), 9, Color(0.7, 0.75, 0.95), usable_w)
 	_clock.text = "%s  |  %s" % [I18N.tr_str("hud.day"), Game.formatted_playtime()]
-	_add_item("menu.resume", 116, func(): Game.change_state(Game.State.PLAYING))
-	_add_item("menu.settings", 134, _open_settings)
-	_add_item("menu.save_quit", 152, _save_quit)
+	_add_item("menu.resume", ROW_FIRST_Y + safe.y, func(): Game.change_state(Game.State.PLAYING), usable_w, safe.x + bars.x)
+	_add_item("menu.settings", ROW_FIRST_Y + ROW_STEP_Y + safe.y, _open_settings, usable_w, safe.x + bars.x)
+	_add_item("menu.save_quit", ROW_FIRST_Y + ROW_STEP_Y * 2 + safe.y, _save_quit, usable_w, safe.x + bars.x)
 	_refresh()
 
-func _mk_label(pos: Vector2, size: int, col: Color) -> Label:
+func _mk_label(pos: Vector2, size: int, col: Color, w: float = 480.0) -> Label:
 	var l := Label.new()
 	l.position = pos
-	l.size = Vector2(480, size + 6)
+	l.size = Vector2(w, size + 6)
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", col)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
@@ -71,10 +75,10 @@ func _mk_label(pos: Vector2, size: int, col: Color) -> Label:
 	_root.add_child(l)
 	return l
 
-func _add_item(key: String, y: float, action: Callable) -> void:
-	var l := _mk_label(Vector2(0, y), 10, Color(0.9, 0.91, 1.0))
+func _add_item(key: String, y: float, action: Callable, w: float = 480.0, x_off: float = 0.0) -> void:
+	var l := _mk_label(Vector2(x_off, y), 11, Color(0.9, 0.91, 1.0), w)
 	l.text = I18N.tr_str(key)
-	_items.append({"label": l, "action": action, "key": key})
+	_items.append({"label": l, "action": action, "key": key, "y": y})
 
 func _refresh() -> void:
 	for i in _items.size():
@@ -86,10 +90,6 @@ func _refresh() -> void:
 		l.text = text
 		I18N.tag(l)
 
-# ------------------------------------------------------------ pointer -------
-## Same touch/mouse treatment as the title screen: taps select + activate a
-## row directly, hover follows the mouse. Previously the pause menu only read
-## keyboard actions, so it was unreachable on Android.
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
@@ -112,12 +112,20 @@ func _canvas_y(event_pos: Vector2) -> float:
 	return (inv * event_pos).y
 
 func _row_at(canvas_y: float) -> int:
-	var idx := int(floor((canvas_y - ROW_FIRST_Y) / ROW_STEP_Y))
+	var vp := get_viewport()
+	var safe_y := 0.0
+	if vp != null:
+		safe_y = SafeArea.get_safe_margins(vp).y
+	var idx := int(floor((canvas_y - safe_y - ROW_FIRST_Y) / ROW_STEP_Y))
 	return clampi(idx, 0, _items.size() - 1)
 
 func _pointer_hover(event_pos: Vector2) -> void:
 	var cy := _canvas_y(event_pos)
-	if cy < ROW_FIRST_Y - 4.0 or cy > ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 2.0:
+	var vp := get_viewport()
+	var safe_y := 0.0
+	if vp != null:
+		safe_y = SafeArea.get_safe_margins(vp).y
+	if cy < safe_y + ROW_FIRST_Y - 6.0 or cy > safe_y + ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 4.0:
 		return
 	var idx := _row_at(cy)
 	if idx != _sel:
@@ -126,7 +134,11 @@ func _pointer_hover(event_pos: Vector2) -> void:
 
 func _pointer_press(event_pos: Vector2) -> void:
 	var cy := _canvas_y(event_pos)
-	if cy < ROW_FIRST_Y - 4.0 or cy > ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 2.0:
+	var vp := get_viewport()
+	var safe_y := 0.0
+	if vp != null:
+		safe_y = SafeArea.get_safe_margins(vp).y
+	if cy < safe_y + ROW_FIRST_Y - 6.0 or cy > safe_y + ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 4.0:
 		return
 	var idx := _row_at(cy)
 	_sel = idx
@@ -138,7 +150,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
 	if settings_ui != null and settings_ui.visible:
-		return   # settings swallows input while open
+		return
 	if event.is_action_pressed("move_up") or event.is_action_pressed("move_down"):
 		var dir := 1 if event.is_action_pressed("move_down") else -1
 		_sel = (_sel + dir + _items.size()) % _items.size()
