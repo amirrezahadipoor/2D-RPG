@@ -103,11 +103,20 @@ docs/                    audit of the previous build, screenshots
 - Code: MIT (see `LICENSE`).
 - Vazirmatn font: SIL Open Font License 1.1 (see `assets/fonts/OFL-Vazirmatn.txt`).
 
+### The world is fixed, not re-rolled per run
+The overworld uses one hard-coded seed (`FIXED_WORLD_SEED = 20260906` in both
+`src/world/world.gd` and `src/autoload/game.gd`): every new adventure/hardcore
+run loads the exact same 384×256 layout of biomes, settlements, dungeons and
+landmarks. Starting a new run only resets the hero's stats, bag and position —
+it never regenerates the map. This is deliberate (players can share routes,
+screenshots and dungeon knowledge across runs) and is enforced by
+`tests/verify.gd`, not just by convention.
+
 ### M4 addendum — dungeons & shops
-Press [E] on cave stairs to descend. Each depth is a fresh seeded layout of
-rooms and corridors, lit only by torches and your lantern; depth 3 ends in a
-dragon. Merchants now open a shop page in dialogue (W/S to select, E to buy,
-K to leave): health potions 25 G, greater potions 60 G, and one seeded
+Tap cave stairs to descend. Each depth is a fresh seeded layout of rooms and
+corridors, lit only by torches and your lantern; depth 3 ends in a dragon.
+Merchants open a shop page in dialogue: tap a row to select it, tap the same
+row again to buy — health potions 25 G, greater potions 60 G, and one seeded
 equipment piece priced by rarity.
 
 ### Feel & bestiary addendum
@@ -134,8 +143,12 @@ checkpoint*; hardcore death deletes the save for good.
 - **Screens**: animated night-sky main menu (continue / adventure / hardcore /
   settings / quit), Esc pause menu with save-&-quit, and a settings overlay
   with volume bars, quality tier and EN/FA language — all persisted.
-- **Touch**: virtual stick + A/K/E/H/pause buttons on Android, translated into
-  the same input actions the keyboard uses.
+- **Touch-only, no virtual stick or on-screen buttons**: tap the ground to
+  walk, tap an NPC/chest/prompt to interact, drag to look around, flick to
+  dodge — foes in range are auto-fought. Every menu (inventory, shop, journal,
+  talents, map, settings) is driven purely by tap/double-tap/long-press/drag;
+  keyboard input only survives as a parallel path for desktop testing and is
+  never shown in any on-screen hint.
 - **Quality tiers**: low/medium/high trade contact shadows, point lights,
   dungeon dim and vignette for framerate on weak phones.
 - **Release**: `tools/release.sh` gates on verify, stamps versions and prints

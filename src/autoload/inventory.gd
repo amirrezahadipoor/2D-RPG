@@ -33,6 +33,12 @@ func deserialize(data: Dictionary) -> void:
 	equipment_changed.emit()
 
 ## Next relic the hero has not claimed yet (secret chests and the dragon).
+## Once all three are claimed, returns an empty dictionary: secret chests
+## used to fall back to a free greater_health_potion forever, which let
+## players farm unlimited potions by leaving and re-entering a dungeon
+## (depths regenerate deterministically from world_seed, so every re-entry
+## respawns the same secret chest). Now a claimed-out secret chest pays only
+## its bonus gold, same as any other empty chest.
 func claim_artifact() -> Dictionary:
 	for aid in ItemDB.ARTIFACTS:
 		if not artifacts_found.has(aid):
@@ -40,8 +46,7 @@ func claim_artifact() -> Dictionary:
 			return {"id": aid, "slot": "accessory", "rarity": 4, "prefix": "",
 				"suffix": "", "dmg": 0, "armor": ItemDB.armor_of(aid),
 				"weight": ItemDB.weight_of(aid), "qty": 1}
-	return {"id": "greater_health_potion", "slot": "", "rarity": 0, "prefix": "",
-		"suffix": "", "dmg": 0, "armor": 0, "weight": 1, "qty": 1}
+	return {}
 
 func reset_run() -> void:
 	artifacts_found = []

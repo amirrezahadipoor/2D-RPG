@@ -64,12 +64,15 @@ func open() -> void:
 	var parent := get_parent()
 	if secret:
 		var relic := Inventory.claim_artifact()
-		var rp := Pickup.new()
-		parent.add_child(rp)
-		rp.setup(relic)
-		rp.global_position = global_position + Vector2(0, -14)
-		Juice.world_text(global_position + Vector2(0, -34),
-			ItemDB.name_of(relic["id"]), Color(1.0, 0.85, 0.3), 9)
+		# every relic already claimed this run: no infinite potion farm,
+		# the bonus gold above is the whole reward
+		if not relic.is_empty():
+			var rp := Pickup.new()
+			parent.add_child(rp)
+			rp.setup(relic)
+			rp.global_position = global_position + Vector2(0, -14)
+			Juice.world_text(global_position + Vector2(0, -34),
+				ItemDB.name_of(relic["id"]), Color(1.0, 0.85, 0.3), 9)
 	if parent == null:
 		return
 	for i in _rng.randi_range(2, 3):

@@ -1748,11 +1748,30 @@ func _check_secrets() -> void:
 		ids.append(str(Inventory.claim_artifact()["id"]))
 	_ok(ids == ItemDB.ARTIFACTS, "three unique relics, claimed once each")
 	var fourth := Inventory.claim_artifact()
-	_ok(str(fourth["id"]) == "greater_health_potion", "no fourth relic: fallback brew")
+	_ok(fourth.is_empty(), "no fourth relic: empty, not an infinite potion farm")
 	var gear := {"weapon": "iron_sword", "accessory": "amulet_of_depths"}
 	var plain := {"weapon": "iron_sword", "accessory": "red_cloak"}
 	_ok(ItemDB.attack_power(gear) == ItemDB.attack_power(plain) + 3 - 0
 		or ItemDB.attack_power(gear) > ItemDB.attack_power(plain), "relics carry attack power")
+
+	# BUG-6.2: a claimed-out secret chest must not spawn a relic pickup
+	# (the old fallback handed out a free greater_health_potion forever,
+	# an infinite-farm exploit since dungeons regenerate deterministically).
+	# Ordinary loot pickups (the 2-3 random items every chest drops) are
+	# unaffected -- only the artifact-specific pickup must disappear.
+	var farm_chest := Chest.new()
+	world.actors.add_child(farm_chest)
+	farm_chest.secret = true
+	farm_chest.global_position = Vector2(2300, 2300)
+	var before_gold := Stats.gold
+	farm_chest.open()
+	var spawned_relic := false
+	for c in world.actors.get_children():
+		if c is Pickup and c.global_position.distance_to(farm_chest.global_position + Vector2(0, -14)) < 1.0:
+			spawned_relic = true
+	_ok(not spawned_relic, "a claimed-out secret chest spawns no relic pickup")
+	_ok(Stats.gold > before_gold, "but still pays its bonus gold")
+	farm_chest.queue_free()
 	Inventory.reset_run()
 
 # ------------------------------------------------------------ monster AI ----

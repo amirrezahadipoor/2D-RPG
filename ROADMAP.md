@@ -43,11 +43,11 @@
 - [x] 3.1 `src/world/world.gd`: seed ثابت `FIXED_WORLD_SEED = 20260906` — همه نیوگیم‌ها همان دنیا، نه `randi()` — `forced_seed` همیشه FIXED، `nearest_walkable` null برمی‌گرداند نه آب، `nearest_walkable_or_same` اضافه
 - [x] 3.2 `src/autoload/game.gd`: `saved_world_seed` همیشه FIXED، `start_new_run` دنیا را دوباره نسازد، فقط hero pos ریست — `FIXED_WORLD_SEED=20260906` const + legacy save -1 → FIXED
 - [x] 3.3 `src/main.gd`: `forced_seed` همیشه FIXED، تست 6 seed قدیمی حذف → تست walkable روی FIXED — `world.forced_seed = FIXED` در new و load
-- [ ] 3.4 مستندسازی در README: "جهان یک بار چیده شده، persistent" — هنوز مانده
+- [x] 3.4 مستندسازی در README: "جهان یک بار چیده شده، persistent" — بخش جدید «The world is fixed, not re-rolled per run» اضافه شد + بخش M4/touch بازنویسی شد تا دیگر از کنترل‌های کیبوردی/virtual-stick قدیمی حرف نزند
 
 ## فاز 4 — تاچ هسته‌ای (BUG-101 تا BUG-106)
 - [x] 4.1 `src/ui/touch_ui.gd`: مولتی‌تاچ — لیست انگشت‌ها، نه تک `_index` — هندل CANCEL، گیر پن فیکس — P0 پوش شد
-- [ ] 4.2 `src/ui/touch_ui.gd`: آستانه‌ها قابل تنظیم — `TAP_MOVE 9→12`, `PAN_START 12→14`, `FLICK_SPEED 600→400` + تست windowed — مانده برای P3
+- [x] 4.2 `src/ui/touch_ui.gd`: آستانه‌ها در کامیت P0 (`6aa903e`) اصلاح شدند (`TAP_MOVE 9→14`, `PAN_START 12→16`, `FLICK_SPEED 600→900` — مقادیر نهایی کمی متفاوت از پیش‌بینی اولیهٔ نقشه‌راه، بعد از تست واقعی روی صفحهٔ 20:9)؛ `_check_touch_quality()` در `tests/verify.gd` این رفتار تپ/درگ/فلیک را هم در حالت هدلس و هم ویندویید (1920×1080 واقعی Xvfb) پوشش می‌دهد — هر دو در 568/568 پاس می‌شوند
 - [x] 4.3 `src/entities/hero.gd`: `nearest_walkable` اگر walkable پیدا نشد null برگردان → `command_tap` لغو، نه گیر در آب + `_stuck_t` بهبود — water null fix + blocked toast
 - [x] 4.4 `src/entities/hero.gd`: `_tap_target` بهینه — اول نزدیک‌ترین 60px چک، نه کل گروه‌ها هر تپ (پرف) — با `tap_radius` + `_is_touch_device()` جدا
 - [x] 4.5 `src/ui/dialogue.gd`: `_shop_tap` ارتفاع ردیف 11→18px، hitbox بزرگ، دو تپ برای خرید نگه دار — responsive + Vector2 typed p fix
@@ -59,11 +59,11 @@
 - [x] 5.2 `src/ui/inventory_screen.gd`, `dialogue.gd`, `talents_ui.gd`: originها درصد + clamp با safe area — inventory 44px, dialogue safe-area, talents 260x160 centered, craft 32px
 - [x] 5.3 `src/main.gd`: `_apply_ui_scale` با `keep` سازگار — scale CanvasLayer نه Control، جلوگیری overflow
 - [x] 5.4 `src/ui/hud.gd`: `_update_safe` برای همه منوها، نه فقط HUD — تابع مشترک در `src/ui/safe_area.gd` جدید — `get_safe_margins()` + `get_bars()` helper، همه UI ها استفاده می‌کنند: pause, settings, act_card, tutorial, map, journal, cutscene
-- [ ] 5.5 `src/world/world.gd`: cull بر اساس `vp` و `zoom`، نه ثابت 520px — `cull_dist = 520 * ui_scale * (vp.x/480)` — مانده
+- [x] 5.5 `src/world/world.gd`: بررسی شد که این آیتم عملاً با فیکس دیگری در همین فاز حل شده — قبل از P0، `window/stretch/aspect` روی `"expand"` بود (ناحیهٔ دیدهٔ دنیا واقعاً با پهنای صفحه رشد می‌کرد، پس یک `cull_dist` ثابت می‌توانست روی صفحه‌های خیلی پهن کوتاه بیفتد)؛ کامیت P0 (`626e853`) این را به `"keep"` تغییر داد که یعنی حالا ناحیهٔ ۴۸۰×۲۷۰ نویسنده‌شده روی هر دستگاهی letterbox می‌شود و اندازهٔ دیدهٔ دنیا (با `cam.zoom=2.5` ثابت) دیگر به viewport واقعی دستگاه بستگی ندارد. نیم‌قطر واقعی دید ≈۱۱۰px دنیا در برابر شعاع cull ۵۲۰px یعنی حاشیهٔ اطمینان ~4.7 برابر — کافی و صحیح برای طراحی فعلی؛ فرمول پویا دیگر لازم نیست چون فرضش (رشد ناحیهٔ دید با صفحه) دیگر برقرار نیست. تست `_check_gphase` («far actors stop drawing (cull at 520px)») هم در ۵۶۸/۵۶۸ پاس است.
 
 ## فاز 6 — گیم‌پلی و پایداری (BUG-301 تا BUG-504)
 - [x] 6.1 `src/entities/mine_node.gd`, `fish_spot.gd`: offset تعامل 24px، اگر walkable دور بود 24px نزدیک‌تر — hero command_tap nearest_walkable 12px + offset fallback
-- [ ] 6.2 `src/entities/chest.gd`: secret فارم فیکس — بعد از 3 relic، secret chest فقط gold، نه potion بی‌نهایت — مانده
+- [x] 6.2 `src/entities/chest.gd` + `src/autoload/inventory.gd`: باگ فارم واقعی پیدا و رفع شد — `Inventory.claim_artifact()` بعد از تمام‌شدن هر ۳ relic به‌جای دیکشنری خالی، همیشه یک `greater_health_potion` رایگان برمی‌گرداند؛ چون دانجن‌ها از `world_seed` قطعی دوباره ساخته می‌شوند، خروج و ورود مجدد به یک دانجن یعنی همان صندوق مخفی دوباره ظاهر می‌شود → فارم بی‌نهایت پوشن. حالا `claim_artifact()` دیکشنری خالی برمی‌گرداند و `chest.gd` وقتی خالی بود هیچ pickup‌ی اسپان نمی‌کند (فقط طلای پاداش را می‌دهد که از قبل جدا حساب می‌شد). دو تست جدید در `tests/verify.gd` این را تأیید می‌کنند (۵۷۰/۵۷۰ الان).
 - [x] 6.3 `src/entities/enemy.gd`: `_alert_pack` spatial — فقط دشمنان داخل 120px چک، نه کل گروه — throttle 500ms + distance_squared_to + early-out WANDER only
 - [ ] 6.4 `src/autoload/settings.gd`: `auto_quality_tick` میانگین متحرک 5 فریم، نه تک فریم — مانده
 - [ ] 6.5 `src/entities/projectile.gd`: `_owner_node` fallback به `world` از group، نه parent chain که در Interior null میشه — مانده
