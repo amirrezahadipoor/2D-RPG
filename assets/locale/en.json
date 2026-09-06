@@ -279,5 +279,14 @@
  "poi.sign.0": "West: the old town. East: worse.",
  "poi.sign.1": "Wolves ate the last cart. Walk fast.",
  "poi.sign.2": "Shrine ahead: pray once, it remembers.",
- "poi.sign.3": "Bandits camp where the road bends. Their chests travel light."
+ "poi.sign.3": "Bandits camp where the road bends. Their chests travel light.",
+ "toast.discovered": "Discovered: %s",
+ "place.0": "Alderfen",
+ "place.1": "Brinhollow",
+ "place.2": "Cinderford",
+ "place.3": "Duskmoor",
+ "place.4": "Eastwatch",
+ "place.5": "Ferngrace",
+ "place.6": "Galecrest",
+ "place.7": "Hollowmere"
 }

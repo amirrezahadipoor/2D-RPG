@@ -35,6 +35,7 @@ func run() -> void:
 	await _check_houses()
 	await _check_pois()
 	_check_edges()
+	_check_places()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -906,6 +907,22 @@ func _check_edges() -> void:
 	_ok(d.edge_painter != null and d.edge_painter.edges.size() >= 50,
 		"dungeon walls carry lantern rims (%d accents)" % d.edge_painter.edges.size())
 	d.queue_free()
+
+func _check_places() -> void:
+	print("== places & discovery ==")
+	_ok(world.settlements.size() == world.discovered.size(), "every settlement has a discovery flag")
+	for st in world.settlements:
+		_ok(I18N.tr_str(st["name_key"]) != st["name_key"], "settlement has a name: %s" % st["name_key"])
+	var target: int = -1
+	for i in world.settlements.size():
+		if not world.discovered[i]:
+			target = i
+			break
+	if target >= 0:
+		var r: Rect2i = world.settlements[target]["rect"]
+		world.hero.global_position = Vector2(r.position.x * 16.0 + 8.0, r.position.y * 16.0 + 8.0)
+		await get_tree().create_timer(0.8).timeout
+		_ok(bool(world.discovered[target]), "walking in discovers %s" % world.settlements[target]["name_key"])
 
 func _check_people() -> void:
 	print("== people ==")

@@ -59,6 +59,9 @@ func build(seed_value: int) -> void:
 	_spawn_npcs()
 	_place_chests()
 	_place_pois()
+	discovered.clear()
+	for i in settlements.size():
+		discovered.append(false)
 	_place_cave_entrance()
 	_place_house_doors()
 	_paint_shade()
@@ -162,6 +165,7 @@ func _place_settlements() -> void:
 				"rect": rect,
 				"plaza": Vector2i(x0 + w / 2, y0 + h / 2),
 				"index": settlements.size(),
+				"name_key": "place.%d" % ((settlements.size() * 3 + 1) % 8),
 			})
 			for yy in range(y0, y0 + h):
 				for xx in range(x0, x0 + w):
@@ -494,8 +498,26 @@ func is_walkable_at(world_pos: Vector2) -> bool:
 	var prop := _prop_at(biome, t.x, t.y)
 	return prop == "" or not SOLID_PROPS.has(prop)
 
-## Readable silhouettes: eave shadow under every roof edge, a light kiss on
-## the top edge, dark rims on the sides (Phase 3.4).
+## Walking into a settlement's outskirts discovers it: a toast names the
+## place and the map starts showing its label (Phase 4.1).
+func _discover_tick(delta: float) -> void:
+	_discover_t -= delta
+	if _discover_t > 0.0:
+		return
+	_discover_t = 0.4
+	if hero == null or not is_instance_valid(hero):
+		return
+	var ht := Vector2i(int(hero.global_position.x / 16.0), int(hero.global_position.y / 16.0))
+	for i in settlements.size():
+		if discovered[i]:
+			continue
+		var r: Rect2i = settlements[i]["rect"]
+		if r.grow(5).has_point(ht):
+			discovered[i] = true
+			var hud := get_tree().get_first_node_in_group("hud")
+			if hud != null and hud.has_method("show_toast"):
+				hud.show_toast(I18N.tr_str("toast.discovered") % I18N.tr_str(settlements[i]["name_key"]))
+
 func _paint_roof_edges() -> void:
 	edge_painter.edges.clear()
 	var roof: int = ArtIndex.TERRAIN_INDEX["roof"]
@@ -637,6 +659,8 @@ func _place_chests() -> void:
 ## Points of interest on the roads between settlements: shrines, camps and
 ## signposts, so the open world has beats between the towns (Phase 3.3).
 var pois: Array = []   # [{type: String, pos: Vector2}]
+var discovered: Array = []   # per-settlement bool: hero has reached it
+var _discover_t := 0.0
 
 func _place_pois() -> void:
 	pois.clear()
@@ -828,6 +852,7 @@ func _place_lights() -> void:
 		placed += 1
 
 func _process(delta: float) -> void:
+	_discover_tick(delta)
 	for entry in _lights:
 		var light: PointLight2D = entry["light"]
 		entry["phase"] += delta

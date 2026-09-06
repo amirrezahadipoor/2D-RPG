@@ -24,6 +24,7 @@ var _map_tex: TextureRect
 var _hero_dot: ColorRect
 var _obj_dot: ColorRect
 var _markers: Array = []          # [sett_index, ColorRect, map_local]
+var _name_lbls: Array = []        # [sett_index, Label, map_local]
 var _hero_local := Vector2.ZERO
 var _obj_local := Vector2.ZERO
 var _baked_seed := -1
@@ -187,6 +188,13 @@ func _apply_view() -> void:
 	for m in _markers:
 		if is_instance_valid(m[1]):
 			(m[1] as ColorRect).position = (m[2] as Vector2) * zoom - _off - (m[1] as ColorRect).size * 0.5
+	for nl in _name_lbls:
+		if is_instance_valid(nl[1]):
+			var li: int = int(nl[0])
+			var seen: bool = li < world.discovered.size() and bool(world.discovered[li])
+			(nl[1] as Label).visible = seen
+			if seen:
+				(nl[1] as Label).position = (nl[2] as Vector2) * zoom - _off + Vector2(5, -3)
 	_zoom_lbl.text = "x2" if zoom > ZOOM_FIT else "x1"
 
 # ------------------------------------------------------------- baking -------
@@ -229,11 +237,25 @@ func _place_markers() -> void:
 		if is_instance_valid(m[1]):
 			m[1].free()
 	_markers.clear()
+	for nl in _name_lbls:
+		if is_instance_valid(nl[1]):
+			nl[1].free()
+	_name_lbls.clear()
 	for st in world.settlements:
 		var col := Color(0.95, 0.85, 0.45) if st["type"] == "town" else Color(0.9, 0.8, 0.6)
 		var d := _dot(col, 3 if st["type"] == "village" else 5)
 		var plaza := Vector2(st["plaza"].x * 16.0 + 8.0, st["plaza"].y * 16.0 + 8.0)
 		_markers.append([int(st["index"]), d, _to_local(plaza)])
+		var lb := Label.new()
+		lb.add_theme_font_size_override("font_size", 6)
+		lb.add_theme_font_override("font", load(I18N.FONT_REGULAR_PATH))
+		lb.add_theme_color_override("font_color", Color(0.95, 0.9, 0.7, 0.85))
+		lb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+		lb.add_theme_constant_override("outline_size", 2)
+		lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lb.text = I18N.tr_str(st.get("name_key", "place.0"))
+		_clip.add_child(lb)
+		_name_lbls.append([int(st["index"]), lb, _to_local(plaza)])
 	for p in world.pois:
 		var col := Color(0.4, 0.95, 1.0)
 		var sz := 2
