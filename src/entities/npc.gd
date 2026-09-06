@@ -70,16 +70,34 @@ func setup(role_str: String, settlement: Dictionary, index: int) -> void:
 ## Where this person wants to be at a given hour of the day.
 ## Small personal offset so crowds do not stack on a single pixel.
 func _personal_offset() -> Vector2:
-	return Vector2(float(npc_index % 5) * 7.0 - 14.0, float(npc_index / 5) * 6.0 - 9.0)
+	# a 7x4 personal grid (~63x32px) so a whole crowd never stacks on one spot
+	return Vector2(float(npc_index % 7) * 9.0 - 27.0, float(npc_index / 7) * 8.0 - 12.0)
+
+## Personal space: without this the whole crowd converges on the same
+## schedule point and stacks into one blob of overlapping pixels.
+func _separation() -> Vector2:
+	var push := Vector2.ZERO
+	for node in get_tree().get_nodes_in_group("npc"):
+		if node == self:
+			continue
+		var d := global_position - (node as Node2D).global_position
+		var l := d.length()
+		if l > 0.001 and l < 12.0:
+			push += d / l * (12.0 - l)
+	return push * 6.0
 
 func schedule_target(hour: int) -> Vector2:
+	# guards stay on plaza duty all day (this used to be dead code below the
+	# hour match, so it never ran - audit phase 3.1)
+	if role == Role.GUARD and hour >= 6 and hour <= 20:
+		return plaza + _personal_offset()
 	match hour:
 		0, 1, 2, 3, 4, 5:
 			return home                      # asleep at home
 		6, 7:
 			return plaza + _personal_offset()
 		8, 9, 10, 11:
-			return field if role == Role.VILLAGER else plaza
+			return field if role == Role.VILLAGER else plaza + _personal_offset()
 		12, 13:
 			return plaza + Vector2(32, 0) + _personal_offset()
 		14, 15, 16, 17:
@@ -88,10 +106,6 @@ func schedule_target(hour: int) -> Vector2:
 			return plaza + Vector2(-24, 8) + _personal_offset()
 		_:
 			return home
-	match role:
-		Role.GUARD:
-			return plaza                     # guards stay on duty
-	return home
 
 var _bob_t := 0.0
 
@@ -117,6 +131,7 @@ func _physics_process(delta: float) -> void:
 				velocity = velocity.rotated(PI * 0.5)
 			_stuck_timer = 0.0
 			_last_pos = global_position
+		velocity += _separation() * delta
 		move_and_slide()
 		anim_time += delta * 9.0
 		doll.play(facing, "walk", int(anim_time))

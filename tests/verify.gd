@@ -820,6 +820,24 @@ func _check_people() -> void:
 		roles[n.role_name] = true
 	_ok(roles.has("elder") and roles.has("merchant") and roles.has("guard"),
 		"role variety: elder/merchant/guard present")
+	# crowd personal space: at lunch everyone gathers, nobody may stack
+	Game.game_minutes = float(Game.day()) * 1440.0 + 12.0 * 60.0
+	for i in 240:
+		await get_tree().physics_frame
+	var town_npcs := []
+	for n in world.npcs:
+		if int(n.sett_index) == int(world.settlements[0]["index"]):
+			town_npcs.append(n)
+	var min_gap := 1e9
+	for i in town_npcs.size():
+		for j in range(i + 1, town_npcs.size()):
+			min_gap = minf(min_gap, (town_npcs[i].global_position - town_npcs[j].global_position).length())
+	_ok(min_gap >= 4.0, "crowd keeps personal space at lunch (min gap %.1fpx)" % min_gap)
+	var guard_ok := true
+	for n in town_npcs:
+		if n.role_name == "guard" and n.global_position.distance_to(n.plaza) > 60.0:
+			guard_ok = false
+	_ok(guard_ok, "guards stay on plaza duty during the day")
 	# the realm has exactly one crowned king, living in the town's palace
 	var towns := 0
 	for st in world.settlements:
