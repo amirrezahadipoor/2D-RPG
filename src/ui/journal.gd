@@ -97,11 +97,17 @@ var _drag_y := 0.0
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
-	# keyboard kept for desktop testing but hint is touch-only
+	# keyboard/mouse-wheel kept for desktop testing but hint is touch-only
 	if event.is_action_pressed("move_up"):
 		_scroll = maxi(0, _scroll - 1); _refresh(); get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
 		_scroll += 1; _refresh(); get_viewport().set_input_as_handled()
+	elif event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		var mb: InputEventMouseButton = event
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_scroll = maxi(0, _scroll - 1); _refresh(); get_viewport().set_input_as_handled()
+		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_scroll += 1; _refresh(); get_viewport().set_input_as_handled()
 
 func _input(event: InputEvent) -> void:
 	if not visible:

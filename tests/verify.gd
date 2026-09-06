@@ -1087,7 +1087,7 @@ func _check_map_fog() -> void:
 		var mk := Vector2(-1, -1)
 		for m in mo._markers:
 			if int(m[0]) == -2 and (m[2] as Vector2).distance_to(mo._to_local(world.pois[si]["pos"])) < 0.5:
-				mk = (m[2] as Vector2) * mo.zoom - mo._off + MapOverlay.PANEL_POS
+				mk = (m[2] as Vector2) * mo.zoom - mo._off + mo._panel_pos
 		if mk.x >= 0:
 			mo._tap_at(mk + Vector2(1, 1))
 		_ok(fired[0] == si, "tapping a discovered shrine asks Main to travel")
@@ -1956,6 +1956,14 @@ func _check_combat_style() -> void:
 	var s_heavy := hero.swing_amount(w, true)
 	_ok(s_open < s_mid and s_mid < s_finish and s_finish < s_heavy,
 		"swing tiers escalate %d < %d < %d < %d" % [s_open, s_mid, s_finish, s_heavy])
+	# re-pin the hero + dummy right before the real swing: earlier attacks in
+	# this test leave residual knockback velocity that can drift the hero a
+	# few pixels off the dummy between frames, pushing it just outside the
+	# heavy-swing arc and making this check flaky.
+	hero.velocity = Vector2.ZERO
+	hero.global_position = Vector2(2200, 2000)
+	dummy.global_position = hero.global_position + Vector2(0, 12)
+	hero.facing = "down"
 	hero.do_attack(true)   # keep the old path exercised too
 	_ok(dummy.hp < dummy.max_hp, "swings still land on a body")
 
@@ -2110,13 +2118,18 @@ func _check_anim() -> void:
 	hero._charge = 0.0
 	hero._handle_actions(0.016)
 	_ok(not hero._ring.visible, "ring hides when the hold ends")
-	# dodge leaves a streak
+	# dodge leaves a streak. Count matching streak sprites directly instead of
+	# the raw child-count delta: the world is full of short-lived FX (damage
+	# numbers, slashes) whose tweens can free a node in the very same frame,
+	# which made a plain "count went up" check flaky under CI scheduling.
 	hero.act = Hero.Act.NONE
 	Stats.stamina = Stats.max_stamina
-	var before := Juice._world.get_child_count()
 	Juice.streak(hero.global_position, Vector2.RIGHT)
-	await get_tree().process_frame
-	_ok(Juice._world.get_child_count() > before, "dodge streak sprites spawn")
+	var streaks := 0
+	for node in Juice._world.get_children():
+		if node is Sprite2D and node.texture != null and "streak" in str(node.texture.resource_path):
+			streaks += 1
+	_ok(streaks >= 3, "dodge streak sprites spawn (%d)" % streaks)
 	# walk bounce moves the doll
 	hero.velocity = Vector2(60, 0)
 	hero.act = Hero.Act.NONE
@@ -2322,10 +2335,13 @@ func _check_menus() -> void:
 	tl.toggle()
 	_ok(tl.visible, "talents screen opens for testing")
 	var tst := get_viewport().get_screen_transform()
+	# rows are laid out responsively now (SafeArea-aware panel); read the
+	# real row-3 (index 2) rect instead of a stale hardcoded coordinate.
+	var row2_center: Vector2 = (tl._rows[2] as Label).position + (tl._rows[2] as Label).size * 0.5
 	var t1 := InputEventMouseButton.new()
 	t1.button_index = MOUSE_BUTTON_LEFT
 	t1.pressed = true
-	t1.position = tst * Vector2(250, 104 + 2 * 18 + 4)
+	t1.position = tst * row2_center
 	Input.parse_input_event(t1)
 	await get_tree().process_frame
 	_ok(tl._sel == 2, "tap selects the third talent row")
@@ -2333,20 +2349,20 @@ func _check_menus() -> void:
 	var mrel := InputEventMouseButton.new()
 	mrel.button_index = MOUSE_BUTTON_LEFT
 	mrel.pressed = false
-	mrel.position = tst * Vector2(250, 146)
+	mrel.position = tst * row2_center
 	Input.parse_input_event(mrel)
 	await get_tree().process_frame
 	# a second tap on the chosen row spends a point (pure touch events: parsed
 	# mouse clicks synthesise an extra touch, and the handler dedupes per frame)
 	var tp_before := Stats.talent_points
 	var ts2 := InputEventScreenTouch.new()
-	ts2.position = tst * Vector2(250, 146)
+	ts2.position = tst * row2_center
 	ts2.pressed = true
 	ts2.index = 4
 	Input.parse_input_event(ts2)
 	await get_tree().process_frame
 	var ts2u := InputEventScreenTouch.new()
-	ts2u.position = tst * Vector2(250, 146)
+	ts2u.position = tst * row2_center
 	ts2u.pressed = false
 	ts2u.index = 4
 	Input.parse_input_event(ts2u)
@@ -2811,9 +2827,13 @@ func _check_touch_settings() -> void:
 	su.open()
 	await get_tree().process_frame
 	var before := Settings.auto_combat
-	su._pointer_press(Vector2(150, 193))
+	# the settings panel is laid out responsively now; read the real
+	# auto-combat row position instead of a stale hardcoded coordinate.
+	var ac_row: Dictionary = su._rows[SettingsUI.Row.AUTOCOMBAT]
+	var ac_p := Vector2(su._panel.position.x + su._panel.size.x * 0.25, float(ac_row["y"]) + 8.0)
+	su._pointer_press(ac_p)
 	_ok(Settings.auto_combat != before, "tapping the auto-combat row toggles it")
-	su._pointer_press(Vector2(150, 193))
+	su._pointer_press(ac_p)
 	su.close()
 	su.queue_free()
 	touch_s.set_enabled(false)
@@ -2959,12 +2979,12 @@ func _check_map_pan() -> void:
 	_ok(mo._hero_dot.position.x < hd0.x, "and the hero dot slides with the realm")
 	# centre the view on settlement 0 so its marker is guaranteed on-screen
 	var loc0: Vector2 = mo._markers[0][2]
-	mo._off = loc0 * mo.zoom - MapOverlay.MAP_PX * 0.5
+	mo._off = loc0 * mo.zoom - mo._panel_size * 0.5
 	mo._clamp_off()
 	mo._apply_view()
 	await get_tree().process_frame
 	# a drag that starts on a settlement must NOT fast-travel
-	var mk: Vector2 = (mo._markers[0][2] as Vector2) * mo.zoom - mo._off + MapOverlay.PANEL_POS
+	var mk: Vector2 = (mo._markers[0][2] as Vector2) * mo.zoom - mo._off + mo._panel_pos
 	_g_touch(true, P.call(mk), 53)
 	for k in 3:
 		_g_drag(P.call(mk + Vector2(0, float(10 * (k + 1)))), 53)
@@ -2974,7 +2994,7 @@ func _check_map_pan() -> void:
 	# ...but a clean tap on it still does (re-aim: the map panned since)
 	var tapped := false
 	for i in 24:
-		mk = (mo._markers[0][2] as Vector2) * mo.zoom - mo._off + MapOverlay.PANEL_POS
+		mk = (mo._markers[0][2] as Vector2) * mo.zoom - mo._off + mo._panel_pos
 		_g_touch(true, P.call(mk), 54)
 		_g_touch(false, P.call(mk), 54)
 		for j in 10:
@@ -2987,7 +3007,7 @@ func _check_map_pan() -> void:
 	mo._pan_by(Vector2(9999, 9999))
 	_ok(mo._off == Vector2.ZERO, "panning clamps at the map edge")
 	mo._pan_by(Vector2(-9999, -9999))
-	_ok(mo._off.x <= 240.0 and mo._off.y <= 160.0, "and at the far edge")
+	_ok(mo._off.x <= mo._panel_size.x and mo._off.y <= mo._panel_size.y, "and at the far edge")
 	# zoom out recentres
 	var zout := false
 	for i in 24:

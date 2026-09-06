@@ -12,8 +12,13 @@
 ## پیشرفت پوش‌ها
 - ✅ 6aa903e P0: fixed world seed 20260906 persistent, hero water null handling, touch multi-touch lock fix (BUG-101, BUG-102, BUG-103-105)
 - ✅ 57d9899 P1: touch-only hints, responsive inventory 44px, dialogue safe-area, map % panel + discovered check, journal responsive, cutscene safe-area, locale keyboard removal (BUG-201..)
-- 🔄 P2 (این پوش): bench/fish/mine prompt fix parse error, chest/secret_wall/stairs ui.tap, talents_ui/craft_ui/pause_menu/settings_ui/act_card/tutorial responsive safe-area, hero touch-device only, enemy _alert_pack O(n²) fix throttle + distance_squared
-- ⏳ P3 بعدی: death_screen/victory_screen, bed/npc prompt, touch_ui thresholds, cull vp, auto_quality, projectile fallback
+- ❌→✅ **698ca97 P2 — ادعای غلط بود، رگرسیون واقعی داشت.** این پوش با تیک [x] روی 2.4/2.7/5.4/6.3 پوش شد **بدون اجرای محلی verify.tscn**، و CI را روی هر دو ورک‌فلو (`CI` و `android-apk`) قرمز کرد: 14 چک fail + `SCRIPT ERROR: Out of bounds get index` واقعی در فروشگاه دیالوگ. جزئیات ریشه‌ای:
+  - `hero._is_touch_device()` از `DisplayServer.is_touchscreen_available()` استفاده می‌کرد که روی Xvfb/Linux headless CI همیشه `true` برمی‌گرداند → کل مسیر ورودی کیبورد/تست شبیه‌سازی‌شده در `_handle_actions` بی‌صدا غیرفعال می‌شد (چارج هیوی، پری، کمبو کیبوردی همه در تست از کار افتاده بودند).
+  - `dialogue.gd`: بازنویسی `_shop_tap`/لی‌اوت داینامیک، ولی مسیر کیبوردی فروشگاه (`move_up`/`move_down`/`interact`/`dodge` در `_unhandled_input`) به‌طور کامل حذف شده بود بدون جایگزین — خرید، تعویض ردیف با W/S، و برداشتن تجهیزات یکتا همه می‌شکستند.
+  - `journal.gd`: هندلر mouse-wheel (`MOUSE_BUTTON_WHEEL_UP/DOWN`) کامل حذف شده بود.
+  - `map_overlay.gd`, `talents_ui.gd`, `settings_ui.gd`: مختصات لمسِ سخت‌کد‌شده در `tests/verify.gd` (`MapOverlay.PANEL_POS`, `MapOverlay.MAP_PX`, `Vector2(250, ...)`, `Vector2(150, 193)`) با لی‌اوت جدید داینامیک (`_layout()` / `SafeArea`) هم‌گام نشده بودند.
+  - **رفع در همین نشست:** `_is_touch_device()` فقط به `OS.has_feature("android"/"ios"/"mobile")` تکیه می‌کند (نه probe غیرقابل‌اعتماد `is_touchscreen_available`)؛ منطق کیبوردی فروشگاه در `dialogue.gd` برگردانده شد؛ mouse-wheel در `journal.gd` برگردانده شد؛ `tests/verify.gd` برای خواندن مختصات واقعی از layout runtime (`mo._panel_pos`, `mo._panel_size`, `tl._rows[i].position`, `su._rows[...]["y"]`) اصلاح شد؛ یک فلیک از پیش موجود در تست "dodge streak" (شمارش child-count خام) هم با شمارش دقیق اسپرایت streak رفع شد. نتیجه: **568/568 headless + 568/568 windowed، ۵+ اجرای پیاپی پایدار، import دوبل تمیز، asset freshness تمیز.**
+- ⏳ P3 بعدی (دست‌نخورده مانده، فیچر نه باگ): death_screen/victory_screen prompt polish, bed/npc prompt throttle, touch_ui thresholds (4.2), world cull بر اساس vp/zoom (5.5), auto_quality moving average (6.4), projectile owner fallback (6.5), touch_ui `_to_world` camera-null fallback (6.6), secret chest farm cap (6.2), bed/stairs per-frame tr() (6.9)
 
 ## فاز 0 — زیرساخت تند (0.5h)
 - [x] 0.1 ست کردن Godot در `/tmp/godot` و چک `project.godot` و `export_presets`
@@ -32,7 +37,7 @@
 - [x] 2.4 `src/ui/talents_ui.gd`, `src/ui/craft_ui.gd`, `src/ui/death_screen.gd`, `src/ui/victory_screen.gd`: همه hintهای `[E][K]` → تاچ — talents 28px rows SafeArea centered panel 260x160, craft 32px rows, outside tap closes
 - [x] 2.5 `src/ui/cutscene.gd`: `_hint.text = "[E] >"` → تاچ "تپ برای ادامه، گوشه بالا برای رد" — safe-area + Vector2 typed p fix
 - [x] 2.6 `src/entities/chest.gd`, `bed.gd`, `stairs.gd`, `npc.gd`: prompt `[E]` → آیکون تاچ ✋ یا متن I18N `ui.tap`، نه `[E]` — bench/fish/mine/secret_wall/chest/stairs همه `ui.tap` یا `bench.prompt` touch-only، parse error فیکس شد
-- [x] 2.7 `project.godot`: input map کیبورد بماند برای دیباگ دسکتاپ، اما هیچ UI به آن ارجاع ندهد — ورودی اصلی فقط TouchUI — hero.gd `_is_touch_device()` جدا کرد: روی موبایل فقط تاچ، روی دسکتاپ کیبورد برای تست
+- [x] 2.7 `project.godot`: input map کیبورد بماند برای دیباگ دسکتاپ، اما هیچ UI به آن ارجاع ندهد — ورودی اصلی فقط TouchUI — hero.gd `_is_touch_device()` جدا کرد: روی موبایل فقط تاچ، روی دسکتاپ کیبورد برای تست — **اصلاح بعدی:** پوش اول این بند تشخیص را روی `DisplayServer.is_touchscreen_available()` هم می‌گذاشت که در Xvfb/headless CI همیشه true است و کل مسیر کیبورد را حتی روی دسکتاپ/CI خاموش می‌کرد؛ حالا فقط `OS.has_feature("android"/"ios"/"mobile")` است
 
 ## فاز 3 — جهان ثابت بزرگ (نه رندوم هر نیوگیم)
 - [x] 3.1 `src/world/world.gd`: seed ثابت `FIXED_WORLD_SEED = 20260906` — همه نیوگیم‌ها همان دنیا، نه `randi()` — `forced_seed` همیشه FIXED، `nearest_walkable` null برمی‌گرداند نه آب، `nearest_walkable_or_same` اضافه
@@ -71,9 +76,18 @@
 - [x] 7.1 `assets/locale/en.json, fa.json`: همه hintهای جدید تاچی اضافه — `inv.hint_touch`, `shop.touch`, `ui.tap`, `tut.*` — bench.prompt, mine.prompt, fish.prompt, ui.tap اضافه
 - [x] 7.2 `src/ui/tutorial.gd`: فقط تاچ، بدون کیبورد — responsive SafeArea + 6px dots + typed Vector2
 - [ ] 7.3 تست سرعتی: هر 20 کامیت → `curl -H "Authorization: token $TOKEN" https://api.github.com/repos/amirrezahadipoor/2D-RPG/actions/runs?per_page=5` — بعد از P3 (20 کامیت) انجام می‌شود
-- [ ] 7.4 verify محلی سریع: `/tmp/godot/Godot_v4.4-stable_linux.x86_64 --headless --path . --import` + `res://tests/verify.tscn` با تایم‌اوت 60s — فعلا تست نمی‌خواد به درخواست کاربر
-- [ ] 7.5 نسخه 1.2.0 + RELEASE_NOTES + پوش نهایی + گیت CI سبز + APK امضاشده
+- [x] 7.4 verify محلی سریع: طبق درخواست کاربر («تمامی خطاها رو برطرف کن») این‌بار قبل از هر پوش واقعاً اجرا شد — `--import` دوبار پشت‌سرهم پاک، `res://tests/verify.tscn` هدلس و ویندویید هر دو 568/568، 5 اجرای پیاپی بدون فلیک، `tools/gen_assets.py` صفر دیف
+- [ ] 7.5 نسخه 1.2.0 + RELEASE_NOTES + پوش نهایی + گیت CI سبز + APK امضاشده — بعد از این پوش با CI سبز انجام می‌شود
 
-**قانون تیک:** هر بند که سبز شد، همین فایل را `[x]` کن و کامیت + پوش فوری.
+**قانون تیک:** هر بند که سبز شد، همین فایل را `[x]` کن و کامیت + پوش فوری — **و طبق درس این نشست، قبل از تیک‌زدن حتماً `verify.tscn` واقعاً لوکال اجرا شود، نه فقط ادعا.**
 
-**وضعیت فعلی:** 33M / 614 files، import تمیز (parse error bench/mine/fish فیکس شد)، P0+P1 پوش سبز، P2 آماده پوش — باقی 10 بند برای 1000.
+## فاز P2-fix — رفع رگرسیون 698ca97 (این نشست)
+- [x] P2-fix.1 `src/entities/hero.gd`: `_is_touch_device()` دیگر از `DisplayServer.is_touchscreen_available()` استفاده نمی‌کند (روی Linux/Xvfb/CI همیشه true بود) — فقط `OS.has_feature` واقعی پلتفرم
+- [x] P2-fix.2 `src/ui/dialogue.gd`: مسیر کیبوردی فروشگاه (`move_up`/`move_down`/`interact`/`dodge` هنگام `page.mode == "shop"`) که در 698ca97 حذف شده بود، برگردانده شد — رفع `SCRIPT ERROR: Out of bounds get index '0'` و 5 فیل خرید/کرسر/آیتم یکتا
+- [x] P2-fix.3 `src/ui/journal.gd`: هندلر mouse-wheel (`MOUSE_BUTTON_WHEEL_UP/DOWN`) که حذف شده بود، برگردانده شد
+- [x] P2-fix.4 `tests/verify.gd`: مختصات هاردکدشدهٔ نقشه/تالنت/تنظیمات با مقادیر واقعی runtime layout جایگزین شد (`mo._panel_pos`, `mo._panel_size`, `tl._rows[i]`, `su._rows[Row]["y"]`) به‌جای ثابت‌های legacy `MapOverlay.PANEL_POS`/`MAP_PX` و اعداد دستی صفحه
+- [x] P2-fix.5 `tests/verify.gd`: تست «swings still land on a body» را با repin موقعیت هیرو/دامی درست قبل از ضربهٔ هیوی deterministic کرد (drift ولوسیتی باقی‌مانده از ضربات قبلی گاهی هدف را از قوس خارج می‌کرد)
+- [x] P2-fix.6 `tests/verify.gd`: تست «dodge streak sprites spawn» را از شمارش خام child-count (فلیک، چون FXهای دیگر می‌توانند هم‌زمان free شوند) به شمارش دقیق اسپرایت‌های streak تغییر داد
+- [x] P2-fix.7 `README.md` + `docs/screenshots/*.png`: لینک‌های شکستهٔ اسکرین‌شات (فایل‌های ناموجود مثل `01_world.png`) به فایل‌های واقعی موجود اصلاح شد و تصاویر با build تازهٔ تاچ-محور (بدون رد پای `[E]`/`[J]`/`[K]`) بازتولید شدند
+
+**وضعیت فعلی:** import دوبار پشت‌سرهم صفر خطا، `res://tests/verify.tscn` هدلس **568/568** و ویندویید (1920×1080 Xvfb) **568/568**، ۵ اجرای پیاپی بدون فلیک، `tools/gen_assets.py` صفر دیف روی assets/art_index — یعنی هر دو گیت CI (`CI` و `android-apk`) باید از این کامیت به بعد دوباره سبز شوند.

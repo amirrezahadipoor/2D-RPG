@@ -124,8 +124,12 @@ func _starting_gear() -> void:
 	doll.equip("weapon", "iron_sword")
 
 # ------------------------------------------------------------- physics ------
+## Real touch device (Android/iOS export), NOT `is_touchscreen_available()`:
+## that DisplayServer probe returns true on plain Linux/X11 desktops (and in
+## our own headless/windowed CI), which used to silently disable every
+## keyboard-driven code path the automated test suite depends on.
 func _is_touch_device() -> bool:
-	return DisplayServer.is_touchscreen_available() or OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile")
+	return OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile")
 
 func _physics_process(delta: float) -> void:
 	var cutscene := get_tree().get_first_node_in_group("cutscene")

@@ -14,15 +14,18 @@ is backed by an automated check or a screenshot, never by a self-reported tick.
 
 | | |
 |---|---|
-| ![world](docs/screenshots/01_world.png) | ![paper doll](docs/screenshots/02_paper_doll.png) |
-| Procedural overworld, 7 biomes, live HUD | Paper-doll: hat + plate + cloak + axe on the hero |
-| ![attack](docs/screenshots/03_attack.png) | ![persian](docs/screenshots/04_persian_rtl.png) |
-| ![combat](docs/screenshots/05_combat.png) | ![death](docs/screenshots/06_death_hardcore.png) |
-| ![inventory](docs/screenshots/08_inventory.png) | ![loot](docs/screenshots/09_loot.png) |
-| ![story](docs/screenshots/10_story_intro.png) | ![village](docs/screenshots/11_village.png) |
-| ![dialogue](docs/screenshots/12_dialogue.png) | ![journal](docs/screenshots/13_journal.png) |
-| ![night graveyard](docs/screenshots/14_night_graveyard.png) | |
-| Stamina-gated attack swing | Persian + RTL + Persian digits |
+| ![boot](docs/screenshots/01_boot.png) | ![walked](docs/screenshots/02_walked.png) |
+| Procedural overworld, 7 biomes, live HUD (touch-only, no keyboard hints) | Hero walked into the world |
+| ![geared](docs/screenshots/03_geared.png) | ![attack](docs/screenshots/04_attack.png) |
+| ![persian](docs/screenshots/05_persian.png) | ![combat](docs/screenshots/06_combat.png) |
+| ![death](docs/screenshots/07_death.png) | ![death fa](docs/screenshots/08_death_fa.png) |
+| ![inventory](docs/screenshots/09_inventory.png) | ![loot](docs/screenshots/10_loot.png) |
+| ![story](docs/screenshots/11_story.png) | ![village](docs/screenshots/12_village.png) |
+| ![dialogue](docs/screenshots/13_dialogue.png) | ![journal](docs/screenshots/14_journal.png) |
+| ![night graveyard](docs/screenshots/15_night_grave.png) | ![dungeon](docs/screenshots/16_dungeon.png) |
+| ![shop](docs/screenshots/17_shop.png) | ![secret](docs/screenshots/18_secret.png) |
+| ![bestiary](docs/screenshots/19_bestiary.png) | ![menu](docs/screenshots/20_menu.png) |
+| Persian + RTL + Persian digits | Paper-doll gear, dungeons, shop, bestiary, menus — all touch-native |
 
 ## What is actually here (M0 + part of M1)
 

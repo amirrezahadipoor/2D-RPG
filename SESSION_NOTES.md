@@ -30,3 +30,12 @@ git add -A && git commit -m "..." && git push origin main
 - پروب‌های ممیزی: /home/user/audit_probes (بیرون از مخزن)؛ لاگ‌ها /tmp.
 - بعد از هر بندِ ROADMAP_MOBILE.md: تیک + کمیـت + پوش (وسط نشست هم پوش کن).
 - وضعیت CI را با API بخوان: GET /repos/amirrezahadipoor/2D-RPG/actions/runs?per_page=3
+
+## درس نشست 698ca97 (مهم — نقض قانون خودمان)
+پوش `698ca97` بدون اجرای محلی `verify.tscn` رفت، ادعای «568 checks» را در ROADMAP تیک زد، ولی واقعاً CI را در هر دو ورک‌فلو قرمز کرد (14 فیل + یک SCRIPT ERROR واقعی). ریشه: `DisplayServer.is_touchscreen_available()` روی Xvfb/Linux headless **همیشه true** برمی‌گردد، پس هر کد touch-only که از این تابع استفاده کند روی دسکتاپ/CI هم فعال می‌شود و مسیرهای کیبوردی/شبیه‌سازی‌شده در تست را بی‌صدا از کار می‌اندازد.
+**قانون جدید اجباری قبل از هر پوش:**
+```bash
+godot --headless --path . --import >/dev/null 2>&1   # دوبار پشت‌سرهم، صفر ERROR/SCRIPT ERROR
+godot --headless --path . res://tests/verify.tscn      # باید دقیقاً ALL N CHECKS PASSED باشد
+```
+اگر verify سبز نبود، پوش نکن. تیک ROADMAP بدون اجرای واقعی = ادعای دروغ، همانی که در `docs/AUDIT_OF_PREVIOUS_BUILD.md` به نسخهٔ قبلی این پروژه انتقاد شده بود.

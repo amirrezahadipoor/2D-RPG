@@ -365,11 +365,44 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 	# keyboard still works for desktop testing but hints are touch-only
+	var page: Dictionary = _pages[_page]
+	if page["mode"] == "shop":
+		if event.is_action_pressed("move_up"):
+			_shop_sel = (_shop_sel + _shop_offers.size() - 1) % _shop_offers.size()
+			_text.text = _shop_text()
+			Sfx.play("click", -14.0, 0.02)
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("move_down"):
+			_shop_sel = (_shop_sel + 1) % _shop_offers.size()
+			_text.text = _shop_text()
+			Sfx.play("click", -14.0, 0.02)
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("interact"):
+			var o: Dictionary = _shop_offers[_shop_sel]
+			if not o["sold"] and Stats.gold >= int(o["price"]):
+				Stats.add_gold(-int(o["price"]))
+				Inventory.add(o["entry"].duplicate())
+				Sfx.play("buy")
+				o["sold"] = not Consumables.is_consumable(o["entry"]["id"])
+				_text.text = _shop_text()
+			else:
+				_toast("shop.no_gold")
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("dodge"):
+			_page += 1
+			if _page >= _pages.size():
+				close()
+			else:
+				_apply_page()
+			get_viewport().set_input_as_handled()
+			return
 	if event.is_action_pressed("interact") or event.is_action_pressed("attack"):
-		var page: Dictionary = _pages[_page]
 		_advance(page)
 	elif event.is_action_pressed("dodge"):
-		if _pages[_page]["mode"] == "offer":
+		if page["mode"] == "offer":
 			QuestLog.decline_side(_offer_index)
 			_pages = _compose_pages()
 			_page = 0
