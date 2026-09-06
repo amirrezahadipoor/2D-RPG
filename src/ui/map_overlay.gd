@@ -256,6 +256,9 @@ func _place_markers() -> void:
 		lb.text = I18N.tr_str(st.get("name_key", "place.0"))
 		_clip.add_child(lb)
 		_name_lbls.append([int(st["index"]), lb, _to_local(plaza)])
+	for lm in world.landmarks:
+		var d := _dot(Color(1.0, 0.82, 0.3), 4)
+		_markers.append([-3, d, _to_local(Vector2(lm["pos"].x * 16.0 + 8.0, lm["pos"].y * 16.0 + 8.0))])
 	for p in world.pois:
 		var col := Color(0.4, 0.95, 1.0)
 		var sz := 2

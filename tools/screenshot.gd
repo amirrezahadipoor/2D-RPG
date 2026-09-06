@@ -210,6 +210,14 @@ func run() -> void:
 			world.set_windows_lit(false)
 			world._discover_t = 0.0
 
+		# ---- a hand-built landmark (Phase A2) ----
+		if world and not world.landmarks.is_empty():
+			var lm: Dictionary = world.landmarks[0]
+			hero.global_position = Vector2(lm["pos"].x * 16.0 + 8.0, lm["pos"].y * 16.0 + 56.0)
+			for i in 45:
+				await get_tree().physics_frame
+			await _grab("12e_landmark")
+
 		# ---- dialogue with the first NPC ----
 		var dlg: DialogueUI = main_node.get_node_or_null("DialogueUI") if main_node else null
 		if dlg and not world.npcs.is_empty():

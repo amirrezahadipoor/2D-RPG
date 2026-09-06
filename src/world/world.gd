@@ -59,6 +59,7 @@ func build(seed_value: int) -> void:
 	_spawn_spawner()
 	_spawn_npcs()
 	_place_chests()
+	_place_landmarks()
 	_place_pois()
 	discovered.clear()
 	for i in settlements.size():
@@ -511,6 +512,13 @@ func is_walkable_at(world_pos: Vector2) -> bool:
 	var t := tile_at(world_pos)
 	if t.x < 0 or t.y < 0 or t.x >= WORLD_W or t.y >= WORLD_H:
 		return false
+	if cell_terrain.has(t):
+		if cell_terrain[t] in SOLID_TERRAIN:
+			return false
+		var op: String = cell_prop.get(t, "")
+		return op == "" or not SOLID_PROPS.has(op)
+	if cell_prop.has(t):
+		return cell_prop[t] == "" or not SOLID_PROPS.has(cell_prop[t])
 	var biome := _biome_grid[t.y * WORLD_W + t.x]
 	if biome == "water":
 		return false
@@ -697,8 +705,135 @@ func _place_chests() -> void:
 var pois: Array = []   # [{type: String, pos: Vector2}]
 var discovered: Array = []   # per-settlement bool: hero has reached it
 var window_cells: Array = []   # Vector2i facade windows; glow at night
+var landmarks: Array = []      # [{type: String, pos: Vector2i}] hand-built set pieces
+var cell_terrain := {}         # Vector2i -> terrain name, landmark overrides
+var cell_prop := {}            # Vector2i -> prop name ("" clears)
+const SOLID_TERRAIN := ["water", "roof", "roof_ridge", "facade", "facade_door",
+		"facade_win", "facade_win_lit"]
 var _win_lit := false
 var _discover_t := 0.0
+
+## Hand-composed set pieces, one per biome where the seed allows (Phase A2):
+## a ruined tower, lakeside pier, crypt, obelisk, stone circle, witch hut.
+## They are built from existing tiles/props so collision stays coherent.
+func _place_landmarks() -> void:
+	landmarks.clear()
+	cell_terrain.clear()
+	cell_prop.clear()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = world_seed + 777
+	var wants := ["ruin", "pier", "crypt", "obelisk", "circle", "hut"]
+	for kind in wants:
+		var spot := _find_landmark_spot(kind, rng)
+		if spot.x < 0:
+			continue
+		landmarks.append({"type": kind, "pos": spot})
+		match kind:
+			"ruin":
+				for dx in range(-2, 3):
+					for dy in range(-2, 3):
+						if abs(dx) == 2 and abs(dy) == 2 or (dx == 0 and dy == 2):
+							continue   # crumbled corners + south entrance
+						_set_tile(spot + Vector2i(dx, dy), "cave", "rock" if (dx * dx + dy * dy) > 2 else "")
+				_set_tile(spot + Vector2i(-1, 0), "cave", "tomb")
+				_set_tile(spot + Vector2i(1, -1), "cave", "tomb")
+				_set_tile(spot + Vector2i(0, 1), "cave", "chest")
+			"pier":
+				for dx in range(0, 7):
+					_set_tile(spot + Vector2i(dx, 0), "wood", "")
+				_set_tile(spot + Vector2i(0, -1), "grass", "fence")
+				_set_tile(spot + Vector2i(0, 1), "grass", "fence")
+				_set_tile(spot + Vector2i(6, 0), "wood", "chest")
+			"crypt":
+				for dx in range(-1, 3):
+					for dy in range(-1, 2):
+						_set_tile(spot + Vector2i(dx, dy), "stone", "")
+				for dx in range(-1, 3):
+					_set_tile(spot + Vector2i(dx, -1), "roof_ridge", "")
+				_set_tile(spot + Vector2i(0, 1), "facade_door", "")
+				_set_tile(spot + Vector2i(-1, 2), "grass", "tomb")
+				_set_tile(spot + Vector2i(2, 2), "grass", "tomb")
+			"obelisk":
+				for dx in range(-1, 2):
+					for dy in range(-1, 2):
+						_set_tile(spot + Vector2i(dx, dy), "cobble", "")
+				_set_tile(spot, "cobble", "rock")
+				_set_tile(spot + Vector2i(-1, -1), "cobble", "torch")
+				_set_tile(spot + Vector2i(1, -1), "cobble", "torch")
+				_set_tile(spot + Vector2i(0, 1), "cobble", "sign")
+			"circle":
+				for i in range(8):
+					var a := i / 8.0 * TAU
+					_set_tile(spot + Vector2i(round(cos(a) * 2), round(sin(a) * 2)), "snow", "rock")
+				_set_tile(spot, "snow", "chest")
+			"hut":
+				for dx in range(0, 4):
+					for dy in range(0, 3):
+						_set_tile(spot + Vector2i(dx, dy), "wood" if dy == 2 else "roof", "")
+				for dx in range(0, 4):
+					_set_tile(spot + Vector2i(dx, 0), "roof_ridge", "")
+				_set_tile(spot + Vector2i(1, 2), "facade_door", "")
+				_set_tile(spot + Vector2i(-1, 2), "swamp", "torch")
+				_set_tile(spot + Vector2i(4, 2), "swamp", "chest")
+
+func _set_tile(t: Vector2i, terrain: String, prop: String) -> void:
+	if t.x < 1 or t.y < 1 or t.x >= WORLD_W - 1 or t.y >= WORLD_H - 1:
+		return
+	terrain_layer.set_cell(t, 0, _atlas(terrain))
+	cell_terrain[t] = terrain
+	if prop == "":
+		props_layer.set_cell(t, -1)
+	else:
+		props_layer.set_cell(t, 1, _atlas_prop(prop))
+	cell_prop[t] = prop
+
+func _atlas(name: String) -> Vector2i:
+	var i: int = ArtIndex.TERRAIN_INDEX[name]
+	return Vector2i(i % 8, i / 8)
+
+func _atlas_prop(name: String) -> Vector2i:
+	var i: int = ArtIndex.PROP_INDEX[name]
+	return Vector2i(i % 8, i / 8)
+
+## Open ground (or water edge for piers) away from settlements and roads.
+func _find_landmark_spot(kind: String, rng: RandomNumberGenerator) -> Vector2i:
+	var need_water := kind == "pier"
+	for attempt in range(220):
+		var x: int = rng.randi_range(12, WORLD_W - 13)
+		var y: int = rng.randi_range(12, WORLD_H - 13)
+		var t := Vector2i(x, y)
+		if _settlement_at_tile(t).size() > 0:
+			continue
+		var biome: String = _biome_grid[y * WORLD_W + x]
+		if need_water:
+			if _ok_pier(t).x < 0:
+				continue
+		else:
+			if biome in ["water", "village", "town"]:
+				continue
+			var clear := true
+			for dx in range(-4, 5):
+				for dy in range(-4, 5):
+					var i := (y + dy) * WORLD_W + (x + dx)
+					if _biome_grid[i] == "water" or _road_grid[i] == 1:
+						clear = false
+					if _settlement_at_tile(Vector2i(x + dx, y + dy)).size() > 0:
+						clear = false
+			if not clear:
+				continue
+		return t
+	return Vector2i(-1, -1)
+
+func _ok_pier(t: Vector2i) -> Vector2i:
+	# six tiles east must be water, the tile west must be land
+	for dx in range(0, 7):
+		var i := t.y * WORLD_W + (t.x + dx)
+		if _biome_grid[i] != "water":
+			return Vector2i(-1, -1)
+	var w := t.y * WORLD_W + (t.x - 1)
+	if _biome_grid[w] == "water":
+		return Vector2i(-1, -1)
+	return t
 
 func _place_pois() -> void:
 	pois.clear()

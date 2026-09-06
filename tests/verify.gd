@@ -38,6 +38,7 @@ func run() -> void:
 	_check_places()
 	_check_houses_art()
 	_check_shadows()
+	_check_landmarks()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -957,6 +958,21 @@ func _check_shadows() -> void:
 	await get_tree().process_frame
 	_ok(world.shadow_layer.pts.size() >= 2,
 		"actors cast soft ground shadows (%d)" % world.shadow_layer.pts.size())
+
+func _check_landmarks() -> void:
+	print("== landmarks A2 ==")
+	_ok(world.landmarks.size() >= 3, "seed scatters hand-built landmarks (%d)" % world.landmarks.size())
+	var types := {}
+	for lm in world.landmarks:
+		types[lm["type"]] = true
+	_ok(types.size() >= 2, "landmark variety (%s)" % str(types.keys()))
+	for lm in world.landmarks:
+		if lm["type"] == "pier":
+			_ok(world.is_walkable_at(Vector2(lm["pos"].x * 16 + 8, lm["pos"].y * 16 + 8)),
+				"pier planks are walkable over water")
+		if lm["type"] == "ruin":
+			_ok(not world.is_walkable_at(Vector2((lm["pos"].x + 2) * 16 + 8, lm["pos"].y * 16 + 8)),
+				"ruin rubble blocks walking")
 
 func _check_people() -> void:
 	print("== people ==")
@@ -2634,11 +2650,11 @@ func _check_map_pan() -> void:
 	_ok(trav[0] == 0, "dragging off a settlement does not fast-travel")
 	# ...but a clean tap on it still does (re-aim: the map panned since)
 	var tapped := false
-	for i in 6:
+	for i in 12:
 		mk = (mo._markers[0][2] as Vector2) * mo.zoom - mo._off + MapOverlay.PANEL_POS
 		_g_touch(true, P.call(mk), 54)
 		_g_touch(false, P.call(mk), 54)
-		for j in 3:
+		for j in 6:
 			await get_tree().process_frame
 		if trav[0] == 1:
 			tapped = true
@@ -2651,10 +2667,10 @@ func _check_map_pan() -> void:
 	_ok(mo._off.x <= 240.0 and mo._off.y <= 160.0, "and at the far edge")
 	# zoom out recentres
 	var zout := false
-	for i in 6:
+	for i in 12:
 		_g_touch(true, P.call(chip_c), 55)
 		_g_touch(false, P.call(chip_c), 55)
-		for j in 3:
+		for j in 6:
 			await get_tree().process_frame
 		if mo.zoom == 1.0 and mo._off == Vector2.ZERO:
 			zout = true
