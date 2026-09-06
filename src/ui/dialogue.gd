@@ -138,7 +138,10 @@ func _compose_pages() -> Array:
 		_offer_index = QuestLog.offer_at(npc.sett_index, npc.role_name)
 		if _offer_index >= 0:
 			var q := QuestDB.side_quest(_offer_index)
-			pages.append({"text": QuestDB.desc_of(q) + "\n%s: %s XP, %s G" % [
+			var tone_key := "quest.tone." + String(q["kind"])
+			var tone: String = I18N.tr_str(tone_key)
+			var flavor := "" if tone == tone_key else tone + "\n"
+			pages.append({"text": flavor + QuestDB.desc_of(q) + "\n%s: %s XP, %s G" % [
 				I18N.tr_str("quest.reward"), I18N.num(int(q["xp"])), I18N.num(int(q["gold"]))],
 				"mode": "offer"})
 		elif npc.role_name == "merchant":

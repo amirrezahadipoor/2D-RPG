@@ -38,7 +38,9 @@ func setup(role_str: String, settlement: Dictionary, index: int) -> void:
 		"merchant": Role.MERCHANT, "guard": Role.GUARD, "king": Role.KING}.get(role_str, Role.VILLAGER)
 	sett_index = int(settlement.get("index", 0))
 	npc_index = index
-	display_name = I18N.tr_str("npc.name.%d" % (index % 8))
+	# a wider, seeded name pool so no two settlements share a full crowd of
+	# identical names (24 names, spread by settlement and slot)
+	display_name = I18N.tr_str("npc.name.%d" % ((sett_index * 13 + index * 7) % 24))
 
 	var shape := CollisionShape2D.new()
 	var box := RectangleShape2D.new()

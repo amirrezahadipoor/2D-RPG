@@ -811,6 +811,34 @@ func _check_people() -> void:
 			king_crowned = king_crowned and n.display_name != ""
 	_ok(towns == 0 or (kings == 1 and king_crowned),
 		"the town rules exactly one crowned king (%d towns, %d kings)" % [towns, kings])
+	# a wide seeded name pool keeps crowds from sharing eight recycled names
+	var name_pool_ok := true
+	for loc in ["en", "fa"]:
+		I18N.set_locale(loc)
+		for i in 24:
+			if I18N.tr_str("npc.name.%d" % i) == "npc.name.%d" % i:
+				name_pool_ok = false
+	I18N.set_locale("en")
+	_ok(name_pool_ok, "the 24-name pool resolves in EN and FA")
+	var pn1 := NPC.new()
+	add_child(pn1)   # the paper-doll needs to be inside the tree before equipping
+	pn1.setup("villager", {"index": 0, "plaza": Vector2i(50, 50)}, 1)
+	var pn2 := NPC.new()
+	add_child(pn2)
+	pn2.setup("villager", {"index": 1, "plaza": Vector2i(50, 50)}, 1)
+	_ok(pn1.display_name != pn2.display_name,
+		"different settlements give different villager names (%s / %s)" % [pn1.display_name, pn2.display_name])
+	pn1.queue_free()
+	pn2.queue_free()
+	await get_tree().process_frame
+	var tones_ok := true
+	for loc in ["en", "fa"]:
+		I18N.set_locale(loc)
+		for kind in ["kill", "collect", "clear", "deliver"]:
+			if I18N.tr_str("quest.tone." + kind) == "quest.tone." + kind:
+				tones_ok = false
+	I18N.set_locale("en")
+	_ok(tones_ok, "side-quest flavour lines resolve in EN and FA")
 	# an NPC actually walks towards its schedule target
 	var target: Vector2 = npc.schedule_target(Game.hour())
 	npc.global_position = npc.home
