@@ -35,13 +35,14 @@ func run() -> void:
 	await _check_houses()
 	await _check_pois()
 	_check_edges()
-	_check_places()
+	await _check_places()
 	_check_houses_art()
-	_check_shadows()
+	await _check_shadows()
 	_check_landmarks()
 	_check_ground()
 	_check_night_grade()
 	_check_dungeon_art()
+	_check_weather()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -930,7 +931,7 @@ func _check_places() -> void:
 	if target >= 0:
 		var r: Rect2i = world.settlements[target]["rect"]
 		world.hero.global_position = Vector2(r.position.x * 16.0 + 8.0, r.position.y * 16.0 + 8.0)
-		await get_tree().create_timer(0.8).timeout
+		await get_tree().create_timer(1.4).timeout
 		_ok(bool(world.discovered[target]), "walking in discovers %s" % world.settlements[target]["name_key"])
 
 func _check_houses_art() -> void:
@@ -1029,6 +1030,21 @@ func _check_dungeon_art() -> void:
 		"bone piles and cracks exist in the atlas")
 	d2.queue_free()
 	d3.queue_free()
+
+func _check_weather() -> void:
+	print("== weather B2 ==")
+	_ok(world.weather != null, "world owns a weather layer")
+	var keep: float = Game.game_minutes
+	var rd := 0
+	while rd < 8 and not Game.is_rainy_day():
+		rd += 1
+		Game.game_minutes = float(rd) * 1440.0 + 12.0 * 60.0
+	world.hero.global_position = Vector2(2000, 2000)
+	world._tick_weather()
+	_ok(world.weather.mode == "rain" or world.biome_at(world.hero.global_position) == "snow",
+		"rainy days bring rain (%s)" % world.weather.mode)
+	Game.game_minutes = keep
+	world._tick_weather()
 
 func _check_people() -> void:
 	print("== people ==")

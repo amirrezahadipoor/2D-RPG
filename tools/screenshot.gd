@@ -237,7 +237,16 @@ func run() -> void:
 			for i in 45:
 				await get_tree().physics_frame
 			await _grab("12g_night_village")
-			Game.game_minutes = keep_min
+
+		# ---- rain (Phase B2) ----
+		if world and world.weather:
+			var keep_rain: float = Game.game_minutes
+			Game.game_minutes = (1.0 * 1440.0) + 12.0 * 60.0
+			world._tick_weather()
+			await get_tree().create_timer(0.3).timeout
+			await _grab("12h_rain")
+			Game.game_minutes = keep_rain
+			world._tick_weather()
 			world._apply_night()
 
 		# ---- dialogue with the first NPC ----

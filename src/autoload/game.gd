@@ -36,6 +36,10 @@ func hour() -> int:
 func day() -> int:
 	return int(game_minutes / 1440.0) + 1
 
+## Roughly one day in three is rainy (deterministic per day).
+func is_rainy_day() -> bool:
+	return day() % 3 == 1
+
 func is_night() -> bool:
 	return hour() >= 21 or hour() < 6
 
