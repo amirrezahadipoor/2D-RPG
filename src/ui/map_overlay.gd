@@ -234,6 +234,18 @@ func _place_markers() -> void:
 		var d := _dot(col, 3 if st["type"] == "village" else 5)
 		var plaza := Vector2(st["plaza"].x * 16.0 + 8.0, st["plaza"].y * 16.0 + 8.0)
 		_markers.append([int(st["index"]), d, _to_local(plaza)])
+	for p in world.pois:
+		var col := Color(0.4, 0.95, 1.0)
+		var sz := 2
+		match p["type"]:
+			"camp":
+				col = Color(0.95, 0.35, 0.3)
+				sz = 3
+			"signpost":
+				col = Color(0.75, 0.6, 0.4)
+				sz = 2
+		var d := _dot(col, sz)
+		_markers.append([-2, d, _to_local(p["pos"])])
 	var cave := world.find_child("CaveEntrance", true, false)
 	if cave != null:
 		var cd := _dot(Color(0.6, 0.5, 0.95), 3)

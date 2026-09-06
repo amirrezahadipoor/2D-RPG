@@ -271,5 +271,13 @@
  "tut.fight.title": "Fights Start Themselves",
  "tut.fight.body": "Step into a foe - or tap it - and your hero swings without being told. The side chips open potion, bag, journal, map and pause.",
  "tut.next": "tap to continue",
- "tut.begin": "tap to begin"
+ "tut.begin": "tap to begin",
+ "poi.shrine.prompt": "Pray",
+ "poi.shrine.bless": "The shrine's warmth mends you (+10 hp)",
+ "poi.shrine.used": "The shrine sleeps now",
+ "poi.sign.prompt": "Read",
+ "poi.sign.0": "West: the old town. East: worse.",
+ "poi.sign.1": "Wolves ate the last cart. Walk fast.",
+ "poi.sign.2": "Shrine ahead: pray once, it remembers.",
+ "poi.sign.3": "Bandits camp where the road bends. Their chests travel light."
 }

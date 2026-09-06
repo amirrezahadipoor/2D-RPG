@@ -33,6 +33,7 @@ func run() -> void:
 	await _check_world_scale()
 	await _check_world_map()
 	await _check_houses()
+	await _check_pois()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -833,6 +834,66 @@ func _check_houses() -> void:
 	_ok(I18N.tr_str("rest.wake") != "rest.wake" and I18N.tr_str("rest.prompt") != "rest.prompt",
 		"rest strings resolve")
 	Stats.reset_run()
+
+func _check_pois() -> void:
+	print("== points of interest ==")
+	var n_sh := 0
+	var n_ca := 0
+	var n_si := 0
+	for p in world.pois:
+		match p["type"]:
+			"shrine": n_sh += 1
+			"camp": n_ca += 1
+			"signpost": n_si += 1
+	_ok(world.pois.size() >= 6, "the roads hold at least six points of interest (%d)" % world.pois.size())
+	_ok(n_sh >= 2 and n_ca >= 2 and n_si >= 1,
+		"shrines, camps and signposts all exist (%d/%d/%d)" % [n_sh, n_ca, n_si])
+	# chests stay put; foes roam (and earlier combat checks clear them), so
+	# chests are checked live and the guard count structurally
+	var camp_chests := 0
+	for node in get_tree().get_nodes_in_group("interact"):
+		if node is Chest and node.name.begins_with("CampChest_"):
+			camp_chests += 1
+	var foes_struct := true
+	for p in world.pois:
+		if p["type"] == "camp" and int(p.get("foes", 0)) < 1:
+			foes_struct = false
+	_ok(camp_chests == n_ca and foes_struct,
+		"every camp holds a chest and a guard detail (%d chests)" % camp_chests)
+	var shrine: Shrine = null
+	for node in get_tree().get_nodes_in_group("interact"):
+		if node is Shrine:
+			shrine = node
+			break
+	_ok(shrine != null, "a shrine node lives in the world")
+	if shrine:
+		Game.change_state(Game.State.PLAYING)
+		Stats.hp = 10
+		shrine.interact()
+		_ok(Stats.hp == 20, "praying at a shrine mends the hero (%d hp)" % Stats.hp)
+		shrine.interact()
+		_ok(Stats.hp == 20, "a second prayer does nothing")
+	var sign_ok := true
+	for loc in ["en", "fa"]:
+		I18N.set_locale(loc)
+		for i in 4:
+			if I18N.tr_str("poi.sign.%d" % i) == "poi.sign.%d" % i:
+				sign_ok = false
+	I18N.set_locale("en")
+	_ok(sign_ok, "signpost lore resolves in EN and FA")
+	var mo := MapOverlay.new()
+	add_child(mo)
+	await get_tree().process_frame
+	mo.show_map(world)
+	await get_tree().process_frame
+	var poi_dots := 0
+	for m in mo._markers:
+		if int(m[0]) == -2:
+			poi_dots += 1
+	_ok(poi_dots == world.pois.size(), "the map marks every POI (%d dots)" % poi_dots)
+	mo.hide_map()
+	mo.queue_free()
+	await get_tree().process_frame
 
 func _check_people() -> void:
 	print("== people ==")

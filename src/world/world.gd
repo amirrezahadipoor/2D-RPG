@@ -56,6 +56,7 @@ func build(seed_value: int) -> void:
 	_spawn_spawner()
 	_spawn_npcs()
 	_place_chests()
+	_place_pois()
 	_place_cave_entrance()
 	_place_house_doors()
 	_paint_shade()
@@ -593,6 +594,81 @@ func _place_chests() -> void:
 		actors.add_child(chest)
 		chest.global_position = pos
 		placed += 1
+
+# ------------------------------------------------------------------- POIs ---
+## Points of interest on the roads between settlements: shrines, camps and
+## signposts, so the open world has beats between the towns (Phase 3.3).
+var pois: Array = []   # [{type: String, pos: Vector2}]
+
+func _place_pois() -> void:
+	pois.clear()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = world_seed ^ 0x9E37
+	var kinds := ["shrine", "camp", "signpost", "camp", "shrine", "signpost", "camp", "shrine"]
+	var ki := 0
+	for i in settlements.size():
+		var a: Dictionary = settlements[i]
+		var b: Dictionary = settlements[(i + 1) % settlements.size()]
+		var pa := Vector2(a["plaza"].x * 16.0 + 8.0, a["plaza"].y * 16.0 + 8.0)
+		var pb := Vector2(b["plaza"].x * 16.0 + 8.0, b["plaza"].y * 16.0 + 8.0)
+		for t in [0.35, 0.68]:
+			var want := pa.lerp(pb, t) + Vector2(rng.randf_range(-24, 24), rng.randf_range(-24, 24))
+			var pos := nearest_walkable(want, 6)
+			if pos.distance_to(want) > 40.0:
+				continue
+			if pos.distance_to(hero.global_position) < 60.0:
+				continue
+			var in_town := false
+			for st in settlements:
+				if (st["rect"] as Rect2i).grow(2).has_point(Vector2i(int(pos.x / 16.0), int(pos.y / 16.0))):
+					in_town = true
+			if in_town:
+				continue
+			var too_close := false
+			for p in pois:
+				if (p["pos"] as Vector2).distance_to(pos) < 48.0:
+					too_close = true
+			if too_close:
+				continue
+			var kind: String = kinds[ki % kinds.size()]
+			ki += 1
+			pois.append({"type": kind, "pos": pos, "foes": 2 if kind == "camp" else 0})
+			_spawn_poi(kind, pos, rng)
+
+func _spawn_poi(kind: String, pos: Vector2, rng: RandomNumberGenerator) -> void:
+	match kind:
+		"shrine":
+			var s := Shrine.new()
+			s.name = "Shrine_%d" % pois.size()
+			actors.add_child(s)
+			s.global_position = pos
+		"signpost":
+			var s := Signpost.new()
+			s.name = "Signpost_%d" % pois.size()
+			s.line_index = rng.randi_range(0, 3)
+			actors.add_child(s)
+			s.global_position = pos
+		"camp":
+			var biome := biome_at(pos)
+			var type := "goblin"
+			if biome in ["snow"]:
+				type = "skeleton"
+			elif biome in ["desert", "swamp"]:
+				type = "orc"
+			elif biome in ["forest"]:
+				type = "goblin"
+			else:
+				type = "slime"
+			for k in 2:
+				var e := Enemy.new()
+				e.name = "Camp_%d_%d" % [pois.size(), k]
+				actors.add_child(e)
+				e.setup(type, 2)
+				e.global_position = pos + Vector2(rng.randf_range(-14, 14), rng.randf_range(-14, 14))
+			var c := Chest.new()
+			c.name = "CampChest_%d" % pois.size()
+			actors.add_child(c)
+			c.global_position = pos
 
 ## The dungeon's mouth: one reachable Stairs on the walkable fringe of the
 ## starting settlement. enter_dungeon()/exit_dungeon() (Main) own the actual

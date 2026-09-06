@@ -183,6 +183,18 @@ func run() -> void:
 			await get_tree().physics_frame
 		await _grab("12_village")
 
+		# ---- a roadside shrine (POI) ----
+		var shrine: Node2D = null
+		for node in get_tree().get_nodes_in_group("interact"):
+			if node is Shrine:
+				shrine = node
+				break
+		if shrine:
+			hero.global_position = shrine.global_position + Vector2(0, 22)
+			for i in 40:
+				await get_tree().physics_frame
+			await _grab("12b_shrine")
+
 		# ---- dialogue with the first NPC ----
 		var dlg: DialogueUI = main_node.get_node_or_null("DialogueUI") if main_node else null
 		if dlg and not world.npcs.is_empty():
