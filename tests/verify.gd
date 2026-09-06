@@ -40,6 +40,7 @@ func run() -> void:
 	_check_shadows()
 	_check_landmarks()
 	_check_ground()
+	_check_night_grade()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -996,6 +997,21 @@ func _check_ground() -> void:
 		"foam line breathes with the water shimmer")
 	world._foam_on = not world._foam_on
 	world._apply_foam()
+
+func _check_night_grade() -> void:
+	print("== night grade A6 ==")
+	var keep: float = Game.game_minutes
+	Game.game_minutes = 23.0 * 60.0
+	world._apply_night()
+	_ok(world.night_mod.color.b > world.night_mod.color.r + 0.15,
+		"midnight casts a cool moonlight grade")
+	_ok(world._win_lit, "windows glow at midnight")
+	Game.game_minutes = 12.0 * 60.0
+	world._apply_night()
+	_ok(world.night_mod.color == Color(1, 1, 1), "noon is ungraded")
+	_ok(not world._win_lit, "windows sleep at noon")
+	Game.game_minutes = keep
+	world._apply_night()
 
 func _check_people() -> void:
 	print("== people ==")

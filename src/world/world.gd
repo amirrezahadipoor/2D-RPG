@@ -25,6 +25,7 @@ var decals: Node2D
 var _water_cells: Array = []
 var _shore_cells: Array = []
 var _foam_on := true
+var night_mod: CanvasModulate
 var _blend_count := 0
 var _water_phase := 0
 var _shimmer_t := 0.0
@@ -254,6 +255,9 @@ func _build_tileset_and_layers() -> void:
 	shadow_layer = EntityShadows.new()
 	shadow_layer.name = "EntityShadows"
 	add_child(shadow_layer)
+	night_mod = CanvasModulate.new()
+	night_mod.name = "Moonlight"
+	add_child(night_mod)
 	decals = Node2D.new()
 	decals.name = "Decals"
 	add_child(decals)
@@ -570,6 +574,24 @@ func is_walkable_at(world_pos: Vector2) -> bool:
 
 ## Walking into a settlement's outskirts discovers it: a toast names the
 ## place and the map starts showing its label (Phase 4.1).
+## Phase A6: how deep into the night are we (0 = noon, 1 = midnight),
+## with one-hour dusk/dawn ramps.
+func nightness() -> float:
+	var h: float = fmod(Game.game_minutes, 1440.0) / 60.0
+	if h >= 21.0 or h < 5.0:
+		return 1.0
+	if h >= 19.0:
+		return (h - 19.0) / 2.0
+	if h < 7.0:
+		return 1.0 - (h - 5.0) / 2.0
+	return 0.0
+
+## Cool moonlight grade over the whole realm + warm windows after dusk.
+func _apply_night() -> void:
+	var n := nightness()
+	night_mod.color = Color(1, 1, 1).lerp(Color(0.52, 0.58, 0.84), n)
+	set_windows_lit(n > 0.5)
+
 ## Warm windows after dusk: swap every facade window to its lit variant
 ## (Phase A1/A6). Public so tests can force it.
 func set_windows_lit(lit: bool) -> void:
@@ -586,7 +608,7 @@ func _discover_tick(delta: float) -> void:
 	if _discover_t > 0.0:
 		return
 	_discover_t = 0.4
-	set_windows_lit(Game.is_night())
+	_apply_night()
 	if hero == null or not is_instance_valid(hero):
 		return
 	var ht := Vector2i(int(hero.global_position.x / 16.0), int(hero.global_position.y / 16.0))

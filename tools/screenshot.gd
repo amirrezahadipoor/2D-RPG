@@ -226,6 +226,18 @@ func run() -> void:
 				await get_tree().physics_frame
 			await _grab("12f_shore")
 
+		# ---- moonlight grade + lit windows (Phase A6) ----
+		if world and not world.settlements.is_empty():
+			var keep_min: float = Game.game_minutes
+			Game.game_minutes = 23.0 * 60.0
+			var plz: Vector2i = world.settlements[0]["plaza"]
+			hero.global_position = Vector2(plz.x * 16 + 8, (plz.y + 3) * 16)
+			for i in 45:
+				await get_tree().physics_frame
+			await _grab("12g_night_village")
+			Game.game_minutes = keep_min
+			world._apply_night()
+
 		# ---- dialogue with the first NPC ----
 		var dlg: DialogueUI = main_node.get_node_or_null("DialogueUI") if main_node else null
 		if dlg and not world.npcs.is_empty():
