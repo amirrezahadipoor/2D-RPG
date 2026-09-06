@@ -14,6 +14,7 @@ func run() -> void:
 	# NOTE: add as a child of root, NOT change_scene_to_file(): changing the
 	# scene frees the current scene, which is this very node, and get_tree()
 	# then returns null mid-coroutine.
+	Settings.tutorial_seen = false   # capture the first-run flow every time
 	var main: Node = load("res://scenes/main.tscn").instantiate()
 	main.name = "Main"
 	get_tree().root.add_child(main)
@@ -24,6 +25,16 @@ func run() -> void:
 	var cs0: Cutscene = main.get_node_or_null("Cutscene")
 	if cs0 and cs0.active:
 		cs0._end()
+
+	# first-run tutorial evidence, then get it out of the way of later shots
+	var tut0 := main.get_node_or_null("Tutorial") as Tutorial
+	if tut0:
+		tut0._auto = false
+		tut0.open()
+		for i in 4:
+			await get_tree().process_frame
+		await _grab("00_tutorial")
+		tut0.close()
 
 	# deterministic capture: the world is populated by hand further down
 	var world: Overworld = _world()

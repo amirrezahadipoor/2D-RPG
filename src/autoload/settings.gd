@@ -16,6 +16,7 @@ var quality: String = "high"
 var pan_speed: float = 1.0       # camera pan multiplier, 0.5 .. 2.0
 var tap_radius: float = 16.0     # design px a tap may land from a thing, 8..28
 var auto_combat: bool = true     # swing at foes that close in / attack us
+var tutorial_seen := false       # first-run touch tutorial already shown
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -34,6 +35,7 @@ func load_settings() -> void:
 		pan_speed = clampf(float(cfg.get_value("touch", "pan_speed", 1.0)), 0.5, 2.0)
 		tap_radius = clampf(float(cfg.get_value("touch", "tap_radius", 16.0)), 8.0, 28.0)
 		auto_combat = bool(cfg.get_value("touch", "auto_combat", true))
+		tutorial_seen = bool(cfg.get_value("touch", "tutorial_seen", false))
 
 func save_settings() -> void:
 	var cfg := ConfigFile.new()
@@ -45,6 +47,7 @@ func save_settings() -> void:
 	cfg.set_value("touch", "pan_speed", pan_speed)
 	cfg.set_value("touch", "tap_radius", tap_radius)
 	cfg.set_value("touch", "auto_combat", auto_combat)
+	cfg.set_value("touch", "tutorial_seen", tutorial_seen)
 	cfg.save(PATH)
 
 ## Push the values into the audio buses so they take effect immediately.
@@ -93,6 +96,11 @@ func set_tap_radius(v: float) -> void:
 
 func set_auto_combat(on: bool) -> void:
 	auto_combat = on
+	save_settings()
+	settings_changed.emit()
+
+func set_tutorial_seen(seen: bool) -> void:
+	tutorial_seen = seen
 	save_settings()
 	settings_changed.emit()
 

@@ -79,6 +79,12 @@ func _ready() -> void:
 	journal = JournalUI.new()
 	journal.name = "JournalUI"
 	add_child(journal)
+	if not Settings.tutorial_seen and (OS.has_feature("android") or OS.has_feature("ios")
+			or DisplayServer.is_touchscreen_available()):
+		var tut := Tutorial.new()
+		tut.name = "Tutorial"
+		add_child(tut)
+		tut.request_auto_open()
 
 	talents = TalentsUI.new()
 	talents.name = "TalentsUI"

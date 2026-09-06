@@ -51,6 +51,7 @@ func run() -> void:
 	await _check_touch_quality()
 	await _check_touch_settings()
 	await _check_safe_rails()
+	await _check_tutorial()
 	await _check_dialogue_touch()
 	await _check_act_card()
 
@@ -2406,6 +2407,51 @@ func _check_safe_rails() -> void:
 	touch_r.set_enabled(false)
 	touch_r.queue_free()
 	hud_t.queue_free()
+	await get_tree().process_frame
+
+func _check_tutorial() -> void:
+	print("== first-run tutorial ==")
+	Settings.set_tutorial_seen(false)
+	var tut := Tutorial.new()
+	add_child(tut)
+	await get_tree().process_frame
+	tut.open()
+	await get_tree().process_frame
+	_ok(tut.visible and tut._slide == 0, "the tutorial opens on slide one")
+	var stt := get_viewport().get_screen_transform()
+	var mid := stt * Vector2(240, 135)
+	for expect in [1, 2]:
+		tut._open_ms = 0
+		_g_touch(true, mid, 41)
+		_g_touch(false, mid, 41)
+		for i in 2:
+			await get_tree().process_frame
+		_ok(tut.visible and tut._slide == expect, "a tap advances to slide %d" % (expect + 1))
+	tut._open_ms = 0
+	_g_touch(true, mid, 42)
+	_g_touch(false, mid, 42)
+	for i in 2:
+		await get_tree().process_frame
+	_ok(not tut.visible, "the last tap dismisses the tutorial")
+	_ok(Settings.tutorial_seen, "and it never comes back (flag persisted)")
+	# the opening tap must not skip a slide on a real device
+	tut._open_ms = Time.get_ticks_msec()
+	tut.visible = true
+	_g_touch(true, mid, 43)
+	_g_touch(false, mid, 43)
+	await get_tree().process_frame
+	_ok(tut._slide == 2, "the tap that opens it does not skip ahead")
+	tut.visible = false
+	tut.queue_free()
+	var tut_ok := true
+	for loc in ["en", "fa"]:
+		I18N.set_locale(loc)
+		for k in ["tut.tap.title", "tut.tap.body", "tut.look.title", "tut.look.body",
+				"tut.fight.title", "tut.fight.body", "tut.next", "tut.begin"]:
+			if I18N.tr_str(k) == k:
+				tut_ok = false
+	I18N.set_locale("en")
+	_ok(tut_ok, "tutorial copy resolves in EN and FA")
 	await get_tree().process_frame
 
 func _check_dialogue_touch() -> void:

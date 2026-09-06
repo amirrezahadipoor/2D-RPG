@@ -263,5 +263,13 @@
  "settings.off": "Off",
  "settings.pan": "Pan Speed",
  "settings.tap_radius": "Tap Radius",
- "settings.auto_combat": "Auto-Combat"
+ "settings.auto_combat": "Auto-Combat",
+ "tut.tap.title": "Tap the World",
+ "tut.tap.body": "Tap the ground to walk. Tap a person to talk. Tap loot, chests or stairs to take and open them.",
+ "tut.look.title": "Drag to Look, Flick to Dodge",
+ "tut.look.body": "Hold and drag anywhere to look around the realm. Swipe fast in a direction to dodge-dash that way.",
+ "tut.fight.title": "Fights Start Themselves",
+ "tut.fight.body": "Step into a foe - or tap it - and your hero swings without being told. The side chips open potion, bag, journal, map and pause.",
+ "tut.next": "tap to continue",
+ "tut.begin": "tap to begin"
 }
