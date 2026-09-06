@@ -84,6 +84,9 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var t: InputEventScreenTouch = event
 		if t.pressed and not _down:
+			var vp := get_viewport().get_visible_rect().size
+			if t.position.x < 0.0 or t.position.y < 0.0 or t.position.x > vp.x or t.position.y > vp.y:
+				return   # finger is on the letterbox bars, not the stage
 			if _on_chip(t.position):
 				return   # a HUD chip owns this finger
 			_down = true

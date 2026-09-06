@@ -24,6 +24,17 @@ var _root: Control
 var _grade: TextureRect
 var _vignette: ColorRect
 var _chips: Array[Control] = []
+var _tl: Array[Control] = []
+var _tl_base: Dictionary = {}
+var _rail_l: ColorRect
+var _rail_r: ColorRect
+var _rail_hint: Label
+var safe_l := 0.0
+var safe_t := 0.0
+var safe_r := 0.0
+var safe_b := 0.0
+var _safe_override := Rect2()   # test hook: pretend a notch, in window px
+var _rail_override := 0.0       # test hook: pretend letterbox bars, design px
 var _chip_rects: Array[Rect2] = []
 var _toast: Label
 var _last_level := 1
@@ -107,6 +118,30 @@ func _build() -> void:
 	_biome_label = _label(Vector2(0, 6), Color(0.85, 0.9, 1.0))
 	_biome_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
+	# --- letterbox rails: the black bars on 20:9 phones become useful chrome ---
+	_rail_l = ColorRect.new()
+	_rail_l.color = Color(0.03, 0.03, 0.05, 1.0)
+	_rail_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_rail_l.visible = false
+	_root.add_child(_rail_l)
+	_rail_r = ColorRect.new()
+	_rail_r.color = Color(0.03, 0.03, 0.05, 1.0)
+	_rail_r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_rail_r.visible = false
+	_root.add_child(_rail_r)
+	_rail_hint = Label.new()
+	_rail_hint.add_theme_font_size_override("font_size", 7)
+	_rail_hint.add_theme_font_override("font", load(I18N.FONT_REGULAR_PATH))
+	_rail_hint.add_theme_color_override("font_color", Color(0.6, 0.63, 0.72))
+	_rail_hint.rotation_degrees = -90.0
+	_rail_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_rail_hint.visible = false
+	_root.add_child(_rail_hint)
+
+	for n in [_hp_bg, _hp_fill, _sta_bg, _sta_fill, _level_label, _gold_label]:
+		_tl.append(n)
+		_tl_base[n] = n.position
+
 	# --- gear strip (bottom-right): live icons of what is equipped ---
 	_strip = HBoxContainer.new()
 	_strip.name = "GearStrip"
@@ -174,15 +209,33 @@ func _build() -> void:
 
 func _layout() -> void:
 	var vp := get_viewport().get_visible_rect().size
+	_update_safe(vp)
+	var bars := _bars(vp)
+	var railed := bars.x > 6.0 or bars.y > 6.0
+	if _rail_l:
+		_rail_l.visible = railed
+		_rail_l.position = Vector2.ZERO
+		_rail_l.size = Vector2(bars.x, vp.y)
+		_rail_r.visible = railed
+		_rail_r.position = Vector2(vp.x - bars.y, 0.0)
+		_rail_r.size = Vector2(bars.y, vp.y)
+	if _rail_hint:
+		_rail_hint.visible = railed and bars.x > 14.0
+		_rail_hint.text = I18N.tr_str("hud.gestures")
+		_rail_hint.size = Vector2(vp.y - 48.0, 10.0)
+		_rail_hint.position = Vector2(bars.x * 0.5 + 3.0, vp.y - 24.0)
 	if _biome_label:
-		_biome_label.position = Vector2(vp.x - 140, 6)
+		_biome_label.position = Vector2(vp.x - safe_r - 140, safe_t + 6)
 		_biome_label.size = Vector2(134, 12)
 	if _prompts:
-		_prompts.position = Vector2(6, vp.y - 30)
+		_prompts.position = Vector2(6 + safe_l, vp.y - safe_b - 30)
+		_prompts.visible = not railed
 	if _strip:
-		# fixed width: the container's own size is 0 on the first layout pass
+		# fixed width: the container's own size is 0 on the first layout pass;
+		# keep it on the stage, never on a letterbox rail
 		var strip_w := float(ArtIndex.EQUIPMENT_SLOTS.size()) * 20.0 - 2.0
-		_strip.position = Vector2(vp.x - 6 - strip_w, vp.y - 6 - 18)
+		var inset_r := bars.y if railed else safe_r
+		_strip.position = Vector2(vp.x - inset_r - 6 - strip_w, vp.y - safe_b - 6 - 18)
 	if _vignette:
 		_vignette.position = Vector2.ZERO
 		_vignette.size = vp
@@ -193,12 +246,52 @@ func _layout() -> void:
 		_night.position = Vector2.ZERO
 		_night.size = vp
 	_chip_rects.clear()
+	var chip_x := vp.x - safe_r - 28.0
+	var chip_y0 := vp.y * 0.42
+	if railed and bars.y > 26.0:
+		# park the chips inside the right bar instead of over the world
+		chip_x = vp.x - bars.y + (bars.y - 24.0) * 0.5
+		chip_y0 = (vp.y - 5.0 * 26.0) * 0.5
 	for i in _chips.size():
-		_chips[i].position = Vector2(vp.x - 28, vp.y * 0.42 + float(i) * 26.0)
+		_chips[i].position = Vector2(chip_x, chip_y0 + float(i) * 26.0)
 		_chip_rects.append(Rect2(_chips[i].position, _chips[i].size))
+	for n in _tl:
+		n.position = (_tl_base[n] as Vector2) + Vector2(safe_l, safe_t)
 	if _clock:
-		_clock.position = Vector2(0, 6)
-		_clock.size = Vector2(vp.x, 10)
+		_clock.position = Vector2(bars.x, safe_t + 6)
+		_clock.size = Vector2(vp.x - bars.x - bars.y, 10)
+
+## Notch / punch-hole margins, in design px, from the OS safe area.
+func _update_safe(vp: Vector2) -> void:
+	var st := get_viewport().get_screen_transform()
+	var s := st.get_scale()
+	var o := st.get_origin()
+	var area := _safe_override
+	if area.size == Vector2.ZERO:
+		area = Rect2(DisplayServer.get_display_safe_area())
+		var win := DisplayServer.window_get_size()
+		if area.position == Vector2.ZERO and area.size == Vector2(win):
+			safe_l = 0.0
+			safe_t = 0.0
+			safe_r = 0.0
+			safe_b = 0.0
+			return
+	safe_l = maxf(0.0, (area.position.x - o.x) / s.x)
+	safe_t = maxf(0.0, (area.position.y - o.y) / s.y)
+	safe_r = maxf(0.0, vp.x - (area.position.x + area.size.x - o.x) / s.x)
+	safe_b = maxf(0.0, vp.y - (area.position.y + area.size.y - o.y) / s.y)
+
+## Letterbox bar widths in design px (aspect "keep" centres the 480x270 stage).
+func _bars(vp: Vector2) -> Vector2:
+	if _rail_override > 0.0:
+		return Vector2(_rail_override, _rail_override)
+	var st := get_viewport().get_screen_transform()
+	var s := st.get_scale()
+	var o := st.get_origin()
+	var win := DisplayServer.window_get_size()
+	var l := o.x / s.x
+	var r := (float(win.x) - o.x) / s.x - vp.x
+	return Vector2(maxf(0.0, l), maxf(0.0, r))
 
 ## True when a design-space point lands on one of the quick chips
 ## (TouchUI uses this to let taps on chips pass through to the GUI).

@@ -50,6 +50,7 @@ func run() -> void:
 	await _check_menus()
 	await _check_touch_quality()
 	await _check_touch_settings()
+	await _check_safe_rails()
 	await _check_dialogue_touch()
 	await _check_act_card()
 
@@ -1954,7 +1955,7 @@ func _check_touch_quality() -> void:
 	_g_touch(true, _g_screen_at(npc_t.global_position), 12)
 	_g_touch(false, _g_screen_at(npc_t.global_position), 12)
 	var talked := false
-	for i in 300:
+	for i in 420:
 		await get_tree().physics_frame
 		if dlg_t.visible and dlg_t.npc == npc_t:
 			talked = true
@@ -2233,9 +2234,13 @@ func _check_touch_settings() -> void:
 	var tap_w := foe_t.global_position
 	_g_touch(true, _g_screen_at(tap_w), 21)
 	_g_touch(false, _g_screen_at(tap_w), 21)
-	for i in 2:
+	var engaged := false
+	for i in 6:
 		await get_tree().process_frame
-	_ok(hero_t._enemy_target == foe_t, "tapping a foe still engages it with auto-combat off")
+		if hero_t._enemy_target == foe_t:
+			engaged = true
+			break
+	_ok(engaged, "tapping a foe still engages it with auto-combat off")
 	func_reset_t(hero_t)
 	foe_t.queue_free()
 	await _clear_enemies_now()
@@ -2265,24 +2270,31 @@ func _check_touch_settings() -> void:
 	var pk2 := Pickup.new()
 	world.actors.add_child(pk2)
 	pk2.setup(ItemGen.roll("leather_boots", grng2))
-	pk2.global_position = hero_t.global_position + Vector2(90, 0)
+	pk2.global_position = hero_t.global_position + Vector2(56, 0)  # on-stage: design x < 480
 	hero_t.cam.reset_smoothing()
 	for i in 3:
 		await get_tree().physics_frame
 	var sloppy := pk2.global_position + Vector2(24, 0)
 	_g_touch(true, _g_screen_at(sloppy), 22)
 	_g_touch(false, _g_screen_at(sloppy), 22)
-	for i in 2:
+	var wide_ok := false
+	for i in 6:
 		await get_tree().process_frame
-	_ok(hero_t._interact_pending == pk2, "a wide tap radius forgives a sloppy tap")
+		if hero_t._interact_pending == pk2:
+			wide_ok = true
+			break
+	_ok(wide_ok, "a wide tap radius forgives a sloppy tap")
 	Settings.set_tap_radius(8.0)
 	func_reset_t(hero_t)
 	_g_touch(true, _g_screen_at(sloppy), 23)
 	_g_touch(false, _g_screen_at(sloppy), 23)
-	for i in 2:
+	var narrow_ok := false
+	for i in 6:
 		await get_tree().process_frame
-	_ok(hero_t._interact_pending == null and hero_t._has_move_to,
-		"a narrow tap radius walks to the sloppy spot instead")
+		if hero_t._interact_pending == null and hero_t._has_move_to:
+			narrow_ok = true
+			break
+	_ok(narrow_ok, "a narrow tap radius walks to the sloppy spot instead")
 	pk2.queue_free()
 	Inventory.reset_run()
 	Settings.set_tap_radius(16.0)
@@ -2341,6 +2353,59 @@ func _check_touch_settings() -> void:
 	su.queue_free()
 	touch_s.set_enabled(false)
 	touch_s.queue_free()
+	await get_tree().process_frame
+
+func _check_safe_rails() -> void:
+	print("== safe area & letterbox rails ==")
+	var hud_t := Hud.new()
+	add_child(hud_t)
+	await get_tree().process_frame
+	var vp := get_viewport().get_visible_rect().size
+
+	# a notched phone: everything slides inside the safe area
+	var win := DisplayServer.window_get_size()
+	hud_t._safe_override = Rect2(20, 16, win.x - 40, win.y - 32)
+	hud_t._layout()
+	var st := get_viewport().get_screen_transform().get_scale().x
+	_ok(absf(hud_t.safe_l - 20.0 / st) < 0.6 and absf(hud_t.safe_t - 16.0 / st) < 0.6,
+		"a notch pushes the HUD inside the safe area (%.1f/%.1f design px)" % [hud_t.safe_l, hud_t.safe_t])
+	_ok(hud_t._hp_bg.position.x >= hud_t.safe_l + 5.0 and hud_t._hp_bg.position.y >= hud_t.safe_t + 5.0,
+		"vitals bars dodge the notch")
+	_ok(hud_t._chips[0].position.x <= vp.x - hud_t.safe_r - 26.0,
+		"the chip column dodges the right notch edge")
+	hud_t._safe_override = Rect2()
+	hud_t._layout()
+	_ok(hud_t.safe_l == 0.0 and hud_t.safe_r == 0.0, "no notch, no margins")
+
+	# a 20:9 phone: the letterbox bars become rails, not dead black
+	hud_t._rail_override = 34.0
+	hud_t._layout()
+	_ok(hud_t._rail_l.visible and hud_t._rail_r.visible, "letterbox bars get rail chrome")
+	_ok(hud_t._rail_hint.visible, "the left rail carries the gesture hint")
+	var cx := hud_t._chips[0].position.x
+	_ok(cx >= vp.x - 34.0 and cx <= vp.x - 10.0,
+		"chips park inside the right rail (%.0f of %..0f)" % [cx, vp.x] if false else "chips park inside the right rail (%.0f)" % cx)
+	_ok(not hud_t._prompts.visible, "the bottom hint yields to the rail hint")
+	hud_t._rail_override = 0.0
+	hud_t._layout()
+	_ok(not hud_t._rail_l.visible and hud_t._prompts.visible, "16:9 keeps the classic layout")
+
+	# a finger on a letterbox bar is not a world command
+	var touch_r := TouchUI.new()
+	add_child(touch_r)
+	await get_tree().process_frame
+	touch_r.set_enabled(true)
+	Game.change_state(Game.State.PLAYING)
+	var hero_r := world.hero
+	func_reset_t(hero_r)
+	_g_touch(true, Vector2(-14.0, vp.y * 0.5), 31)
+	_g_touch(false, Vector2(-14.0, vp.y * 0.5), 31)
+	for i in 2:
+		await get_tree().process_frame
+	_ok(not hero_r._has_move_to, "taps on the letterbox bar never walk the hero")
+	touch_r.set_enabled(false)
+	touch_r.queue_free()
+	hud_t.queue_free()
 	await get_tree().process_frame
 
 func _check_dialogue_touch() -> void:

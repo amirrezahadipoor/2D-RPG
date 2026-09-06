@@ -256,6 +256,9 @@ func _touch_think(delta: float) -> void:
 		_has_move_to = false
 	if is_instance_valid(_interact_pending):
 		var n := _interact_pending as Node2D
+		if n != null and (n.global_position - global_position).length() > 17.0 and _has_move_to:
+			var back := (global_position - n.global_position).normalized() * 10.0
+			_move_to = n.global_position + back
 		if n != null and (n.global_position - global_position).length() < 17.0:
 			_interact_pending = null
 			_has_move_to = false
