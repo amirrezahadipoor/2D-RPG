@@ -37,5 +37,5 @@ locally فقط import/verify سریع با تایم‌اوت کوتاه.
 
 ## فاز F — کارایی و انتشار
 - [x] F1 ۶۰fps میان‌رده: pool کردن VFX، cull، atlas واحد
-- [ ] F2 AAB/APK امضاشده در CI + manifest آمادهٔ استور
+- [x] F2 AAB/APK امضاشده در CI + manifest آمادهٔ استور
 - [x] F3 assets استور: اسکرین‌شات، گرافیک ویژه، توضیح EN/FA
