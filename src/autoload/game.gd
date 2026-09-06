@@ -31,6 +31,15 @@ var saved_hero_pos := Vector2.ZERO
 var saved_dungeon_depth := 0
 var pending_load := false
 
+## R1.2: a tiny "world remembers" system. When the hero fells a dungeon boss,
+## the name travels back to town - NPCs get one extra rumor line about it
+## instead of every conversation staying frozen in a bubble that ignores
+## what just happened in the world. Empty string = no rumor yet.
+var last_boss_defeated := ""
+
+func report_boss_defeated(enemy_type: String) -> void:
+	last_boss_defeated = enemy_type
+
 func hour() -> int:
 	return int(game_minutes / 60.0) % 24
 
@@ -104,6 +113,7 @@ func die() -> void:
 func start_new_run(hardcore: bool = true) -> void:
 	is_hardcore = hardcore
 	playtime = 0.0
+	last_boss_defeated = ""
 	saved_world_seed = FIXED_WORLD_SEED
 	saved_hero_pos = Vector2.ZERO
 	saved_dungeon_depth = 0
@@ -126,6 +136,7 @@ func save_run() -> bool:
 		"playtime": playtime,
 		"game_minutes": game_minutes,
 		"seen_intro": seen_intro,
+		"last_boss_defeated": last_boss_defeated,
 		"stats": Stats.serialize(),
 		"inventory": Inventory.serialize(),
 		"quests": QuestLog.serialize(),
@@ -163,6 +174,7 @@ func load_run() -> bool:
 	playtime = float(parsed.get("playtime", 0.0))
 	game_minutes = float(parsed.get("game_minutes", 8.0 * 60.0))
 	seen_intro = bool(parsed.get("seen_intro", false))
+	last_boss_defeated = String(parsed.get("last_boss_defeated", ""))
 	Stats.deserialize(parsed.get("stats", {}))
 	Inventory.deserialize(parsed.get("inventory", {}))
 	QuestLog.deserialize(parsed.get("quests", {}))

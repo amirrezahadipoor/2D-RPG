@@ -1510,6 +1510,67 @@ func _check_people() -> void:
 		await get_tree().physics_frame
 	_ok(true, "npc simulation ran 30 frames without error")
 
+	# --- R1: villagers have several lines, not one frozen sentence ---
+	var line_locale_ok := true
+	for loc in ["en", "fa"]:
+		I18N.set_locale(loc)
+		for role in ["villager", "elder", "guard", "merchant", "king"]:
+			for i in DialogueUI.HELLO_LINE_COUNT:
+				var k := "npc.hello.%s.%d" % [role, i]
+				if I18N.tr_str(k) == k:
+					line_locale_ok = false
+	I18N.set_locale("en")
+	_ok(line_locale_ok, "every role has %d hello lines in EN and FA" % DialogueUI.HELLO_LINE_COUNT)
+
+	var chat_npc := NPC.new()
+	chat_npc.role_name = "villager"
+	chat_npc.sett_index = 0
+	chat_npc.npc_index = 3
+	var seen_lines := {}
+	var chat_dlg := DialogueUI.new()
+	add_child(chat_dlg)
+	var day0 := Game.game_minutes
+	for d in 6:
+		Game.game_minutes = day0 + float(d) * 1440.0
+		chat_dlg.open_with(chat_npc)
+		seen_lines[String(chat_dlg._pages[0]["text"])] = true
+	Game.game_minutes = day0
+	_ok(seen_lines.size() >= 2,
+		"the same villager says different things across several days (%d distinct)" % seen_lines.size())
+
+	# --- R1.2: the world remembers a slain dungeon boss as a rumor ---
+	Game.last_boss_defeated = ""
+	chat_dlg.open_with(chat_npc)
+	var no_rumor := true
+	for p in chat_dlg._pages:
+		if String(p.get("text", "")).find("%") >= 0:
+			no_rumor = false
+	_ok(no_rumor, "no rumor page when nothing has happened")
+	Game.report_boss_defeated("dragon")
+	_ok(Game.last_boss_defeated == "dragon", "Game remembers the last boss defeated")
+	chat_dlg.open_with(chat_npc)
+	var rumor_found := false
+	for p in chat_dlg._pages:
+		if String(p.get("text", "")).find(I18N.tr_str("enemy.dragon")) >= 0:
+			rumor_found = true
+	_ok(rumor_found, "a town NPC greets the hero with a rumor about the fallen boss")
+	_ok(Game.last_boss_defeated == "", "the rumor is spent after being told once")
+	var resident_npc := NPC.new()
+	add_child(resident_npc)
+	resident_npc.setup("resident_home", {"index": 0}, 0)
+	Game.report_boss_defeated("dragon")
+	chat_dlg.open_with(resident_npc)
+	var resident_got_rumor := false
+	for p in chat_dlg._pages:
+		if String(p.get("text", "")).find(I18N.tr_str("enemy.dragon")) >= 0:
+			resident_got_rumor = true
+	_ok(not resident_got_rumor, "house residents skip town rumor chatter")
+	Game.last_boss_defeated = ""
+	resident_npc.queue_free()
+	chat_dlg.queue_free()
+	chat_npc.queue_free()
+	await get_tree().process_frame
+
 # ---------------------------------------------------------------- quests ----
 func _check_quests() -> void:
 	print("== quests ==")

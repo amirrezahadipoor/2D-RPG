@@ -335,6 +335,10 @@ func _update_boss_bar() -> void:
 func _on_boss_down() -> void:
 	if _stairs_down_node != null and is_instance_valid(_stairs_down_node):
 		_stairs_down_node.set_locked(false)
+	if boss != null:
+		# R1.2: the world remembers - town NPCs get one rumor line about this
+		# the next time they are talked to (see dialogue.gd _maybe_rumor_page)
+		Game.report_boss_defeated(boss.enemy_type)
 	if not is_inside_tree():
 		return
 	var hud := get_tree().get_first_node_in_group("hud")

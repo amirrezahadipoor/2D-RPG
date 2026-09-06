@@ -139,13 +139,38 @@ func close() -> void:
 	visible = false
 	npc = null
 
+## R1: a seeded pick of several lines per role instead of one fixed sentence,
+## so re-visiting the same villager over many days does not always read the
+## exact same greeting. Seeded on the NPC + day, so it is still deterministic
+## and testable, and the world.gd king's chapter-aware line (see below) stays
+## untouched.
+const HELLO_LINE_COUNT := 6
+
+func _pick_hello_key(role: String) -> String:
+	var pick := (npc.npc_index * 2654435761 + npc.sett_index * 97 + Game.day() * 131) % HELLO_LINE_COUNT
+	return "npc.hello.%s.%d" % [role, pick]
+
+## R1.2: the first town NPC talked to after a dungeon boss falls gets one
+## extra rumor line, then the rumor is "spent" (Game.last_boss_defeated
+## clears) so it does not repeat forever. Residents skip this - they are a
+## private conversation, not town chatter.
+func _maybe_rumor_page() -> Dictionary:
+	if npc.is_resident or Game.last_boss_defeated == "":
+		return {}
+	var enemy_name := I18N.tr_str("enemy." + Game.last_boss_defeated)
+	Game.last_boss_defeated = ""
+	return {"text": I18N.tr_str("npc.rumor.boss_down") % enemy_name, "mode": "talk"}
+
 func _compose_pages() -> Array:
 	var pages := []
 	if npc.is_resident:
 		return _compose_resident_pages()
 	pages.append({"text": "%s\n%s" % [
 		I18N.tr_str("npc.role." + npc.role_name),
-		I18N.tr_str("npc.hello." + npc.role_name)], "mode": "talk"})
+		I18N.tr_str(_pick_hello_key(npc.role_name))], "mode": "talk"})
+	var rumor := _maybe_rumor_page()
+	if not rumor.is_empty():
+		pages.append(rumor)
 	var live_main := QuestLog.current_main()
 	if npc.role_name in ["elder", "king"] and not live_main.is_empty():
 		var act_line: String = I18N.tr_str("story.act.%d" % QuestLog.current_act())
