@@ -12,6 +12,7 @@ var music: float = 0.8
 var sfx: float = 1.0
 var quality: String = "high"
 var fps_cap: int = 60
+var ui_scale: float = 1.0
 
 # ---- touch feel (Phase 2.3) ----
 var pan_speed: float = 1.0       # camera pan multiplier, 0.5 .. 2.0
@@ -31,6 +32,7 @@ func load_settings() -> void:
 		music = clampf(float(cfg.get_value("audio", "music", 0.8)), 0.0, 1.0)
 		sfx = clampf(float(cfg.get_value("audio", "sfx", 1.0)), 0.0, 1.0)
 		fps_cap = int(cfg.get_value("video", "fps", 60))
+		ui_scale = float(cfg.get_value("video", "ui_scale", 1.0))
 		Engine.max_fps = fps_cap
 		var q: String = str(cfg.get_value("video", "quality", "high"))
 		if q in QUALITIES:
@@ -48,6 +50,7 @@ func save_settings() -> void:
 	cfg.set_value("audio", "sfx", sfx)
 	cfg.set_value("video", "quality", quality)
 	cfg.set_value("video", "fps", fps_cap)
+	cfg.set_value("video", "ui_scale", ui_scale)
 	cfg.set_value("touch", "pan_speed", pan_speed)
 	cfg.set_value("touch", "tap_radius", tap_radius)
 	cfg.set_value("touch", "auto_combat", auto_combat)
@@ -80,6 +83,12 @@ func set_sfx(v: float) -> void:
 	sfx = clampf(v, 0.0, 1.0)
 	save_settings()
 	apply()
+
+## Phase E3: bigger UI for small eyes / small phones.
+func set_ui_scale(v: float) -> void:
+	ui_scale = clampf(v, 1.0, 1.6)
+	settings_changed.emit()
+	save_settings()
 
 ## Phase E1: battery-saving 30 fps cap for weak phones.
 func set_fps_cap(v: int) -> void:

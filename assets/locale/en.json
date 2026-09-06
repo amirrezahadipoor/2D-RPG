@@ -310,5 +310,6 @@
  "bench.prompt": "Craft",
  "mine.prompt": "Mine",
  "fish.prompt": "Fish",
- "item.fish": "Fish"
+ "item.fish": "Fish",
+ "settings.ui_scale": "UI size"
 }

@@ -51,6 +51,7 @@ func run() -> void:
 	_check_camera()
 	await _check_craft()
 	await _check_gather()
+	_check_access()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -1193,6 +1194,19 @@ func _check_gather() -> void:
 			dropped = true
 	_ok(dropped, "mining drops ore for the hero to pick up")
 	Inventory.reset_run()
+
+func _check_access() -> void:
+	print("== access E3 ==")
+	Settings.set_ui_scale(1.3)
+	var scaled := 0
+	for ch in main_node.get_children():
+		if ch is CanvasLayer and ch.scale.x > 1.2:
+			scaled += 1
+	_ok(scaled >= 2, "UI scale enlarges every overlay (%d layers)" % scaled)
+	Settings.set_ui_scale(1.0)
+	for ch in main_node.get_children():
+		if ch is CanvasLayer:
+			ch.scale = Vector2.ONE
 
 func _check_people() -> void:
 	print("== people ==")

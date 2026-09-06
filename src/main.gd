@@ -49,6 +49,8 @@ func _ready() -> void:
 	hud = Hud.new()
 	hud.name = "Hud"
 	add_child(hud)
+	_apply_ui_scale.call_deferred()
+	Settings.settings_changed.connect(_apply_ui_scale)
 
 	death_screen = DeathScreen.new()
 	death_screen.name = "DeathScreen"
@@ -411,3 +413,9 @@ func exit_house() -> void:
 		world.ambient.set_process(true)
 	hud.set_biome(world.biome_at(world.hero.global_position))
 	Sfx.set_biome(world.biome_at(world.hero.global_position))
+
+## Phase E3: every UI canvas honours the accessibility scale.
+func _apply_ui_scale() -> void:
+	for ch in get_children():
+		if ch is CanvasLayer and ch.name != "World":
+			ch.scale = Vector2(Settings.ui_scale, Settings.ui_scale)

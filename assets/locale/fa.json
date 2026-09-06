@@ -310,5 +310,6 @@
  "bench.prompt": "کرفت",
  "mine.prompt": "استخراج",
  "fish.prompt": "ماهیگیری",
- "item.fish": "ماهی"
+ "item.fish": "ماهی",
+ "settings.ui_scale": "اندازهٔ رابط"
 }
