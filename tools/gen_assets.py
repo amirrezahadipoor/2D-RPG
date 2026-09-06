@@ -685,7 +685,80 @@ TILE_DEFS = [
     ("roof",     "red_m", "red_d", "red_l"),
     ("shade",    "black", "black", "black"),
     ("water2",   "water_m", "water_d", "water_l"),
+    ("roof_ridge", "red_m", "red_d", "red_l"),
+    ("facade",   "leath_m", "leath_d", "leath_l"),
+    ("facade_door", "leath_m", "leath_d", "leath_l"),
+    ("facade_win", "leath_m", "leath_d", "leath_l"),
+    ("facade_win_lit", "leath_m", "leath_d", "leath_l"),
 ]
+
+PLASTER = (198, 180, 146)
+PLASTER_D = (164, 146, 114)
+TIMBER = (94, 64, 42)
+TIMBER_D = (64, 42, 26)
+FOUND = (112, 112, 120)
+FOUND_D = (86, 86, 94)
+GLASS = (36, 48, 84)
+GLASS_L = (78, 100, 150)
+LIT = (252, 204, 96)
+LIT_L = (255, 236, 168)
+
+
+def _wall_base(c):
+    c.rect(0, 0, 16, 16, PLASTER)
+    for y in range(16):
+        for x in range(16):
+            if _noise(x, y, 77) > 0.88:
+                c.px(x, y, PLASTER_D)
+    c.hline(0, 0, 16, TIMBER_D)          # eave beam under the roof
+    c.hline(0, 1, 16, TIMBER)
+    c.vline(0, 2, 11, TIMBER)            # corner studs
+    c.vline(15, 2, 11, TIMBER)
+    c.rect(0, 13, 16, 3, FOUND)          # stone foundation
+    c.hline(0, 13, 16, FOUND_D)
+    for x in range(0, 16, 4):
+        c.px(x, 14, FOUND_D)
+
+
+def _paint_custom(c, name):
+    """Fully hand-painted tiles (Phase A1): 2.5D house fronts + ridge caps."""
+    if name == "roof_ridge":
+        c.rect(0, 0, 16, 16, PAL["red_m"])
+        c.hline(0, 0, 16, PAL["red_d"])
+        c.hline(0, 1, 16, PAL["red_l"])
+        c.hline(0, 2, 16, darken(PAL["red_m"], 0.9))
+        for x in range(0, 16, 4):
+            c.px(x, 1, PAL["white"])
+        for y in range(4, 16):
+            for x in range(16):
+                if y % 4 == 3:
+                    c.px(x, y, darken(PAL["red_m"], 0.82))
+                elif (x + (y // 4) % 2) % 4 == 0:
+                    c.px(x, y, PAL["red_l"])
+        return True
+    if name in ("facade", "facade_door", "facade_win", "facade_win_lit"):
+        _wall_base(c)
+        if name == "facade":
+            return True
+        if name == "facade_door":
+            c.rect(4, 3, 8, 10, TIMBER_D)
+            c.rect(5, 4, 6, 9, PAL["leath_m"])
+            c.vline(6, 4, 9, PAL["leath_d"]); c.vline(9, 4, 9, PAL["leath_d"])
+            c.hline(5, 4, 6, PAL["leath_l"])
+            c.px(9, 9, PAL["gold_l"])
+            c.rect(3, 13, 10, 1, PAL["stone_l"])   # doorstep
+            return True
+        lit = name == "facade_win_lit"
+        c.rect(4, 4, 8, 8, TIMBER_D)
+        c.rect(5, 5, 6, 6, LIT if lit else GLASS)
+        c.vline(7, 5, 6, TIMBER_D); c.hline(5, 7, 6, TIMBER_D)
+        if lit:
+            c.px(6, 6, LIT_L); c.px(9, 8, LIT_L)
+            c.px(5, 12, PAL["gold_m"]); c.px(8, 12, PAL["gold_m"]); c.px(10, 12, PAL["gold_m"])
+        else:
+            c.px(5, 5, GLASS_L); c.px(6, 6, GLASS_L)
+        return True
+    return False
 
 
 def _noise(x, y, seed=1):
@@ -795,11 +868,12 @@ def make_tileset():
         bx, by = (idx % TILE_COLS) * TILE, (idx // TILE_COLS) * TILE
         bc = PAL[base]
         c = Canvas(TILE, TILE)
-        if name != "shade":   # shade is a transparent tile with a dark crown
-            c.rect(0, 0, TILE, TILE, bc)
-        for y in range(TILE):
-            for x in range(TILE):
-                _detail(name, x, y, _noise(x, y, idx + 1), c, bc)
+        if not _paint_custom(c, name):
+            if name != "shade":   # shade is a transparent tile with a dark crown
+                c.rect(0, 0, TILE, TILE, bc)
+            for y in range(TILE):
+                for x in range(TILE):
+                    _detail(name, x, y, _noise(x, y, idx + 1), c, bc)
         for (x, y), col in c.buf.items():
             sheet.px(bx + x, by + y, col)
     return sheet, [d[0] for d in TILE_DEFS]
@@ -808,7 +882,7 @@ def make_tileset():
 def make_props():
     """Overlay props drawn on top of terrain."""
     names = ["tree", "rock", "bush", "flower", "chest", "stairs", "sign", "torch",
-             "tomb", "fence", "well"]
+             "tomb", "fence", "well", "chimney"]
     # 8 columns x 2 rows: matches the (i % 8, i / 8) atlas coords used in-game
     sheet = Canvas(8 * TILE, 2 * TILE)
     for i, name in enumerate(names):
@@ -890,6 +964,14 @@ def make_props():
             c.hline(3, 8, 10, PAL["leath_d"])
             c.vline(3, 3, 6, PAL["leath_l"]); c.vline(12, 3, 6, PAL["leath_d"])
             c.hline(5, 5, 6, PAL["leath_d"]); c.hline(5, 7, 4, PAL["leath_d"])
+        elif name == "chimney":
+            c.rect(5, 5, 6, 10, PAL["stone_d"])
+            c.vline(5, 5, 10, PAL["stone_m"])
+            for y in range(6, 14, 3):
+                c.hline(6, y, 4, PAL["stone_d"])
+            c.rect(4, 3, 8, 3, PAL["stone_m"])
+            c.hline(4, 3, 8, PAL["stone_l"])
+            c.rect(6, 3, 4, 1, PAL["black"])
         elif name == "torch":
             c.rect(7, 8, 2, 7, PAL["leath_d"])
             c.vline(7, 8, 7, PAL["leath_m"])

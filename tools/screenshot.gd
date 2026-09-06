@@ -195,6 +195,21 @@ func run() -> void:
 				await get_tree().physics_frame
 			await _grab("12b_shrine")
 
+		# ---- house facade + lit windows (Phase A1) ----
+		if world and not world.settlements.is_empty():
+			var h0: Rect2i = world._house_rects(world.settlements[0])[0]
+			hero.global_position = Vector2((h0.position.x + h0.size.x / 2) * 16.0 + 8.0,
+					h0.end.y * 16.0 + 8.0)
+			for i in 45:
+				await get_tree().physics_frame
+			await _grab("12c_facade")
+			world._discover_t = 999.0   # freeze the day/night window tick
+			world.set_windows_lit(true)
+			await get_tree().create_timer(0.2).timeout
+			await _grab("12d_windows_lit")
+			world.set_windows_lit(false)
+			world._discover_t = 0.0
+
 		# ---- dialogue with the first NPC ----
 		var dlg: DialogueUI = main_node.get_node_or_null("DialogueUI") if main_node else null
 		if dlg and not world.npcs.is_empty():

@@ -62,6 +62,7 @@ func build(seed_value: int) -> void:
 	discovered.clear()
 	for i in settlements.size():
 		discovered.append(false)
+	_win_lit = false
 	_place_cave_entrance()
 	_place_house_doors()
 	_paint_shade()
@@ -217,6 +218,8 @@ func _build_tileset_and_layers() -> void:
 
 	_set_solid(src_terrain, ArtIndex.TERRAIN_INDEX["water"], Rect2(0, 0, TILE, TILE))
 	_set_solid(src_terrain, ArtIndex.TERRAIN_INDEX["roof"], Rect2(0, 0, TILE, TILE))
+	for solid_name in ["roof_ridge", "facade", "facade_door", "facade_win", "facade_win_lit"]:
+		_set_solid(src_terrain, ArtIndex.TERRAIN_INDEX[solid_name], Rect2(0, 0, TILE, TILE))
 	for prop_name in SOLID_PROPS:
 		_set_solid(src_props, ArtIndex.PROP_INDEX[prop_name], SOLID_PROPS[prop_name])
 
@@ -265,6 +268,7 @@ func _set_solid(src: TileSetAtlasSource, tile_index: int, rect: Rect2) -> void:
 	]))
 
 func _paint() -> void:
+	window_cells.clear()
 	for y in WORLD_H:
 		for x in WORLD_W:
 			var i := y * WORLD_W + x
@@ -280,6 +284,8 @@ func _paint() -> void:
 				tidx = override[0]
 				prop = override[1]
 			terrain_layer.set_cell(Vector2i(x, y), 0, Vector2i(tidx % 8, tidx / 8))
+			if tidx == ArtIndex.TERRAIN_INDEX["facade_win"]:
+				window_cells.append(Vector2i(x, y))
 			if prop != "":
 				props_layer.set_cell(Vector2i(x, y), 1, Vector2i(ArtIndex.PROP_INDEX[prop] % 8, ArtIndex.PROP_INDEX[prop] / 8))
 
@@ -377,13 +383,25 @@ func _settlement_tile(st: Dictionary, t: Vector2i) -> Array:
 	# ring road around the plot
 	if rel.x == 0 or rel.y == 0 or rel.x == w - 1 or rel.y == h - 1:
 		return [ArtIndex.TERRAIN_INDEX["cobble"], ""]
-	# houses: roof blocks with a wood "door" tile at the bottom middle
+	# houses (Phase A1): ridge cap, shingle roof, then a two-tile 2.5D front
+	# facade with a door, windows and a chimney on half the roofs
 	for hr in _house_rects(st):
 		var house: Rect2i = hr
 		if house.has_point(t):
-			var door_x: int = house.position.x + house.size.x / 2
-			if t.y == house.position.y + house.size.y - 1 and t.x == door_x:
-				return [ArtIndex.TERRAIN_INDEX["wood"], ""]
+			var relh := t - house.position
+			var hw: int = house.size.x
+			var hh: int = house.size.y
+			var door_x: int = house.position.x + hw / 2
+			if relh.y == 0:
+				if relh.x == 2 and (house.position.x + house.position.y) % 2 == 0:
+					return [ArtIndex.TERRAIN_INDEX["roof_ridge"], "chimney"]
+				return [ArtIndex.TERRAIN_INDEX["roof_ridge"], ""]
+			if relh.y >= hh - 2:
+				if relh.y == hh - 1 and t.x == door_x:
+					return [ArtIndex.TERRAIN_INDEX["facade_door"], ""]
+				if relh.y == hh - 2 and relh.x % 3 == 1 and relh.x != hw / 2:
+					return [ArtIndex.TERRAIN_INDEX["facade_win"], ""]
+				return [ArtIndex.TERRAIN_INDEX["facade"], ""]
 			return [ArtIndex.TERRAIN_INDEX["roof"], ""]
 	# plaza props
 	if t == plaza:
@@ -500,11 +518,23 @@ func is_walkable_at(world_pos: Vector2) -> bool:
 
 ## Walking into a settlement's outskirts discovers it: a toast names the
 ## place and the map starts showing its label (Phase 4.1).
+## Warm windows after dusk: swap every facade window to its lit variant
+## (Phase A1/A6). Public so tests can force it.
+func set_windows_lit(lit: bool) -> void:
+	if lit == _win_lit:
+		return
+	_win_lit = lit
+	var idx: int = ArtIndex.TERRAIN_INDEX["facade_win_lit" if lit else "facade_win"]
+	var at := Vector2i(idx % 8, idx / 8)
+	for cell in window_cells:
+		terrain_layer.set_cell(cell, 0, at)
+
 func _discover_tick(delta: float) -> void:
 	_discover_t -= delta
 	if _discover_t > 0.0:
 		return
 	_discover_t = 0.4
+	set_windows_lit(Game.is_night())
 	if hero == null or not is_instance_valid(hero):
 		return
 	var ht := Vector2i(int(hero.global_position.x / 16.0), int(hero.global_position.y / 16.0))
@@ -660,6 +690,8 @@ func _place_chests() -> void:
 ## signposts, so the open world has beats between the towns (Phase 3.3).
 var pois: Array = []   # [{type: String, pos: Vector2}]
 var discovered: Array = []   # per-settlement bool: hero has reached it
+var window_cells: Array = []   # Vector2i facade windows; glow at night
+var _win_lit := false
 var _discover_t := 0.0
 
 func _place_pois() -> void:

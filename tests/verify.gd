@@ -36,6 +36,7 @@ func run() -> void:
 	await _check_pois()
 	_check_edges()
 	_check_places()
+	_check_houses_art()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -709,10 +710,13 @@ func _check_world_scale() -> void:
 		"world is 384x256 tiles (%d cells)" % (Overworld.WORLD_W * Overworld.WORLD_H))
 	_ok(world.settlements.size() >= 2, "settlements placed (%d)" % world.settlements.size())
 	var roofs := 0
+	var house_tiles := {}
+	for hn in ["roof", "roof_ridge", "facade", "facade_door", "facade_win"]:
+		house_tiles[Vector2i(ArtIndex.TERRAIN_INDEX[hn] % 8, ArtIndex.TERRAIN_INDEX[hn] / 8)] = true
 	for cell in world.terrain_layer.get_used_cells():
-		if world.terrain_layer.get_cell_atlas_coords(cell) == Vector2i(ArtIndex.TERRAIN_INDEX["roof"] % 8, ArtIndex.TERRAIN_INDEX["roof"] / 8):
+		if house_tiles.has(world.terrain_layer.get_cell_atlas_coords(cell)):
 			roofs += 1
-	_ok(roofs > 30, "houses have roofs (%d roof tiles)" % roofs)
+	_ok(roofs > 30, "houses have roofs (%d house tiles)" % roofs)
 	_ok(not world.is_walkable_at(_roof_pos()), "roof tiles are solid")
 	var graves := 0
 	for y in range(0, Overworld.WORLD_H, 4):
@@ -923,6 +927,28 @@ func _check_places() -> void:
 		world.hero.global_position = Vector2(r.position.x * 16.0 + 8.0, r.position.y * 16.0 + 8.0)
 		await get_tree().create_timer(0.8).timeout
 		_ok(bool(world.discovered[target]), "walking in discovers %s" % world.settlements[target]["name_key"])
+
+func _check_houses_art() -> void:
+	print("== house art A1 ==")
+	var houses := 0
+	for st in world.settlements:
+		houses += world._house_rects(st).size()
+	_ok(houses > 0 and world.window_cells.size() >= houses,
+		"houses carry glazed windows (%d windows / %d houses)" % [world.window_cells.size(), houses])
+	var st0: Dictionary = world.settlements[0]
+	var h0: Rect2i = world._house_rects(st0)[0]
+	var ridge := ArtIndex.TERRAIN_INDEX["roof_ridge"]
+	var door := ArtIndex.TERRAIN_INDEX["facade_door"]
+	var at_r: Vector2i = world.terrain_layer.get_cell_atlas_coords(h0.position)
+	var door_cell := Vector2i(h0.position.x + h0.size.x / 2, h0.end.y - 1)
+	var at_d: Vector2i = world.terrain_layer.get_cell_atlas_coords(door_cell)
+	_ok(at_r.x + at_r.y * 8 == ridge, "roof tops carry a ridge cap")
+	_ok(at_d.x + at_d.y * 8 == door, "every house front has a real door")
+	world.set_windows_lit(true)
+	var wl := ArtIndex.TERRAIN_INDEX["facade_win_lit"]
+	var at_w: Vector2i = world.terrain_layer.get_cell_atlas_coords(world.window_cells[0])
+	_ok(at_w.x + at_w.y * 8 == wl, "windows glow warm at night")
+	world.set_windows_lit(false)
 
 func _check_people() -> void:
 	print("== people ==")
