@@ -115,8 +115,36 @@ func can_carry(entry: Dictionary) -> bool:
 	return bag.size() < BAG_SIZE and total_weight() + int(entry["weight"]) <= ItemDB.CARRY_LIMIT
 
 # ------------------------------------------------------------------ bag -----
+func count_of(item_id: String) -> int:
+	var n := 0
+	for e in bag:
+		if e["id"] == item_id:
+			n += int(e.get("qty", 1))
+	return n
+
+func remove_id(item_id: String, qty: int) -> bool:
+	if count_of(item_id) < qty:
+		return false
+	var left := qty
+	for i in range(bag.size() - 1, -1, -1):
+		if bag[i]["id"] != item_id:
+			continue
+		var have: int = int(bag[i].get("qty", 1))
+		if have <= left:
+			left -= have
+			bag.remove_at(i)
+		else:
+			bag[i]["qty"] = have - left
+			left = 0
+		if left == 0:
+			break
+	changed.emit()
+	return true
+
 func add(entry: Dictionary) -> bool:
-	if Consumables.is_consumable(entry["id"]):
+	if not entry.has("weight"):
+		entry["weight"] = ItemDB.weight_of(entry["id"])
+	if Consumables.is_consumable(entry["id"]) or ItemDB.is_material(entry["id"]):
 		for e in bag:
 			if e["id"] == entry["id"]:
 				e["qty"] = int(e.get("qty", 1)) + 1
@@ -125,7 +153,7 @@ func add(entry: Dictionary) -> bool:
 	if not can_carry(entry):
 		denied.emit("inv.bag_full")
 		return false
-	if Consumables.is_consumable(entry["id"]):
+	if Consumables.is_consumable(entry["id"]) or ItemDB.is_material(entry["id"]):
 		entry["qty"] = int(entry.get("qty", 1))
 	bag.append(entry)
 	changed.emit()

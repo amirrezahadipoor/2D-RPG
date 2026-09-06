@@ -92,6 +92,9 @@ func _ready() -> void:
 	add_child(talents)
 
 	dialogue = DialogueUI.new()
+	var craft_ui := CraftUI.new()
+	craft_ui.name = "CraftUI"
+	add_child(craft_ui)
 	dialogue.name = "DialogueUI"
 	add_child(dialogue)
 

@@ -301,5 +301,14 @@
  "enemy.ghoul_king": "Ghoul King",
  "enemy.frost_warden": "Frost Warden",
  "stairs.sealed": "Sealed — slay the boss first",
- "toast.boss_down": "The boss falls! The way down opens."
+ "toast.boss_down": "The boss falls! The way down opens.",
+ "item.hide": "Hide",
+ "item.iron": "Iron",
+ "item.herb": "Herb",
+ "craft.title": "Crafting Bench",
+ "craft.made": "Crafted: %s",
+ "bench.prompt": "Craft",
+ "mine.prompt": "Mine",
+ "fish.prompt": "Fish",
+ "item.fish": "Fish"
 }

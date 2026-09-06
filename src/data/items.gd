@@ -30,6 +30,12 @@ const WEIGHT := {
 	"amulet_of_depths": 1, "idol_of_embers": 4, "dragonfang_talisman": 2,
 }
 
+## Crafting materials (Phase C3): stack like potions, never equipped.
+const MATERIALS := {"hide": 1, "iron": 1, "herb": 1, "fish": 1}
+
+static func is_material(item_id: String) -> bool:
+	return MATERIALS.has(item_id)
+
 const CARRY_LIMIT := 40
 
 static func armor_of(item_id: String) -> int:

@@ -486,6 +486,7 @@ func _apply_flash() -> void:
 func _die() -> void:
 	Juice.hitstop()
 	Juice.haptic(10)
+	_drop_material()
 	state = State.DEAD
 	velocity = Vector2.ZERO
 	Stats.add_xp(xp_value)
@@ -507,3 +508,15 @@ func _die() -> void:
 	# a plain timer guarantees the corpse is freed even if the tween is
 	# interrupted (scene change, parent freed mid-fade)
 	_death_timer = 0.45
+
+## Phase C3: foes leave crafting materials behind (45% chance).
+func _drop_material() -> void:
+	if not is_inside_tree():
+		return
+	var mat: String = Recipes.MAT_DROP.get(enemy_type, "")
+	if mat == "" or randf() > 0.45:
+		return
+	var pk := Pickup.new()
+	get_parent().add_child(pk)
+	pk.global_position = global_position + Vector2(randf_range(-6, 6), randf_range(-4, 4))
+	pk.setup({"id": mat, "qty": 1})

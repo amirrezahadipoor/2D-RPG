@@ -49,6 +49,8 @@ func run() -> void:
 	await _check_bosses()
 	await _check_music_loops()
 	_check_camera()
+	await _check_craft()
+	await _check_gather()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -1146,6 +1148,51 @@ func _check_camera() -> void:
 	h.apply_lookahead(1.0)
 	_ok(h.cam.position.length() < h.cam.position.length() + 1.0, "and settles back when idle")
 	h.cam.position = Vector2.ZERO
+
+func _check_craft() -> void:
+	print("== crafting C3 ==")
+	Inventory.reset_run()
+	Inventory.add({"id": "iron", "qty": 3})
+	Inventory.add({"id": "hide", "qty": 2})
+	_ok(Inventory.count_of("iron") == 3, "materials stack in the bag")
+	_ok(Recipes.can_craft({"iron": 2, "hide": 1}), "iron sword is within reach")
+	_ok(Recipes.craft("iron_sword"), "crafting consumes and yields")
+	_ok(Inventory.count_of("iron") == 1 and Inventory.count_of("hide") == 1, "materials were spent")
+	var has_sword := false
+	for e in Inventory.bag:
+		if e["id"] == "iron_sword":
+			has_sword = true
+	_ok(has_sword, "the forged blade lands in the bag")
+	var bench_found := false
+	for n in get_tree().get_nodes_in_group("interact"):
+		if n is Bench:
+			bench_found = true
+	_ok(bench_found, "towns keep a crafting bench")
+	Inventory.reset_run()
+
+func _check_gather() -> void:
+	print("== gathering C4 ==")
+	var mines := 0
+	var spots := 0
+	for n in get_tree().get_nodes_in_group("interact"):
+		if n is MineNode:
+			mines += 1
+		elif n is FishSpot:
+			spots += 1
+	_ok(mines >= 3, "ore veins glitter in the wilds (%d)" % mines)
+	_ok(spots >= 2, "lakes keep fishing spots (%d)" % spots)
+	Inventory.reset_run()
+	for n in get_tree().get_nodes_in_group("interact"):
+		if n is MineNode:
+			n.interact()
+			break
+	await get_tree().process_frame
+	var dropped := false
+	for n in get_tree().get_nodes_in_group("pickup"):
+		if n.get("entry") != null and n.entry.get("id", "") in ["iron", "herb"]:
+			dropped = true
+	_ok(dropped, "mining drops ore for the hero to pick up")
+	Inventory.reset_run()
 
 func _check_people() -> void:
 	print("== people ==")

@@ -65,6 +65,8 @@ func build(seed_value: int) -> void:
 	_spawn_spawner()
 	_spawn_npcs()
 	_place_chests()
+	_place_benches()
+	_place_gather_nodes()
 	_place_landmarks()
 	_place_pois()
 	poi_seen.clear()
@@ -823,6 +825,40 @@ var poi_seen: Array = []     # per-POI bool: hero has stood near it
 ## Hand-composed set pieces, one per biome where the seed allows (Phase A2):
 ## a ruined tower, lakeside pier, crypt, obelisk, stone circle, witch hut.
 ## They are built from existing tiles/props so collision stays coherent.
+## Ore veins in rock and sand, fishing spots on lake edges (Phase C4).
+func _place_gather_nodes() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = world_seed + 431
+	var mines := 0
+	var fish := 0
+	for attempt in range(400):
+		var x: int = rng.randi_range(6, WORLD_W - 7)
+		var y: int = rng.randi_range(6, WORLD_H - 7)
+		var i := y * WORLD_W + x
+		var biome: String = _biome_grid[i]
+		if mines < 6 and biome in ["caves", "desert", "snow"] and _road_grid[i] == 0 \
+				and _settlement_at_tile(Vector2i(x, y)).is_empty():
+			var m := MineNode.new()
+			actors.add_child(m)
+			m.global_position = Vector2(x * 16.0 + 8.0, y * 16.0 + 8.0)
+			mines += 1
+		elif fish < 5 and biome == "water" and y > 0 and _biome_grid[i - WORLD_W] != "water":
+			var f := FishSpot.new()
+			actors.add_child(f)
+			f.global_position = Vector2(x * 16.0 + 8.0, y * 16.0 + 2.0)
+			fish += 1
+
+## One crafting bench per town plaza (Phase C3).
+func _place_benches() -> void:
+	for st in settlements:
+		if st["type"] != "town":
+			continue
+		var b := Bench.new()
+		b.name = "Bench"
+		actors.add_child(b)
+		var p: Vector2i = st["plaza"]
+		b.global_position = Vector2((p.x + 2) * 16.0 + 8.0, (p.y + 1) * 16.0 + 8.0)
+
 func _place_landmarks() -> void:
 	landmarks.clear()
 	cell_terrain.clear()

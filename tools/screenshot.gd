@@ -345,6 +345,17 @@ func run() -> void:
 			for i in 6:
 				await get_tree().process_frame
 			await _grab("17_shop")
+
+		# ---- crafting bench book (Phase C3) ----
+		var cui: Node = get_tree().get_first_node_in_group("craft_ui")
+		if cui != null:
+			Inventory.add({"id": "iron", "qty": 3})
+			Inventory.add({"id": "hide", "qty": 2})
+			cui.open()
+			for i in 6:
+				await get_tree().process_frame
+			await _grab("17b_craft")
+			cui.close()
 			dlg2.close()
 
 	# ---- hidden chamber: cracked wall shattered, relic chest glowing ----

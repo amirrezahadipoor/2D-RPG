@@ -301,5 +301,14 @@
  "enemy.ghoul_king": "شاه غول",
  "enemy.frost_warden": "نگهبان یخ",
  "stairs.sealed": "مهر شده — نخست باس را بکش",
- "toast.boss_down": "باس فرو افتاد! راه پایین گشوده شد."
+ "toast.boss_down": "باس فرو افتاد! راه پایین گشوده شد.",
+ "item.hide": "چرم",
+ "item.iron": "آهن",
+ "item.herb": "گیاه",
+ "craft.title": "میز کار",
+ "craft.made": "ساخته شد: %s",
+ "bench.prompt": "کرفت",
+ "mine.prompt": "استخراج",
+ "fish.prompt": "ماهیگیری",
+ "item.fish": "ماهی"
 }

@@ -882,7 +882,8 @@ def make_tileset():
 def make_props():
     """Overlay props drawn on top of terrain."""
     names = ["tree", "rock", "bush", "flower", "chest", "stairs", "sign", "torch",
-             "tomb", "fence", "well", "chimney", "pebble", "tuft", "foam", "foam2", "bones", "crack"]
+             "tomb", "fence", "well", "chimney", "pebble", "tuft", "foam", "foam2",
+             "bones", "crack", "bench"]
     # 8 columns x as many rows as needed: (i % 8, i / 8) atlas coords in-game
     rows = (len(names) + 7) // 8
     sheet = Canvas(8 * TILE, rows * TILE)
@@ -989,6 +990,14 @@ def make_props():
                 c.px(x, 1, PAL["white"])
             for x in range(2, 16, 6):
                 c.px(x, 2, PAL["water_l"])
+        elif name == "bench":
+            c.rect(2, 8, 12, 3, PAL["leath_m"])
+            c.hline(2, 8, 12, PAL["leath_l"])
+            c.hline(2, 10, 12, PAL["leath_d"])
+            c.vline(3, 11, 4, PAL["leath_d"]); c.vline(12, 11, 4, PAL["leath_d"])
+            c.rect(5, 5, 2, 3, PAL["stone_m"])     # hammer head
+            c.vline(6, 6, 4, PAL["leath_d"])
+            c.px(10, 6, PAL["gold_l"]); c.px(10, 7, PAL["gold_l"])
         elif name == "bones":
             c.rect(4, 11, 5, 2, PAL["white"])
             c.px(4, 10, PAL["white"]); c.px(8, 10, PAL["white"])
@@ -1271,6 +1280,32 @@ def item_icon(kind, mat, trim=None):
             ox = int(round(math.sin(tt * math.pi) * 4))
             c.px(5 + ox, 2 + i, PAL["leath_m"])
         c.vline(5, 3, 10, PAL["white"])
+    elif kind == "hide":
+        c.rect(4, 8, 8, 5, PAL[mat + "_m"])
+        c.hline(4, 8, 8, PAL[mat + "_l"])
+        c.hline(4, 12, 8, PAL[mat + "_d"])
+        c.px(5, 10, PAL[mat + "_d"]); c.px(9, 10, PAL[mat + "_d"])
+        c.rect(6, 5, 4, 3, PAL[mat + "_m"])
+        c.hline(6, 5, 4, PAL[mat + "_l"])
+    elif kind == "ingot":
+        c.rect(3, 9, 10, 4, PAL[mat + "_m"])
+        c.hline(3, 9, 10, PAL[mat + "_l"])
+        c.hline(3, 12, 10, PAL[mat + "_d"])
+        c.rect(5, 6, 7, 3, PAL[mat + "_m"])
+        c.hline(5, 6, 7, PAL[mat + "_l"])
+        c.px(4, 10, PAL["white"])
+    elif kind == "herb":
+        c.vline(7, 5, 8, PAL[mat + "_m"])
+        c.px(5, 7, PAL[mat + "_l"]); c.px(6, 8, PAL[mat + "_l"])
+        c.px(9, 6, PAL[mat + "_l"]); c.px(8, 9, PAL[mat + "_m"])
+        c.px(5, 10, PAL[mat + "_d"]); c.px(9, 11, PAL[mat + "_d"])
+        c.px(7, 4, PAL[mat + "_l"])
+    elif kind == "fish":
+        c.rect(4, 7, 7, 4, PAL[mat + "_l"])
+        c.hline(4, 7, 7, PAL["white"])
+        c.px(11, 8, PAL[mat + "_m"]); c.px(11, 9, PAL[mat + "_m"]); c.px(12, 8, PAL[mat + "_m"])
+        c.px(5, 8, PAL["black"])
+        c.hline(4, 10, 7, PAL[mat + "_d"])
     elif kind == "potion":
         # corked flask with glowing liquid; trim = gold band for greater brews
         c.px(7, 2, PAL["leath_m"]); c.px(8, 2, PAL["leath_m"])
@@ -1561,6 +1596,10 @@ def main():
         ("health_potion", "potion", "red", None),
         ("greater_health_potion", "potion", "red", "gold"),
         ("stamina_potion", "potion", "leaf", None),
+        ("hide", "hide", "leath", None),
+        ("iron", "ingot", "stone", None),
+        ("herb", "herb", "leaf", None),
+        ("fish", "fish", "water", None),
     ]
     isheet, icon_names = build_icon_sheet(icon_specs)
     save(isheet, "items/equipment_icons.png")

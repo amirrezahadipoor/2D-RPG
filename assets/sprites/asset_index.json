@@ -109,7 +109,8 @@
     "foam",
     "foam2",
     "bones",
-    "crack"
+    "crack",
+    "bench"
   ],
   "enemies": {
     "slime": {
@@ -217,7 +218,11 @@
     "dragonfang_talisman",
     "health_potion",
     "greater_health_potion",
-    "stamina_potion"
+    "stamina_potion",
+    "hide",
+    "iron",
+    "herb",
+    "fish"
   ],
   "icon_grid": [
     8,
