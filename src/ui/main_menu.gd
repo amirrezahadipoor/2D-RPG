@@ -139,7 +139,13 @@ func _pointer_hover(event_pos: Vector2) -> void:
 		_sel = idx
 		_refresh_selection()
 
+var _last_press_ms := -100000
+
 func _pointer_press(event_pos: Vector2) -> void:
+	var now := Time.get_ticks_msec()
+	if now - _last_press_ms < 400:
+		return
+	_last_press_ms = now
 	var cy := _canvas_y(event_pos)
 	if cy < ROW_FIRST_Y - 4.0 or cy > ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 2.0:
 		return
@@ -178,14 +184,14 @@ func _step(dir: int) -> void:
 # ---------------------------------------------------------------- actions ----
 func _continue() -> void:
 	Game.pending_load = true
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	get_tree().call_deferred("change_scene_to_file", "res://scenes/main.tscn")
 
 func _new_run(hardcore: bool) -> void:
 	Game.pending_load = false
 	Game.wipe_save()
 	Game.seen_intro = false
 	Game.start_new_run(hardcore)
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	get_tree().call_deferred("change_scene_to_file", "res://scenes/main.tscn")
 
 func _open_settings() -> void:
 	if settings_ui == null:

@@ -34,7 +34,9 @@ func load_settings() -> void:
 		fps_cap = int(cfg.get_value("video", "fps", 60))
 		ui_scale = float(cfg.get_value("video", "ui_scale", 1.0))
 		Engine.max_fps = fps_cap
-		var q: String = str(cfg.get_value("video", "quality", "high"))
+		var fresh := not cfg.has_section_key("video", "quality")
+		var def := "medium" if (fresh and OS.has_feature("mobile")) else "high"
+		var q: String = str(cfg.get_value("video", "quality", def))
 		if q in QUALITIES:
 			quality = q
 		pan_speed = clampf(float(cfg.get_value("touch", "pan_speed", 1.0)), 0.5, 2.0)

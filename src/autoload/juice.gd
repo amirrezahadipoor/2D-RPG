@@ -29,7 +29,8 @@ func shake(power: float) -> void:
 ## desktop export compiling.
 func haptic(ms: int) -> void:
 	if OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile"):
-		Input.call("vibrate", ms)   # symbol only exists on mobile builds
+		if Input.has_method("vibrate_handheld"):
+			Input.vibrate_handheld(ms)
 
 func _process(delta: float) -> void:
 	if _stop_at > 0 and Time.get_ticks_msec() >= _stop_at:

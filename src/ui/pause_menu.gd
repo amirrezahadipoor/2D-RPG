@@ -158,4 +158,4 @@ func _open_settings() -> void:
 func _save_quit() -> void:
 	Game.save_run()
 	Game.change_state(Game.State.MENU)
-	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	get_tree().call_deferred("change_scene_to_file", "res://scenes/main_menu.tscn")

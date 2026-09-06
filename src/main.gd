@@ -296,7 +296,7 @@ func _hook_autosave() -> void:
 	Stats.level_changed.connect(func(_l: int, _x: int, _n: int): Game.save_checkpoint())
 
 func _reload_scene() -> void:
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	get_tree().call_deferred("change_scene_to_file", "res://scenes/main.tscn")
 
 func _on_revive() -> void:
 	Game.pending_load = true
@@ -312,7 +312,7 @@ func _on_retry() -> void:
 func _on_victory_menu() -> void:
 	Game.pending_load = false
 	Game.change_state(Game.State.MENU)
-	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+	get_tree().call_deferred("change_scene_to_file", "res://scenes/main_menu.tscn")
 
 ## Interact with the overworld cave mouth: drop into dungeon depth 1.
 func _on_cave_entrance(_direction: int) -> void:

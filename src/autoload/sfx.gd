@@ -53,7 +53,11 @@ func play(sfx_name: String, vol_db := 0.0, pitch_rand := 0.07) -> void:
 	if sfx_name not in SFX_NAMES:
 		return
 	var stream: AudioStreamWAV = _sfx(sfx_name)
+	if stream == null or stream.data.is_empty():
+		return
 	var p: AudioStreamPlayer = _free_player()
+	if p == null:
+		return
 	p.stream = stream
 	p.volume_db = vol_db
 	p.pitch_scale = 1.0 + randf_range(-pitch_rand, pitch_rand)
