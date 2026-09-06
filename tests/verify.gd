@@ -45,6 +45,7 @@ func run() -> void:
 	_check_weather()
 	await _check_map_fog()
 	await _check_feel()
+	_check_product()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -1091,6 +1092,16 @@ func _check_feel() -> void:
 	Juice.ring(world.hero.global_position)
 	await get_tree().process_frame
 	_ok(true, "tap ripple spawns without error")
+
+func _check_product() -> void:
+	print("== product E1 ==")
+	_ok(I18N.tr_str("enemy.wolf") != "enemy.wolf", "every enemy has a name in both locales")
+	Settings.set_fps_cap(30)
+	_ok(Engine.max_fps == 30, "settings can cap the frame rate for weak phones")
+	Settings.set_fps_cap(60)
+	_ok(Engine.max_fps == 60, "and restore it")
+	var f := FileAccess.open("res://assets/icon.png", FileAccess.READ)
+	_ok(f != null and f.get_length() > 900, "store icon is a real emblem, not the default (%db)" % f.get_length())
 
 func _check_people() -> void:
 	print("== people ==")

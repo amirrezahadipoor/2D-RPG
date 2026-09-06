@@ -5,7 +5,7 @@ extends CanvasLayer
 
 signal closed
 
-enum Row { MASTER, MUSIC, SFX, QUALITY, PANSPEED, TAPRADIUS, AUTOCOMBAT, LANGUAGE, DONE }
+enum Row { MASTER, MUSIC, SFX, QUALITY, PANSPEED, TAPRADIUS, AUTOCOMBAT, FPS, LANGUAGE, DONE }
 
 var _sel: int = Row.MASTER
 var _root: Control
@@ -47,8 +47,17 @@ func _build() -> void:
 	_add_row(Row.PANSPEED, "settings.pan", 150)
 	_add_row(Row.TAPRADIUS, "settings.tap_radius", 168)
 	_add_row(Row.AUTOCOMBAT, "settings.auto_combat", 186)
-	_add_row(Row.LANGUAGE, "settings.language", 204)
-	_add_row(Row.DONE, "menu.done", 230)
+	_add_row(Row.FPS, "settings.fps", 204)
+	_add_row(Row.LANGUAGE, "settings.language", 222)
+	_add_row(Row.DONE, "menu.done", 244)
+	var ver := Label.new()
+	ver.text = "v1.0.0-mobile · 2026-09-06"
+	ver.position = Vector2(0, 258)
+	ver.size = Vector2(480, 10)
+	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	ver.add_theme_font_size_override("font_size", 5)
+	ver.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))
+	_root.add_child(ver)
 	_refresh()
 
 func _mk_label(pos: Vector2, size: int, col: Color) -> Label:
@@ -111,6 +120,8 @@ func _refresh() -> void:
 				value.text = "%dpx" % int(Settings.tap_radius)
 			Row.AUTOCOMBAT:
 				value.text = I18N.tr_str("settings.on" if Settings.auto_combat else "settings.off")
+			Row.FPS:
+				value.text = "%d" % Settings.fps_cap
 			Row.LANGUAGE:
 				value.text = "فارسی / EN" if I18N.locale == "en" else "EN / فارسی"
 			Row.DONE:
@@ -170,7 +181,7 @@ func _pointer_press(event_pos: Vector2) -> void:
 	_sel = row
 	_refresh()
 	# volume rows scrub on the value column; everything else acts on tap
-	if row in [Row.DONE, Row.LANGUAGE, Row.QUALITY, Row.AUTOCOMBAT]:
+	if row in [Row.DONE, Row.LANGUAGE, Row.QUALITY, Row.AUTOCOMBAT, Row.FPS]:
 		Sfx.play("click")
 		_activate()
 	elif p.x >= 258.0:
@@ -239,8 +250,15 @@ func _adjust(dir: int) -> void:
 		Row.TAPRADIUS:
 			Settings.set_tap_radius(Settings.tap_radius + 2.0 * dir)
 			Sfx.play("click", -12.0, 0.02)
+		Row.FPS:
+			Settings.set_fps_cap(30 if Settings.fps_cap == 60 else 60)
+			Sfx.play("click")
+			_refresh()
 		Row.AUTOCOMBAT:
 			Settings.set_auto_combat(not Settings.auto_combat)
+			Sfx.play("click")
+		Row.FPS:
+			Settings.set_fps_cap(30 if Settings.fps_cap == 60 else 60)
 			Sfx.play("click")
 		Row.LANGUAGE:
 			I18N.toggle_locale()

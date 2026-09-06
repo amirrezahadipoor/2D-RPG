@@ -295,5 +295,7 @@
  "map.legend.camp": "camp",
  "map.legend.ruin": "ruin",
  "map.legend.you": "you",
- "toast.shrine_travel": "The shrine hums: you stand before it."
+ "toast.shrine_travel": "The shrine hums: you stand before it.",
+ "enemy.wolf": "Wolf",
+ "settings.fps": "Frame rate"
 }

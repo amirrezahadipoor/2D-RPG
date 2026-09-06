@@ -295,5 +295,7 @@
  "map.legend.camp": "اردوگاه",
  "map.legend.ruin": "ویرانه",
  "map.legend.you": "شما",
- "toast.shrine_travel": "محراب زمزمه می‌کند: پیش آن ایستاده‌ای."
+ "toast.shrine_travel": "محراب زمزمه می‌کند: پیش آن ایستاده‌ای.",
+ "enemy.wolf": "گرگ",
+ "settings.fps": "نرخ فریم"
 }
