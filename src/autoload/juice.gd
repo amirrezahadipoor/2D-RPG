@@ -23,6 +23,13 @@ func shake(power: float) -> void:
 	_shake_power = maxf(_shake_power, power)
 	_shake_time = 0.22
 
+## Physical feedback on real phones only; desktop stays silent. The symbol
+## only exists on mobile builds, so it is called dynamically to keep the
+## desktop export compiling.
+func haptic(ms: int) -> void:
+	if OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile"):
+		Input.call("vibrate_handshake", ms)
+
 func _process(delta: float) -> void:
 	if _cam == null:
 		return

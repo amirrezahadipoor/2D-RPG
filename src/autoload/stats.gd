@@ -64,6 +64,8 @@ func damage(amount: int) -> int:
 	var taken := clampi(reduced, 0, hp)
 	hp -= taken
 	health_changed.emit(hp, max_hp)
+	if taken > 0:
+		Juice.haptic(60 if hp <= 0 else 18)
 	if hp <= 0:
 		died.emit()
 	return taken
@@ -95,6 +97,13 @@ func reset_run(start_gold: int = 25) -> void:
 	level_changed.emit(level, xp, xp_next)
 	gold_changed.emit(gold)
 	armor_changed.emit(armor)
+
+## Full recharge: wake-up after a night's rest or a total recovery shrine.
+func restore_full() -> void:
+	hp = max_hp
+	stamina = float(max_stamina)
+	health_changed.emit(hp, max_hp)
+	stamina_changed.emit(stamina, max_stamina)
 
 func heal(amount: int) -> void:
 	hp = clampi(hp + amount, 0, max_hp)

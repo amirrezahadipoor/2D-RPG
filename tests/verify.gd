@@ -754,6 +754,9 @@ func _check_houses() -> void:
 			"%s interior offers the way back out" % kind)
 		_ok(it.actors.find_children("Chest", "", true, false).size() >= 1,
 			"%s interior hides a stash" % kind)
+		var has_bed: bool = it.actors.find_children("Bed", "", true, false).size() >= 1
+		_ok(has_bed == (kind != "palace"),
+			"%s interior %s a bed to rest in" % [kind, "has" if has_bed else "skips"])
 		var rooms := 0
 		for c in it.terrain_layer.get_used_cells():
 			if it._grid[c.y * Interior.MAP_W + c.x] == 1:
@@ -770,6 +773,16 @@ func _check_houses() -> void:
 				keys_ok = false
 	I18N.set_locale("en")
 	_ok(keys_ok, "house strings resolve in EN and FA")
+	# a night's rest tops up everything
+	Stats.reset_run()
+	Stats.hp = 1
+	Stats.stamina = 3.0
+	Stats.restore_full()
+	_ok(Stats.hp == Stats.max_hp and absf(Stats.stamina - float(Stats.max_stamina)) < 0.01,
+		"restore_full recharges hp and stamina")
+	_ok(I18N.tr_str("rest.wake") != "rest.wake" and I18N.tr_str("rest.prompt") != "rest.prompt",
+		"rest strings resolve")
+	Stats.reset_run()
 
 func _check_people() -> void:
 	print("== people ==")

@@ -359,6 +359,18 @@ func enter_house(house_id_value: int) -> void:
 	hud.show_toast(I18N.tr_str("toast.enter_house") % I18N.tr_str("house.name." + kind))
 	Sfx.set_biome("house")
 
+## Sleep in a house bed: the clock runs to the next morning and HP plus
+## stamina fully recharge, then the run is checkpointed.
+func rest_in_house() -> void:
+	if _house_id < 0 or dungeon != null or Game.state != Game.State.PLAYING:
+		return
+	var day_index := int(Game.game_minutes / 1440.0)
+	var wakes_later := 1 if Game.hour() >= 8 else 0
+	Game.game_minutes = float((day_index + wakes_later) * 1440 + 8 * 60)
+	Stats.restore_full()
+	Game.save_checkpoint()
+	hud.show_toast(I18N.tr_str("rest.wake"))
+
 ## Leave the Interior through its front door back onto the overworld.
 func exit_house() -> void:
 	if _house_id < 0:

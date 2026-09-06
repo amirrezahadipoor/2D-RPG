@@ -132,6 +132,13 @@ func _build_layers(house_id: int, seed_value: int) -> void:
 	terrain_layer.set_cell(stash, 0, floor_atlas)
 	chest.global_position = cell_center(stash)
 
+	# the bed: resting until morning (only where there is a home to sleep in)
+	if kind != "palace":
+		var bed_node := Bed.new()
+		bed_node.name = "Bed"
+		actors.add_child(bed_node)
+		var bed_stand := Vector2i(room.position.x + 2, room.position.y + 3)
+		bed_node.global_position = cell_center(bed_stand)
 	# warm hearth light makes the room feel lived-in
 	var glow := load("res://assets/sprites/fx/glow.png")
 	var hearth: Vector2i = Vector2i(room.position.x + 2, room.end.y - 2)
