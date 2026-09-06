@@ -1191,7 +1191,16 @@ func _check_gather() -> void:
 			mines += 1
 		elif n is FishSpot:
 			spots += 1
-	_ok(mines >= 1, "ore veins glitter in the wilds (%d)" % mines)
+	# Placement now enumerates candidates deterministically, so any world
+	# with valid cells is guaranteed its full complement.
+	var mine_cells_n := 0
+	for y in range(6, world.WORLD_H - 6):
+		for x in range(6, world.WORLD_W - 6):
+			var bi: String = world._biome_grid[y * world.WORLD_W + x]
+			if bi in ["caves", "desert", "snow"] and world._road_grid[y * world.WORLD_W + x] == 0 \
+					and world._settlement_at_tile(Vector2i(x, y)).is_empty():
+				mine_cells_n += 1
+	_ok(mines >= (6 if mine_cells_n >= 6 else mine_cells_n), "ore veins glitter in the wilds (%d)" % mines)
 	# Count shoreline candidates (water with dry land north): tiny verify
 	# worlds can legitimately have none, then the check is a pass-through.
 	var shore := 0
@@ -1203,7 +1212,7 @@ func _check_gather() -> void:
 	if shore == 0:
 		_ok(true, "lakes keep fishing spots (no shoreline in this world)")
 	else:
-		_ok(spots >= 1, "lakes keep fishing spots (%d of %d shore tiles)" % [spots, shore])
+		_ok(spots >= (5 if shore >= 5 else 1), "lakes keep fishing spots (%d of %d shore tiles)" % [spots, shore])
 	Inventory.reset_run()
 	for n in get_tree().get_nodes_in_group("interact"):
 		if n is MineNode:

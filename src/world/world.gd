@@ -829,24 +829,51 @@ var poi_seen: Array = []     # per-POI bool: hero has stood near it
 func _place_gather_nodes() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = world_seed + 431
-	var mines := 0
-	var fish := 0
-	for attempt in range(400):
-		var x: int = rng.randi_range(6, WORLD_W - 7)
-		var y: int = rng.randi_range(6, WORLD_H - 7)
-		var i := y * WORLD_W + x
-		var biome: String = _biome_grid[i]
-		if mines < 6 and biome in ["caves", "desert", "snow"] and _road_grid[i] == 0 \
-				and _settlement_at_tile(Vector2i(x, y)).is_empty():
-			var m := MineNode.new()
-			actors.add_child(m)
-			m.global_position = Vector2(x * 16.0 + 8.0, y * 16.0 + 8.0)
-			mines += 1
-		elif fish < 5 and biome == "water" and y > 0 and _biome_grid[i - WORLD_W] != "water":
-			var f := FishSpot.new()
-			actors.add_child(f)
-			f.global_position = Vector2(x * 16.0 + 8.0, y * 16.0 + 2.0)
-			fish += 1
+	# Gather every valid cell first, then choose — 400 random probes over a
+	# 384×384 realm was luck-based and could place zero fishing spots.
+	var mine_cells: Array = []
+	var fish_cells: Array = []
+	for y in range(6, WORLD_H - 6):
+		for x in range(6, WORLD_W - 6):
+			var i := y * WORLD_W + x
+			var biome: String = _biome_grid[i]
+			if biome in ["caves", "desert", "snow"] and _road_grid[i] == 0 \
+					and _settlement_at_tile(Vector2i(x, y)).is_empty():
+				mine_cells.append(Vector2i(x, y))
+			elif biome == "water" and _biome_grid[i - WORLD_W] != "water":
+				fish_cells.append(Vector2i(x, y))
+	mine_cells = _rng_pick(rng, mine_cells, 6)
+	fish_cells = _rng_pick(rng, fish_cells, 40)
+	for c0 in mine_cells:
+		var c: Vector2i = c0
+		var m := MineNode.new()
+		actors.add_child(m)
+		m.global_position = Vector2(c.x * 16.0 + 8.0, c.y * 16.0 + 8.0)
+	var placed: Array = []
+	for c in fish_cells:
+		if placed.size() >= 5:
+			break
+		var far := true
+		for p in placed:
+			if (p as Vector2i).distance_to(c) < 24.0:
+				far = false
+				break
+		if not far:
+			continue
+		var f := FishSpot.new()
+		actors.add_child(f)
+		f.global_position = Vector2((c as Vector2i).x * 16.0 + 8.0, (c as Vector2i).y * 16.0 + 2.0)
+		placed.append(c)
+
+## Seeded pick-without-replacement (RandomNumberGenerator has no shuffle).
+func _rng_pick(rng: RandomNumberGenerator, arr: Array, n: int) -> Array:
+	var pool := arr.duplicate()
+	var out: Array = []
+	for i in mini(n, pool.size()):
+		var idx := rng.randi_range(0, pool.size() - 1)
+		out.append(pool[idx])
+		pool.remove_at(idx)
+	return out
 
 ## One crafting bench per town plaza (Phase C3).
 func _place_benches() -> void:
