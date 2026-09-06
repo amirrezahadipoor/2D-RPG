@@ -2693,14 +2693,17 @@ func _check_touch_settings() -> void:
 	world.actors.add_child(pk2)
 	pk2.setup(ItemGen.roll("leather_boots", grng2))
 	pk2.global_position = hero_t.global_position + Vector2(56, 0)  # on-stage: design x < 480
+	# Settle the camera fully: D3 lookahead keeps lerping while velocity is
+	# non-zero, which used to skew _g_screen_at on slow windowed CI frames.
+	hero_t.velocity = Vector2.ZERO
 	hero_t.cam.reset_smoothing()
-	for i in 3:
+	for i in 12:
 		await get_tree().physics_frame
 	var sloppy := pk2.global_position + Vector2(24, 0)
 	_g_touch(true, _g_screen_at(sloppy), 22)
 	_g_touch(false, _g_screen_at(sloppy), 22)
 	var wide_ok := false
-	for i in 6:
+	for i in 24:
 		await get_tree().process_frame
 		if hero_t._interact_pending == pk2:
 			wide_ok = true
