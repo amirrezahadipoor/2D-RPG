@@ -18,6 +18,16 @@ func _ready() -> void:
 	_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_prompt.visible = false
 	add_child(_prompt)
+	# BUG-6.9: the prompt text/RTL tag used to be reapplied every single
+	# frame in _process, even though it never changes except when the
+	# player switches language. Set it once here and again only on the
+	# locale_changed signal.
+	_refresh_prompt_text()
+	I18N.locale_changed.connect(func(_l): _refresh_prompt_text())
+
+func _refresh_prompt_text() -> void:
+	_prompt.text = I18N.tr_str("rest.prompt")
+	I18N.tag(_prompt)
 
 func _process(_delta: float) -> void:
 	if _hero == null or not is_instance_valid(_hero):
@@ -29,8 +39,6 @@ func _process(_delta: float) -> void:
 		if ui.visible:
 			modal = true
 	_prompt.visible = near and not modal and Game.state == Game.State.PLAYING
-	_prompt.text = I18N.tr_str("rest.prompt")
-	I18N.tag(_prompt)
 	if near and not modal and Game.state == Game.State.PLAYING:
 		if Input.is_action_just_pressed("interact"):
 			_rest()

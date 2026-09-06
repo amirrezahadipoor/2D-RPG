@@ -28,10 +28,30 @@ func _ready() -> void:
 	_prompt.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 	_prompt.add_theme_constant_override("outline_size", 3)
 	_prompt.position = Vector2(-6, -26)
-	_prompt.text = I18N.tr_str("ui.tap")
 	_prompt.visible = false
 	_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_prompt)
+	# BUG-6.9: text/color used to be reapplied every _process frame even
+	# though it only depends on `locked` (checked here) and the active
+	# locale (checked via the signal) -- neither changes per-frame.
+	_refresh_prompt_text()
+	I18N.locale_changed.connect(func(_l): _refresh_prompt_text())
+
+func _refresh_prompt_text() -> void:
+	if locked:
+		_prompt.text = I18N.tr_str("stairs.sealed")
+		_prompt.add_theme_color_override("font_color", Color(1, 0.5, 0.4))
+	else:
+		_prompt.text = I18N.tr_str("ui.tap")
+		_prompt.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
+	I18N.tag(_prompt)
+
+## Called whenever a depth's boss dies and the stairs unseal (see dungeon.gd).
+func set_locked(value: bool) -> void:
+	if locked == value:
+		return
+	locked = value
+	_refresh_prompt_text()
 
 ## Touch hook (see npc.gd).
 func interact() -> void:
@@ -42,9 +62,6 @@ func interact() -> void:
 		used.emit(direction)
 
 func _process(_delta: float) -> void:
-	if locked and _prompt != null:
-		_prompt.text = I18N.tr_str("stairs.sealed")
-		_prompt.add_theme_color_override("font_color", Color(1, 0.5, 0.4))
 	if _hero == null or not is_instance_valid(_hero):
 		_hero = get_tree().get_first_node_in_group("player") as Node2D
 		return

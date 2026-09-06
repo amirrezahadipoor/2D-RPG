@@ -334,7 +334,7 @@ func _update_boss_bar() -> void:
 
 func _on_boss_down() -> void:
 	if _stairs_down_node != null and is_instance_valid(_stairs_down_node):
-		_stairs_down_node.locked = false
+		_stairs_down_node.set_locked(false)
 	if not is_inside_tree():
 		return
 	var hud := get_tree().get_first_node_in_group("hud")

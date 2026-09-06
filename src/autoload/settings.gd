@@ -101,18 +101,38 @@ func set_fps_cap(v: int) -> void:
 
 ## G2: if fps stays under 40 for three straight samples, step the quality
 ## tier down once (high → medium → low). Pure function → unit-testable.
+##
+## BUG-6.4: a single stray tick (GC pause, a menu opening, an asset import
+## hiccup) used to count as a full "bad" sample on its own, so three
+## consecutive brief stutters — not actual sustained low framerate — could
+## trigger a quality drop. Each raw sample is now folded into a 5-sample
+## moving average first, and the average is what's compared against the
+## 40fps floor, so a couple of one-off spikes get smoothed out instead of
+## demoting quality by themselves.
 var _aq_bad := 0
+var _aq_samples: Array = []
+const AQ_WINDOW := 5
 
 func auto_quality_tick(fps: float) -> bool:
 	if quality == "low":
 		return false
-	if fps > 0.0 and fps < 40.0:
+	if fps > 0.0:
+		_aq_samples.append(fps)
+		if _aq_samples.size() > AQ_WINDOW:
+			_aq_samples.pop_front()
+	var avg := 0.0
+	for s in _aq_samples:
+		avg += s
+	if not _aq_samples.is_empty():
+		avg /= _aq_samples.size()
+	if avg > 0.0 and avg < 40.0:
 		_aq_bad += 1
 	else:
 		_aq_bad = 0
 	if _aq_bad < 3:
 		return false
 	_aq_bad = 0
+	_aq_samples.clear()
 	set_quality("medium" if quality == "high" else "low")
 	return true
 

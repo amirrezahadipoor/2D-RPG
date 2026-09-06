@@ -1134,6 +1134,29 @@ func _check_bosses() -> void:
 	d2.build(2, 777)
 	_ok(d2.boss != null and d2.boss.enemy_type == "frost_warden", "depth 2 keeps the Frost Warden")
 	d1.free()
+
+	# BUG-6.5: a demon's fireball resolves its "owner" (for is_walkable_at
+	# wall-collision checks) by walking up the parent chain from wherever it
+	# was spawned. Inside a Dungeon that chain is ball -> actors -> Dungeon,
+	# which does define is_walkable_at -- confirm that live (needs d2 in the
+	# actual scene tree, unlike d1 above, so groups/_process resolve).
+	add_child(d2)
+	var demon := Enemy.new()
+	d2.actors.add_child(demon)
+	demon.setup("demon", 3)
+	demon.global_position = d2._pos_of(d2._center(d2.rooms[0]))
+	demon._cast_fireball(Vector2.RIGHT)
+	await get_tree().process_frame
+	var demon_ball: Node = null
+	for n in get_tree().get_nodes_in_group("projectile"):
+		if n.global_position.distance_to(demon.global_position) < 20.0:
+			demon_ball = n
+	_ok(demon_ball != null, "a demon in a dungeon casts a fireball")
+	if demon_ball != null:
+		demon_ball._process(0.016)
+		_ok(demon_ball._owner_node != null and demon_ball._owner_node.has_method("is_walkable_at"),
+			"its owner-node chain resolves to something that knows the dungeon layout")
+		demon_ball.queue_free()
 	d2.free()
 
 func _check_music_loops() -> void:
@@ -1274,21 +1297,35 @@ func _check_gphase() -> void:
 		npc.global_position = home
 	else:
 		_ok(true, "far actors stop drawing (no npc in this world — skipped)")
-	# G2 auto-quality
+	# G2 auto-quality (BUG-6.4: samples are folded into a 5-tick moving
+	# average before being compared to the 40fps floor, so an isolated
+	# stutter can no longer demote quality on its own).
 	var keep_q := Settings.quality
 	Settings.set_quality("high")
-	Settings.auto_quality_tick(30.0)
-	Settings.auto_quality_tick(30.0)
-	_ok(not Settings.auto_quality_tick(55.0), "a good frame resets the bad-fps streak")
-	Settings.auto_quality_tick(30.0)
-	Settings.auto_quality_tick(30.0)
-	_ok(Settings.auto_quality_tick(30.0) and Settings.quality == "medium", "sustained low fps steps quality down (high→medium)")
-	Settings.auto_quality_tick(30.0)
-	Settings.auto_quality_tick(30.0)
-	Settings.auto_quality_tick(30.0)
+	Settings._aq_samples.clear()
+	Settings._aq_bad = 0
+	Settings.auto_quality_tick(60.0)
+	Settings.auto_quality_tick(60.0)
+	_ok(not Settings.auto_quality_tick(20.0), "one stray stutter among good frames doesn't count towards a drop")
+	Settings.auto_quality_tick(60.0)
+	_ok(not Settings.auto_quality_tick(60.0) and Settings.quality == "high",
+		"the moving average stays healthy, quality untouched")
+	Settings._aq_samples.clear()
+	Settings._aq_bad = 0
+	Settings.auto_quality_tick(20.0)
+	Settings.auto_quality_tick(20.0)
+	_ok(Settings.auto_quality_tick(20.0) and Settings.quality == "medium",
+		"sustained low fps (moving average) steps quality down (high→medium)")
+	Settings._aq_samples.clear()
+	Settings._aq_bad = 0
+	Settings.auto_quality_tick(20.0)
+	Settings.auto_quality_tick(20.0)
+	Settings.auto_quality_tick(20.0)
 	_ok(Settings.quality == "low", "and again (medium→low)")
-	_ok(not Settings.auto_quality_tick(30.0), "low is the floor — never below")
+	_ok(not Settings.auto_quality_tick(20.0), "low is the floor — never below")
 	Settings.set_quality(keep_q)
+	Settings._aq_samples.clear()
+	Settings._aq_bad = 0
 
 func _check_people() -> void:
 	print("== people ==")
