@@ -38,7 +38,12 @@ func _ready() -> void:
 	world.name = "Overworld"
 	if loading:
 		Game.load_run()
+		# legacy saves may have -1; force fixed world for them too
+		if Game.saved_world_seed < 0:
+			Game.saved_world_seed = Game.FIXED_WORLD_SEED
 		world.forced_seed = Game.saved_world_seed
+	else:
+		world.forced_seed = Game.FIXED_WORLD_SEED
 	add_child(world)
 	if loading and Game.saved_hero_pos != Vector2.ZERO \
 			and world.is_walkable_at(Game.saved_hero_pos):

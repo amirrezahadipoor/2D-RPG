@@ -25,7 +25,8 @@ var playtime: float = 0.0
 var last_death_was_hardcore: bool = false
 var game_minutes: float = 8.0 * 60.0
 var seen_intro: bool = false
-var saved_world_seed: int = -1
+const FIXED_WORLD_SEED := 20260906
+var saved_world_seed: int = FIXED_WORLD_SEED
 var saved_hero_pos := Vector2.ZERO
 var saved_dungeon_depth := 0
 var pending_load := false
@@ -103,6 +104,10 @@ func die() -> void:
 func start_new_run(hardcore: bool = true) -> void:
 	is_hardcore = hardcore
 	playtime = 0.0
+	saved_world_seed = FIXED_WORLD_SEED
+	saved_hero_pos = Vector2.ZERO
+	saved_dungeon_depth = 0
+	pending_load = false
 	Stats.reset_run()
 	Inventory.reset_run()
 	QuestLog.reset_run()

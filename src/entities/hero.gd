@@ -195,12 +195,31 @@ func command_tap(world_pos: Vector2) -> void:
 		var n2 := node as Node2D
 		var off := global_position - n2.global_position
 		off = off.normalized() * 10.0 if off.length() > 0.001 else Vector2(0, 10)
-		_set_move_to(n2.global_position + off)
+		var dest := n2.global_position + off
+		var w2 := _world_node()
+		if w2 != null and w2.has_method("nearest_walkable"):
+			var walk: Variant = w2.nearest_walkable(dest, 12)
+			if walk is Vector2:
+				dest = walk
+			else:
+				# try 24px offset for edge cases (mine on rock edge)
+				var walk2: Variant = w2.nearest_walkable(n2.global_position, 12)
+				if walk2 is Vector2:
+					dest = (walk2 as Vector2) + off
+		_set_move_to(dest)
 		return
 	_enemy_target = null
 	_interact_pending = null
 	var w := _world_node()
-	_set_move_to(w.nearest_walkable(world_pos) if w != null else world_pos)
+	if w != null and w.has_method("nearest_walkable"):
+		var walk: Variant = w.nearest_walkable(world_pos, 12)
+		if walk is Vector2:
+			_set_move_to(walk)
+			return
+		# water or blocked — show feedback, don't walk into void
+		Juice.world_text(world_pos, I18N.tr_str("toast.blocked"), Color(1,0.6,0.4), 8)
+		return
+	_set_move_to(world_pos)
 
 func command_dodge(dir: Vector2) -> void:
 	Juice.haptic(15)

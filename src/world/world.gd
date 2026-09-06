@@ -44,12 +44,14 @@ var _road_grid: PackedByteArray = PackedByteArray()
 var _current_biome := ""
 var world_seed: int = 0
 
+const FIXED_WORLD_SEED := 20260906
 var forced_seed := -1
 
 func _ready() -> void:
 	add_to_group("world")
 	Settings.settings_changed.connect(apply_quality)
-	build(forced_seed if forced_seed >= 0 else randi())
+	# Fixed world: one big persistent realm, not random each new game
+	build(forced_seed if forced_seed >= 0 else FIXED_WORLD_SEED)
 
 # ---------------------------------------------------------------- build -----
 func build(seed_value: int) -> void:
@@ -552,7 +554,8 @@ func _hash2(x: int, y: int) -> float:
 ## Nearest walkable tile centre, spiral-searched out to `radius` tiles.
 ## Every spawn (hero, NPC homes and fields) goes through here so nobody can
 ## ever start the game embedded in a roof, a well or a tree (audit P0-2).
-func nearest_walkable(pos: Vector2, radius: int = 8) -> Vector2:
+## Returns null if no walkable tile in radius — caller must handle (was returning pos which could be water)
+func nearest_walkable(pos: Vector2, radius: int = 8) -> Variant:
 	var c := tile_at(pos)
 	for r in range(0, radius + 1):
 		for dy in range(-r, r + 1):
@@ -563,7 +566,11 @@ func nearest_walkable(pos: Vector2, radius: int = 8) -> Vector2:
 				var centre := Vector2(t.x * TILE + 8.0, t.y * TILE + 8.0)
 				if is_walkable_at(centre):
 					return centre
-	return pos
+	return null
+
+func nearest_walkable_or_same(pos: Vector2, radius: int = 8) -> Vector2:
+	var v: Variant = nearest_walkable(pos, radius)
+	return v if v is Vector2 else pos
 
 func is_walkable_at(world_pos: Vector2) -> bool:
 	var t := tile_at(world_pos)
@@ -732,7 +739,7 @@ func _spawn_hero() -> void:
 	actors.add_child(hero)
 	if not settlements.is_empty():
 		var plaza: Vector2i = settlements[0]["plaza"]
-		hero.global_position = nearest_walkable(
+		hero.global_position = nearest_walkable_or_same(
 			Vector2(plaza.x * TILE + 8.0, (plaza.y + 1) * TILE + 8.0))
 	else:
 		hero.global_position = Vector2(WORLD_W * TILE * 0.5, WORLD_H * TILE * 0.5)
@@ -756,8 +763,8 @@ func _spawn_npcs() -> void:
 				plaza.y * TILE + 8 + sin(angle) * 18.0)
 			npc.global_position = npc.home
 			npc.setup(roles[i], st, i)
-			npc.home = nearest_walkable(npc.home)
-			npc.field = nearest_walkable(npc.field)
+			npc.home = nearest_walkable_or_same(npc.home)
+			npc.field = nearest_walkable_or_same(npc.field)
 			npc.global_position = npc.home
 			npcs.append(npc)
 		# the realm's sovereign rules from the town's palace: a unique, named
@@ -770,7 +777,7 @@ func _spawn_npcs() -> void:
 			king.home = Vector2((door_tile.x) * TILE + 8.0, (door_tile.y + 1) * TILE + 8.0)
 			king.global_position = king.home
 			king.setup("king", st, 99)
-			king.home = nearest_walkable(king.home)
+			king.home = nearest_walkable_or_same(king.home)
 			king.global_position = king.home
 			king.display_name = I18N.tr_str("npc.name.king")
 			npcs.append(king)
@@ -1018,7 +1025,10 @@ func _place_pois() -> void:
 		var pb := Vector2(b["plaza"].x * 16.0 + 8.0, b["plaza"].y * 16.0 + 8.0)
 		for t in [0.35, 0.68]:
 			var want := pa.lerp(pb, t) + Vector2(rng.randf_range(-24, 24), rng.randf_range(-24, 24))
-			var pos := nearest_walkable(want, 6)
+			var walk: Variant = nearest_walkable(want, 6)
+			if not (walk is Vector2):
+				continue
+			var pos: Vector2 = walk
 			if pos.distance_to(want) > 40.0:
 				continue
 			if pos.distance_to(hero.global_position) < 60.0:
