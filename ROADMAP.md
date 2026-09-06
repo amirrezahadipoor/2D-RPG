@@ -44,4 +44,4 @@ locally فقط import/verify سریع با تایم‌اوت کوتاه.
 - [x] G1 cull کردن actorهای دوردست (کم‌هزینه‌سازی رندر)
 - [x] G2 محافظ خودکار کیفیت: افت fps → کاهش tier + toast
 - [x] G3 نسخه 1.1.0 + RELEASE_NOTES دوزبانه
-- [ ] G4 گیت نهایی: verify سبز + CI + APK امضاشده روی HEAD
+- [x] G4 گیت نهایی: verify سبز + CI + APK امضاشده روی HEAD
