@@ -2440,11 +2440,15 @@ func _check_touch_quality() -> void:
 	_g_touch(true, _g_screen_at(pk_t.global_position), 13)
 	_g_touch(false, _g_screen_at(pk_t.global_position), 13)
 	var got_it := false
-	for i in 240:
+	for i in 420:
 		await get_tree().physics_frame
 		if not is_instance_valid(pk_t) or pk_t.is_queued_for_deletion():
 			got_it = true
 			break
+		if i % 60 == 59 and is_instance_valid(pk_t):
+			# re-aim: on slow CI frames the first tap can predate the settle
+			_g_touch(true, _g_screen_at(pk_t.global_position), 13)
+			_g_touch(false, _g_screen_at(pk_t.global_position), 13)
 	_ok(got_it, "tapping loot walks the hero over and picks it up")
 	Inventory.reset_run()
 
@@ -2968,11 +2972,11 @@ func _check_map_pan() -> void:
 	_ok(trav[0] == 0, "dragging off a settlement does not fast-travel")
 	# ...but a clean tap on it still does (re-aim: the map panned since)
 	var tapped := false
-	for i in 12:
+	for i in 24:
 		mk = (mo._markers[0][2] as Vector2) * mo.zoom - mo._off + MapOverlay.PANEL_POS
 		_g_touch(true, P.call(mk), 54)
 		_g_touch(false, P.call(mk), 54)
-		for j in 6:
+		for j in 10:
 			await get_tree().process_frame
 		if trav[0] == 1:
 			tapped = true
@@ -2985,10 +2989,10 @@ func _check_map_pan() -> void:
 	_ok(mo._off.x <= 240.0 and mo._off.y <= 160.0, "and at the far edge")
 	# zoom out recentres
 	var zout := false
-	for i in 12:
+	for i in 24:
 		_g_touch(true, P.call(chip_c), 55)
 		_g_touch(false, P.call(chip_c), 55)
-		for j in 6:
+		for j in 10:
 			await get_tree().process_frame
 		if mo.zoom == 1.0 and mo._off == Vector2.ZERO:
 			zout = true

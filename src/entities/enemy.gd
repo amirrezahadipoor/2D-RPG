@@ -162,6 +162,8 @@ func _damage_mult() -> float:
 
 ## One monster spotting you is every monster nearby spotting you.
 func _alert_pack() -> void:
+	if not is_inside_tree():
+		return
 	for node in get_tree().get_nodes_in_group("enemy"):
 		var other := node as Enemy
 		if other == null or other == self or other.state != State.WANDER:
