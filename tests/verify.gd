@@ -43,6 +43,7 @@ func run() -> void:
 	await _check_menus()
 	await _check_touch_quality()
 	await _check_dialogue_touch()
+	await _check_act_card()
 
 	print("")
 	if _failures.is_empty():
@@ -1910,3 +1911,37 @@ func _check_dialogue_touch() -> void:
 	Stats.reset_run()
 	Inventory.reset_run()
 	QuestLog.reset_run()
+
+func _check_act_card() -> void:
+	print("== act card ==")
+	QuestLog.reset_run()
+	var ac := ActCard.new()
+	add_child(ac)
+	await get_tree().process_frame
+	_ok(not ac.visible, "act card starts hidden")
+	QuestLog.main_progress = 42
+	ac.show_act(4)
+	await get_tree().process_frame
+	var body: String = str(ac._body.text)
+	_ok(ac.visible and not body.begins_with("story.act.") and not body.is_empty(),
+		"act card shows a resolved act text")
+	var lead: String = str(ac._lead.text)
+	_ok(lead.find(I18N.num(42)) >= 0 and lead.find(I18N.num(100)) >= 0,
+		"act card places the run at N/100 in its header")
+	# any tap dismisses it
+	var tap := InputEventMouseButton.new()
+	tap.button_index = MOUSE_BUTTON_LEFT
+	tap.pressed = true
+	tap.position = Vector2(240, 135)
+	Input.parse_input_event(tap)
+	await get_tree().process_frame
+	var tap_up := InputEventMouseButton.new()
+	tap_up.button_index = MOUSE_BUTTON_LEFT
+	tap_up.pressed = false
+	tap_up.position = Vector2(240, 135)
+	Input.parse_input_event(tap_up)
+	await get_tree().process_frame
+	_ok(not ac.visible, "tapping the act card dismisses it")
+	ac.queue_free()
+	QuestLog.reset_run()
+	Stats.reset_run()

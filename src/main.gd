@@ -13,6 +13,8 @@ var events: WorldEvents
 var dungeon: Dungeon = null
 var touch: TouchUI = null
 var victory_screen: VictoryScreen
+var act_card: ActCard
+var _announced_act := -1
 var _interiors := {}          # house_id -> Interior
 var _house_id := -1
 var _house_return_pos := Vector2.ZERO
@@ -59,6 +61,10 @@ func _ready() -> void:
 	victory_screen.continue_pressed.connect(func(): Game.change_state(Game.State.PLAYING))
 	victory_screen.new_run_pressed.connect(_on_retry)
 	victory_screen.menu_pressed.connect(_on_victory_menu)
+
+	act_card = ActCard.new()
+	act_card.name = "ActCard"
+	add_child(act_card)
 
 	inv_screen = InventoryScreen.new()
 	inv_screen.name = "InventoryScreen"
@@ -123,10 +129,28 @@ func _ready() -> void:
 		Game.pending_load = false
 	Game.pending_load = false
 
+	# chronicle interludes: mark the act we booted into so only real progress
+	# (a finished objective that crosses an act boundary) raises a card
+	_announced_act = QuestLog.current_act()
+	QuestLog.changed.connect(_on_quest_changed)
+
 	if Game.seen_intro:
 		Game.change_state(Game.State.PLAYING)
 	else:
 		cutscene.play()
+
+func _on_quest_changed() -> void:
+	if Game.state != Game.State.PLAYING:
+		return
+	var act := QuestLog.current_act()
+	if act <= _announced_act or act <= 0:
+		return
+	_announced_act = act
+	# let the beat land alone: drop whatever modal was open (the turn-in box)
+	for ui in get_tree().get_nodes_in_group("modal_ui"):
+		if ui.has_method("close"):
+			ui.close()
+	act_card.show_act(act)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if Game.state == Game.State.DEAD or Game.state == Game.State.VICTORY:
