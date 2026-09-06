@@ -17,9 +17,10 @@ const BUTTONS := {
 	"inventory": {"pos": Vector2(24, 152), "r": 9.0, "glyph": "B"},
 	"quests":   {"pos": Vector2(48, 152), "r": 9.0, "glyph": "J"},
 	"talents":  {"pos": Vector2(72, 152), "r": 9.0, "glyph": "T"},
+	"map":      {"pos": Vector2(96, 152), "r": 9.0, "glyph": "M"},
 }
 ## toggle actions release themselves a beat after the tap
-const TOGGLE_ACTIONS := {"inventory": 1, "quests": 1, "talents": 1, "pause": 1}
+const TOGGLE_ACTIONS := {"inventory": 1, "quests": 1, "talents": 1, "pause": 1, "map": 1}
 
 var enabled := false
 var _root: Control

@@ -14,6 +14,7 @@ var dungeon: Dungeon = null
 var touch: TouchUI = null
 var victory_screen: VictoryScreen
 var act_card: ActCard
+var world_map: MapOverlay
 var _announced_act := -1
 var _interiors := {}          # house_id -> Interior
 var _house_id := -1
@@ -65,6 +66,11 @@ func _ready() -> void:
 	act_card = ActCard.new()
 	act_card.name = "ActCard"
 	add_child(act_card)
+
+	world_map = MapOverlay.new()
+	world_map.name = "MapOverlay"
+	add_child(world_map)
+	world_map.travel_requested.connect(_on_map_travel)
 
 	inv_screen = InventoryScreen.new()
 	inv_screen.name = "InventoryScreen"
@@ -156,7 +162,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Game.state == Game.State.DEAD or Game.state == Game.State.VICTORY:
 		return
 	if event.is_action_pressed("pause"):
+		# pausing while the map is open just closes the map first
+		if world_map.visible:
+			close_map()
+			get_viewport().set_input_as_handled()
+			return
 		Game.toggle_pause()
+	elif event.is_action_pressed("map"):
+		_toggle_map()
 	elif event.is_action_pressed("inventory"):
 		inv_screen.toggle()
 	elif event.is_action_pressed("quests"):
@@ -230,6 +243,8 @@ func _on_player_died() -> void:
 	Game.die()
 
 func _on_game_state(new_state: int, _old_state: int) -> void:
+	if new_state != Game.State.PLAYING:
+		close_map()
 	if new_state == Game.State.DEAD:
 		victory_screen.hide_victory()
 		death_screen.show_death()
@@ -281,6 +296,38 @@ func _on_cave_entrance(_direction: int) -> void:
 	if dungeon != null or _house_id >= 0 or Game.state != Game.State.PLAYING:
 		return
 	enter_dungeon(1)
+
+# ------------------------------------------------------------ map ----------
+func _toggle_map() -> void:
+	if world_map.visible:
+		close_map()
+		return
+	if dungeon != null or _house_id >= 0 or Game.state != Game.State.PLAYING:
+		return
+	world_map.show_map(world)
+	get_tree().paused = true   # the map reads while the world is frozen
+
+func close_map() -> void:
+	if world_map == null or not world_map.visible:
+		return
+	world_map.hide_map()
+	get_tree().paused = false
+
+## Fast travel: the hero walks out of the realm and into another town.
+func _on_map_travel(settlement_index: int) -> void:
+	close_map()
+	if dungeon != null or _house_id >= 0 or world == null:
+		return
+	for st in world.settlements:
+		if int(st["index"]) == settlement_index:
+			var p: Vector2i = st["plaza"]
+			var pos := Vector2(p.x * Overworld.TILE + 8.0, (p.y + 1) * Overworld.TILE + 8.0)
+			world.hero.global_position = pos
+			world.hero.cam.reset_smoothing()
+			hud.set_biome(world.biome_at(pos))
+			Sfx.play("stairs")
+			hud.show_toast(I18N.tr_str("toast.travel") % I18N.tr_str("sett.name.%d" % settlement_index))
+			return
 
 # ------------------------------------------------------------ houses -------
 ## Step through a house door into that home's furnished Interior.

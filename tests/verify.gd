@@ -25,6 +25,7 @@ func run() -> void:
 	await _check_spawner()
 	await _check_inventory()
 	await _check_world_scale()
+	await _check_world_map()
 	await _check_houses()
 	await _check_people()
 	_check_quests()
@@ -674,6 +675,46 @@ func _roof_pos() -> Vector2:
 	return Vector2(-100, -100)
 
 # ---------------------------------------------------------------- people ----
+
+func _check_world_map() -> void:
+	print("== overworld map ==")
+	var mo := MapOverlay.new()
+	add_child(mo)
+	await get_tree().process_frame
+	mo.show_map(world)
+	await get_tree().process_frame
+	_ok(mo.visible, "map overlay opens")
+	_ok(mo._map_tex.texture != null, "the realm bakes a map texture")
+	var town_dots := 0
+	var village_dots := 0
+	for m in mo._markers:
+		if int(m[0]) == -1:
+			continue
+		for st in world.settlements:
+			if int(st["index"]) == int(m[0]):
+				town_dots += 1 if st["type"] == "town" else 0
+				village_dots += 1 if st["type"] == "village" else 0
+	_ok(mo._markers.size() >= world.settlements.size() + 1,
+		"map marks every settlement plus the cave mouth (%d markers)" % mo._markers.size())
+	_ok(town_dots == 1 and village_dots == 3, "map draws one town and three villages")
+	var rect: Rect2 = mo._map_tex.get_global_rect()
+	var hero_px: Vector2 = mo._hero_dot.position + mo._hero_dot.size / 2.0
+	_ok(rect.grow(4.0).has_point(hero_px), "the hero dot sits on the map")
+	# an active deliver quest paints an objective dot on its settlement
+	QuestLog.reset_run()
+	var did := -1
+	for i in 60:
+		if QuestDB.side_quest(i).get("kind", "") == "deliver":
+			did = i
+			break
+	if did >= 0:
+		QuestLog.start_side(did)
+		mo._place_markers()
+		_ok(mo._obj_dot.visible, "deliver quest lights an objective dot")
+	mo.hide_map()
+	_ok(not mo.visible, "map closes")
+	mo.queue_free()
+	QuestLog.reset_run()
 func _check_houses() -> void:
 	print("== houses & interiors ==")
 	var door_count := 0
