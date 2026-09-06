@@ -124,6 +124,9 @@ func _starting_gear() -> void:
 	doll.equip("weapon", "iron_sword")
 
 # ------------------------------------------------------------- physics ------
+func _is_touch_device() -> bool:
+	return DisplayServer.is_touchscreen_available() or OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile")
+
 func _physics_process(delta: float) -> void:
 	var cutscene := get_tree().get_first_node_in_group("cutscene")
 	if (cutscene != null and cutscene.active) or _modal_open():
@@ -138,14 +141,18 @@ func _physics_process(delta: float) -> void:
 	_retaliate_t = maxf(0.0, _retaliate_t - delta)
 	_handle_actions(delta)
 
-	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	if input.length() > 0.1:
-		# a real keyboard/gamepad takes over and cancels touch commands
-		_has_move_to = false
-		_enemy_target = null
+	var input := Vector2.ZERO
+	# keyboard only for desktop testing, not on touch devices (touch-only requirement)
+	if not _is_touch_device():
+		input = Input.get_vector("move_left", "move_right", "move_up", "move_down")
+		if input.length() > 0.1:
+			_has_move_to = false
+			_enemy_target = null
 	_touch_think(delta)
 	apply_lookahead(delta)
-	var drive := input if input.length() > 0.1 else _touch_dir()
+	var drive := _touch_dir()
+	if not _is_touch_device() and input.length() > 0.1:
+		drive = input
 	if act == Act.DODGE:
 		# dash keeps its launch velocity, no steering
 		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * 0.25 * delta)
@@ -385,9 +392,16 @@ func _handle_actions(delta: float) -> void:
 	_counter_window = maxf(0.0, _counter_window - delta)
 	if _combo_window <= 0.0:
 		_combo = 0
-	if Input.is_action_pressed("attack"):
-		_charge += delta
+
+	# touch-only: on real touch devices, attacks come from auto-combat / tap foe, not keyboard
+	var is_touch := _is_touch_device()
+	if not is_touch:
+		if Input.is_action_pressed("attack"):
+			_charge += delta
+		else:
+			_charge = 0.0
 	else:
+		# heavy charge via long-press on foe? For now no keyboard charge on touch
 		_charge = 0.0
 	var charging := _charge >= HEAVY_CHARGE
 	doll.modulate = Color(1.35, 1.2, 0.8) if charging else Color.WHITE
@@ -402,16 +416,17 @@ func _handle_actions(delta: float) -> void:
 			act = Act.NONE
 		return
 
-	if Input.is_action_just_pressed("attack"):
-		_parry_window = PARRY_WINDOW
+	if not is_touch:
+		if Input.is_action_just_pressed("attack"):
+			_parry_window = PARRY_WINDOW
 	if _attack_cooldown <= 0.0:
 		var want_heavy := _charge >= HEAVY_CHARGE
-		if Input.is_action_just_pressed("attack") or want_heavy:
+		if not is_touch and (Input.is_action_just_pressed("attack") or want_heavy):
 			do_attack(want_heavy)
 		elif _auto_foe() != null:
 			_face_towards((_auto_foe() as Node2D).global_position)
 			do_attack(false)
-	if Input.is_action_just_pressed("dodge"):
+	if not is_touch and Input.is_action_just_pressed("dodge"):
 		if Stats.spend_stamina(DODGE_STAMINA):
 			act = Act.DODGE
 			act_timer = DODGE_TIME
@@ -419,7 +434,7 @@ func _handle_actions(delta: float) -> void:
 			velocity = dir * DASH_SPEED
 			Juice.streak(global_position + Vector2(0, -8), dir)
 
-	if Input.is_action_just_pressed("debug_swap_gear"):
+	if not is_touch and Input.is_action_just_pressed("debug_swap_gear"):
 		cycle_gear()
 
 	if Input.is_action_just_pressed("use_potion"):

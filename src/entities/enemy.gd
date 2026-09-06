@@ -160,15 +160,22 @@ func _damage_mult() -> float:
 		m *= 1.25
 	return m
 
+var _last_alert_t := 0.0
 ## One monster spotting you is every monster nearby spotting you.
+## Optimized: throttle to 0.5s and early-out distance squared (was O(n²) every frame)
 func _alert_pack() -> void:
 	if not is_inside_tree():
 		return
+	var now := Time.get_ticks_msec()
+	if now - _last_alert_t < 500:
+		return
+	_last_alert_t = now
+	var pack_radius_sq := 110.0 * 110.0
 	for node in get_tree().get_nodes_in_group("enemy"):
 		var other := node as Enemy
 		if other == null or other == self or other.state != State.WANDER:
 			continue
-		if other.global_position.distance_to(global_position) < 110.0:
+		if other.global_position.distance_squared_to(global_position) < pack_radius_sq:
 			other.state = State.CHASE
 
 ## Parried or caught mid-windup: the monster loses its footing.
