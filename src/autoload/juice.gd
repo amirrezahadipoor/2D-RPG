@@ -6,6 +6,7 @@ signal hurt_taken
 
 var _cam: Camera2D
 var _world: Node
+var _stop_at := 0
 var _shake_power := 0.0
 var _shake_time := 0.0
 
@@ -28,9 +29,12 @@ func shake(power: float) -> void:
 ## desktop export compiling.
 func haptic(ms: int) -> void:
 	if OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile"):
-		Input.call("vibrate_handshake", ms)
+		Input.call("vibrate", ms)   # symbol only exists on mobile builds
 
 func _process(delta: float) -> void:
+	if _stop_at > 0 and Time.get_ticks_msec() >= _stop_at:
+		_stop_at = 0
+		Engine.time_scale = 1.0
 	if _cam == null:
 		return
 	if _shake_time > 0.0:
@@ -179,3 +183,13 @@ func puff(world_pos: Vector2) -> void:
 	var killer := node.create_tween()
 	killer.tween_interval(0.4)
 	killer.tween_callback(node.queue_free)
+
+## Phase D1: 45 ms of frozen time on every kill (real-time guarded).
+func hitstop() -> void:
+	Engine.time_scale = 0.25
+	_stop_at = Time.get_ticks_msec() + 40
+
+## Expanding touch ripple at a world point: every tap answers the finger.
+func ring(world_pos: Vector2) -> void:
+	if _world != null and is_instance_valid(_world) and _world.has_method("spawn_ripple"):
+		_world.spawn_ripple(world_pos)

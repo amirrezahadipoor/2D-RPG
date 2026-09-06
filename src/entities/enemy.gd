@@ -422,6 +422,8 @@ func _apply_flash() -> void:
 		_tele.visible = false
 
 func _die() -> void:
+	Juice.hitstop()
+	Juice.haptic(10)
 	state = State.DEAD
 	velocity = Vector2.ZERO
 	Stats.add_xp(xp_value)

@@ -44,6 +44,7 @@ func run() -> void:
 	_check_dungeon_art()
 	_check_weather()
 	await _check_map_fog()
+	await _check_feel()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -1079,6 +1080,17 @@ func _check_map_fog() -> void:
 		_ok(fired[0] == si, "tapping a discovered shrine asks Main to travel")
 	mo.hide_map()
 	mo.queue_free()
+
+func _check_feel() -> void:
+	print("== feel D1 ==")
+	_ok(world.hero.reticle != null, "hero carries a target reticle")
+	Juice.hitstop()
+	_ok(Engine.time_scale < 0.5, "kills freeze the frame for a beat")
+	await get_tree().create_timer(0.1, true, false, true).timeout
+	_ok(Engine.time_scale == 1.0, "and time flows again")
+	Juice.ring(world.hero.global_position)
+	await get_tree().process_frame
+	_ok(true, "tap ripple spawns without error")
 
 func _check_people() -> void:
 	print("== people ==")

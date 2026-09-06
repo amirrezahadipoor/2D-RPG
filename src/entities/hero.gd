@@ -45,6 +45,7 @@ var _move_to := Vector2.ZERO
 var _has_move_to := false
 var _interact_pending: Node = null
 var _enemy_target: Node = null
+var reticle: Reticle
 var _retaliate_t := 0.0
 var _stuck_t := 0.0
 var _wiggle := 0.0
@@ -67,6 +68,9 @@ func _ready() -> void:
 	add_child(shape)
 
 	add_to_group("player")
+	reticle = Reticle.new()
+	reticle.name = "Reticle"
+	add_child(reticle)
 	doll = PaperDoll.new()
 	doll.gear_changed.connect(_on_gear_changed)
 	add_child(doll)
@@ -165,10 +169,19 @@ func _physics_process(delta: float) -> void:
 	_animate(delta, drive)
 	_update_lantern(delta)
 
+	if reticle:
+		if _enemy_target != null and is_instance_valid(_enemy_target):
+			reticle.visible = true
+			reticle.global_position = _enemy_target.global_position + Vector2(0, -20)
+		else:
+			reticle.visible = false
+
 # ------------------------------------------------------- touch commands ----
 ## One finger tap on the world: walk there, or walk to the thing under the
 ## finger and use it (talk / pick / open / descend), or engage an enemy.
+
 func command_tap(world_pos: Vector2) -> void:
+	Juice.ring(world_pos)
 	var node := _tap_target(world_pos)
 	if node != null and node.is_in_group("enemy"):
 		_enemy_target = node
@@ -189,6 +202,7 @@ func command_tap(world_pos: Vector2) -> void:
 	_set_move_to(w.nearest_walkable(world_pos) if w != null else world_pos)
 
 func command_dodge(dir: Vector2) -> void:
+	Juice.haptic(15)
 	if act != Act.NONE or Game.state != Game.State.PLAYING:
 		return
 	if not Stats.spend_stamina(DODGE_STAMINA):
@@ -508,6 +522,7 @@ func attack_damage(weapon: Dictionary = {}) -> int:
 ## dodging at the LAST moment banks a counter-attack bonus, and swinging just
 ## as a claw lands parries it outright.
 func hurt(amount: int, from: Node = null) -> int:
+	Juice.haptic(35)
 	if Game.state == Game.State.DEAD:
 		return 0
 	if act == Act.DODGE:
@@ -578,3 +593,4 @@ func cycle_gear() -> void:
 	else:
 		doll.equip(slot, ids[idx])
 	gear_changed.emit(doll.get_gear())
+

@@ -47,6 +47,7 @@ var world_seed: int = 0
 var forced_seed := -1
 
 func _ready() -> void:
+	add_to_group("world")
 	Settings.settings_changed.connect(apply_quality)
 	build(forced_seed if forced_seed >= 0 else randi())
 
@@ -100,7 +101,7 @@ func apply_quality() -> void:
 		shadow_layer.visible = Settings.quality != "low"
 	for entry in _lights:
 		entry["light"].visible = Settings.quality == "high"
-	Juice.register_world(actors)
+	Juice.register_world(self)
 	print("[World] seed=%d size=%dx%d settlements=%d" % [world_seed, WORLD_W, WORLD_H, settlements.size()])
 
 func _generate_biomes() -> void:
@@ -597,6 +598,16 @@ func _tick_weather() -> void:
 		weather.mode = "rain"
 	else:
 		weather.mode = "off"
+
+## Touch feedback ripple (Phase D1): a thin ring blooms where the finger fell.
+func spawn_ripple(world_pos: Vector2) -> void:
+	var n := Node2D.new()
+	n.global_position = world_pos
+	var scr := GDScript.new()
+	scr.source_code = "extends Node2D\nvar t := 0.0\nfunc _process(d: float) -> void:\n\tt += d\n\tqueue_redraw()\n\tif t > 0.3:\n\t\tqueue_free()\nfunc _draw() -> void:\n\tdraw_arc(Vector2.ZERO, 3.0 + t * 26.0, 0, TAU, 24, Color(1, 1, 1, 0.5 - t * 1.5), 1.0)\n"
+	scr.reload()
+	n.set_script(scr)
+	add_child(n)
 
 ## Phase A6: how deep into the night are we (0 = noon, 1 = midnight),
 ## with one-hour dusk/dawn ramps.

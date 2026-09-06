@@ -54,6 +54,7 @@ func interact() -> void:
 		open()
 
 func open() -> void:
+	Juice.haptic(20)
 	opened = true
 	_prompt.visible = false
 	_spr.modulate = Color(0.6, 0.55, 0.5)
