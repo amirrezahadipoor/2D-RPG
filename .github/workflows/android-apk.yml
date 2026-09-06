@@ -105,6 +105,31 @@ jobs:
           fi
           echo "export templates repaired: $TPL_DIR"
 
+      - name: Install Android Gradle build template into the project
+        # export_presets.cfg sets gradle_build/use_gradle_build=true (needed
+        # since 626e853 for the "keep" aspect + adaptive icons), which means
+        # Godot's Android export additionally requires android_source.zip
+        # (one of the export templates) to be unzipped into res://android/
+        # build/ inside the checkout -- normally done once by the editor's
+        # "Project > Install Android Build Template" menu item. That
+        # directory is git-ignored and never exists on a fresh CI checkout,
+        # which is the actual cause of Godot's "Android build template not
+        # installed in the project" export error. It is unrelated to the
+        # export-templates cache (that only supplies the release/debug
+        # engine binaries) and unrelated to the Android SDK/editor settings,
+        # so it has to be done by hand here rather than via the
+        # --install-android-build-template CLI flag (that flag re-derives
+        # its own Android SDK checks and fails in a bare headless CI editor
+        # profile that has never opened Editor Settings before).
+        run: |
+          set -euo pipefail
+          TPL_DIR="$HOME/.local/share/godot/export_templates/4.4.1.stable"
+          test -f "$TPL_DIR/android_source.zip"
+          mkdir -p android/build
+          unzip -q "$TPL_DIR/android_source.zip" -d android/build
+          test -f android/build/build.gradle.kts -o -f android/build/build.gradle
+          echo "android/build/ populated from android_source.zip"
+
       - name: Gate — automated checks must pass before shipping
         run: |
           set -euo pipefail

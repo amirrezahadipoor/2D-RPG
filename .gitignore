@@ -11,6 +11,11 @@ export/
 *.x86_64
 *.pck
 
+# Android Gradle build template (generated in CI from android_source.zip,
+# needed because export_presets.cfg sets gradle_build/use_gradle_build=true;
+# never commit it, it's regenerated fresh on every export)
+/android/
+
 # Keystores / secrets
 *.keystore
 *.jks
