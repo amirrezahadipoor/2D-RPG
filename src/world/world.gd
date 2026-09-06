@@ -1194,8 +1194,29 @@ func _place_lights() -> void:
 		_lights.append({"light": light, "kind": "wisp", "phase": randf() * TAU})
 		placed += 1
 
+var _cull_t := 0.0
+
+## G1: hide actors far off-camera — drawing is the biggest cost on weak
+## phones and a 384×384 realm keeps hundreds of nodes alive.
+func cull_actors() -> void:
+	if hero == null:
+		return
+	var center := hero.global_position
+	var lim := 520.0 * 520.0
+	for ch in actors.get_children():
+		if ch == hero:
+			continue
+		ch.visible = center.distance_squared_to(ch.global_position) < lim
+
+func _cull_tick(delta: float) -> void:
+	_cull_t -= delta
+	if _cull_t <= 0.0:
+		_cull_t = 0.3
+		cull_actors()
+
 func _process(delta: float) -> void:
 	_discover_tick(delta)
+	_cull_tick(delta)
 	if shadow_layer and shadow_layer.visible:
 		var pts: Array = []
 		for g in ["player", "npc", "enemy"]:

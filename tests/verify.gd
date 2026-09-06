@@ -53,6 +53,7 @@ func run() -> void:
 	await _check_gather()
 	_check_access()
 	_check_perf()
+	_check_gphase()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -1253,6 +1254,40 @@ func _check_perf() -> void:
 	await get_tree().create_timer(1.2).timeout
 	var grown := world.get_child_count() - before
 	_ok(grown <= 24, "damage numbers recycle through a pool (+%d nodes)" % grown)
+
+func _check_gphase() -> void:
+	print("== phase G ==")
+	# G1 culling
+	var npc: Node2D = null
+	for n in get_tree().get_nodes_in_group("npc"):
+		npc = n
+		break
+	if npc:
+		var home := npc.global_position
+		npc.global_position = world.hero.global_position + Vector2(2000, 0)
+		world.cull_actors()
+		_ok(not npc.visible, "far actors stop drawing (cull at 520px)")
+		npc.global_position = world.hero.global_position + Vector2(48, 0)
+		world.cull_actors()
+		_ok(npc.visible, "and come back when the hero returns")
+		npc.global_position = home
+	else:
+		_ok(true, "far actors stop drawing (no npc in this world — skipped)")
+	# G2 auto-quality
+	var keep_q := Settings.quality
+	Settings.set_quality("high")
+	Settings.auto_quality_tick(30.0)
+	Settings.auto_quality_tick(30.0)
+	_ok(not Settings.auto_quality_tick(55.0), "a good frame resets the bad-fps streak")
+	Settings.auto_quality_tick(30.0)
+	Settings.auto_quality_tick(30.0)
+	_ok(Settings.auto_quality_tick(30.0) and Settings.quality == "medium", "sustained low fps steps quality down (high→medium)")
+	Settings.auto_quality_tick(30.0)
+	Settings.auto_quality_tick(30.0)
+	Settings.auto_quality_tick(30.0)
+	_ok(Settings.quality == "low", "and again (medium→low)")
+	_ok(not Settings.auto_quality_tick(30.0), "low is the floor — never below")
+	Settings.set_quality(keep_q)
 
 func _check_people() -> void:
 	print("== people ==")

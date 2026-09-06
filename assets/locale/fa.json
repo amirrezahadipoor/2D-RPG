@@ -311,5 +311,6 @@
  "mine.prompt": "استخراج",
  "fish.prompt": "ماهیگیری",
  "item.fish": "ماهی",
- "settings.ui_scale": "اندازهٔ رابط"
+ "settings.ui_scale": "اندازهٔ رابط",
+ "settings.auto_quality": "افت عملکرد تشخیص داده شد — کیفیت گرافیک خودکار کاهش یافت."
 }

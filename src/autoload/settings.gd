@@ -97,6 +97,23 @@ func set_fps_cap(v: int) -> void:
 	save_settings()
 	settings_changed.emit()
 
+## G2: if fps stays under 40 for three straight samples, step the quality
+## tier down once (high → medium → low). Pure function → unit-testable.
+var _aq_bad := 0
+
+func auto_quality_tick(fps: float) -> bool:
+	if quality == "low":
+		return false
+	if fps > 0.0 and fps < 40.0:
+		_aq_bad += 1
+	else:
+		_aq_bad = 0
+	if _aq_bad < 3:
+		return false
+	_aq_bad = 0
+	set_quality("medium" if quality == "high" else "low")
+	return true
+
 func set_quality(q: String) -> void:
 	if q not in QUALITIES:
 		return

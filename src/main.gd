@@ -21,6 +21,17 @@ var _house_id := -1
 var _house_return_pos := Vector2.ZERO
 var _overworld_hero_pos := Vector2.ZERO
 
+var _aq_t := 0.0
+
+func _process(delta: float) -> void:
+	_aq_t -= delta
+	if _aq_t <= 0.0:
+		_aq_t = 1.0
+		if Settings.auto_quality_tick(Engine.get_frames_per_second()):
+			var hud_n := get_node_or_null("Hud")
+			if hud_n and hud_n.has_method("show_toast"):
+				hud_n.show_toast(I18N.tr_str("settings.auto_quality"))
+
 func _ready() -> void:
 	var loading := Game.pending_load
 	world = Overworld.new()

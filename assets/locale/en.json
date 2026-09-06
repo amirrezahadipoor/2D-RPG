@@ -311,5 +311,6 @@
  "mine.prompt": "Mine",
  "fish.prompt": "Fish",
  "item.fish": "Fish",
- "settings.ui_scale": "UI size"
+ "settings.ui_scale": "UI size",
+ "settings.auto_quality": "Performance dip detected — graphics quality lowered automatically."
 }

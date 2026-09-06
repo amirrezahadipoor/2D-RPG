@@ -39,3 +39,9 @@ locally فقط import/verify سریع با تایم‌اوت کوتاه.
 - [x] F1 ۶۰fps میان‌رده: pool کردن VFX، cull، atlas واحد
 - [x] F2 AAB/APK امضاشده در CI + manifest آمادهٔ استور
 - [x] F3 assets استور: اسکرین‌شات، گرافیک ویژه، توضیح EN/FA
+
+## فاز G — آماده‌سازی انتشار نهایی
+- [ ] G1 cull کردن actorهای دوردست (کم‌هزینه‌سازی رندر)
+- [ ] G2 محافظ خودکار کیفیت: افت fps → کاهش tier + toast
+- [ ] G3 نسخه 1.1.0 + RELEASE_NOTES دوزبانه
+- [ ] G4 گیت نهایی: verify سبز + CI + APK امضاشده روی HEAD
