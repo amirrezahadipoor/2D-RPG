@@ -10,6 +10,7 @@ var _reveal := 0.0
 var _offer_index := -1
 var _shop_offers: Array = []  # {entry, price, sold}
 var _shop_sel := 0
+var _shop_selected_row := -1  # a tap first selects, a second tap confirms
 
 var _root: Control
 var _box: ColorRect
@@ -25,6 +26,7 @@ func _ready() -> void:
 	layer = 25
 	add_to_group("modal_ui")
 	_build()
+	_root.gui_input.connect(_on_pointer)
 	visible = false
 
 func _build() -> void:
@@ -68,6 +70,10 @@ func _build() -> void:
 	_portrait_hat.stretch_mode = TextureRect.STRETCH_KEEP
 	_portrait_hat.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_root.add_child(_portrait_hat)
+	# every decorative child is pointer-transparent so taps always reach _root,
+	# which owns the tap-to-talk handling
+	for child: Control in _root.get_children():
+		child.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_name = Label.new()
 	_name.position = Vector2(84, 194)
@@ -154,6 +160,7 @@ func _compose_pages() -> Array:
 func _make_shop() -> void:
 	_shop_offers = []
 	_shop_sel = 0
+	_shop_selected_row = -1
 	var rng := RandomNumberGenerator.new()
 	rng.seed = npc.npc_index * 131 + Game.day() * 17
 	var lvl := maxi(1, Stats.level)
@@ -179,9 +186,17 @@ func _shop_text() -> String:
 	return "\n".join(lines)
 
 func _shop_hint() -> String:
+	if _touch():
+		# keep shop hints honest on mobile: rows are tapped, not steered
+		return "%s: %s G  ·  %s" % [
+			I18N.tr_str("hud.gold"), I18N.num(Stats.gold), I18N.tr_str("shop.touch")]
 	return "%s: %s G   [W/S] %s  [E] %s  [K] %s" % [
 		I18N.tr_str("hud.gold"), I18N.num(Stats.gold), I18N.tr_str("shop.select"),
 		I18N.tr_str("shop.buy"), I18N.tr_str("shop.leave")]
+
+## Are we running on a real touch device (vs a desktop build)?
+func _touch() -> bool:
+	return OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile")
 
 func _toast(key: String) -> void:
 	for child in get_tree().root.get_children():
@@ -216,13 +231,17 @@ func _apply_page() -> void:
 		_portrait_hat.texture = _head_atlas(hat)
 	match page["mode"]:
 		"offer":
-			_hint.text = "[E] %s   [K] %s" % [I18N.tr_str("quest.accept"), I18N.tr_str("quest.decline")]
+			if _touch():
+				_hint.text = "%s: %s   %s: %s" % [I18N.tr_str("ui.tap"),
+					I18N.tr_str("quest.accept"), I18N.tr_str("ui.tap"), I18N.tr_str("quest.decline")]
+			else:
+				_hint.text = "[E] %s   [K] %s" % [I18N.tr_str("quest.accept"), I18N.tr_str("quest.decline")]
 		"turn_in":
-			_hint.text = "[E] %s" % I18N.tr_str("quest.complete")
+			_hint.text = ("%s: %s" % [I18N.tr_str("ui.tap"), I18N.tr_str("quest.complete")]) if _touch() else ("[E] %s" % I18N.tr_str("quest.complete"))
 		"bye":
-			_hint.text = "[E] ..."
+			_hint.text = ("%s: %s" % [I18N.tr_str("ui.tap"), I18N.tr_str("shop.leave")]) if _touch() else "[E] ..."
 		_:
-			_hint.text = "[E]"
+			_hint.text = I18N.tr_str("ui.tap") if _touch() else "[E]"
 	for l in [_name, _text, _hint]:
 		I18N.tag(l)
 
@@ -233,6 +252,91 @@ func _head_atlas(layer: Sprite2D) -> Texture:
 	at.atlas = layer.texture
 	at.region = Rect2(0, 0, 24, 16)
 	return at
+
+var _tap_frame := -1
+
+## Pointer input for the dialogue box: one physical tap arrives both as a
+## ScreenTouch and as a synthesised mouse press (emulate_touch_from_mouse),
+## so a per-frame dedupe makes every tap count exactly once.
+func _on_pointer(event: InputEvent) -> void:
+	if not visible:
+		return
+	var pressed := false
+	var p := Vector2.ZERO
+	if event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event
+		pressed = mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT
+		p = mb.position
+	elif event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		pressed = st.pressed
+		p = st.position
+	if not pressed:
+		return
+	var frame := Engine.get_process_frames()
+	if frame == _tap_frame:
+		return
+	_tap_frame = frame
+	# only taps inside the speech box speak to the NPC
+	if p.x < 16.0 or p.x > 464.0 or p.y < 190.0 or p.y > 264.0:
+		return
+	var page: Dictionary = _pages[_page]
+	if page["mode"] == "shop":
+		_shop_tap(p)
+	else:
+		_advance(page)
+	# the tap was for the dialogue, keep it from also firing elsewhere (e.g.
+	# the mouse-click attack action or a second gui consumer)
+	get_viewport().set_input_as_handled()
+
+func _shop_tap(p: Vector2) -> void:
+	# the three offers are drawn from _text (x 84, y ~206, one line per offer)
+	if p.y < 202.0 or p.y > 240.0:
+		return
+	var row := clampi(int((p.y - 206.0) / 11.0), 0, _shop_offers.size() - 1)
+	get_viewport().set_input_as_handled()
+	# first tap (or a tap on a different row): select, never buy accidentally
+	if row != _shop_sel or _shop_selected_row != row:
+		_shop_sel = row
+		_shop_selected_row = row
+		_text.text = _shop_text()
+		Sfx.play("click", -14.0, 0.02)
+		return
+	# second tap on the confirmed row buys it
+	var o: Dictionary = _shop_offers[_shop_sel]
+	if not o["sold"] and Stats.gold >= int(o["price"]):
+		Stats.add_gold(-int(o["price"]))
+		Inventory.add(o["entry"].duplicate())
+		Sfx.play("buy")
+		o["sold"] = not Consumables.is_consumable(o["entry"]["id"])
+		_text.text = _shop_text()
+	else:
+		_toast("shop.no_gold")
+
+## One tap on a talk page behaves exactly like [E]: fast-forward the
+## typewriter, then step the page (accept / complete / goodbye).
+func _advance(page: Dictionary) -> void:
+	Sfx.play("click", -10.0, 0.02)
+	if _reveal < len(str(page["text"])):
+		_reveal = 400.0
+		get_viewport().set_input_as_handled()
+		return
+	match page["mode"]:
+		"offer":
+			QuestLog.start_side(_offer_index)
+			_pages = _compose_pages()
+			_page = 0
+		"turn_in":
+			QuestLog.complete(page["quest"])
+			_pages = _compose_pages()
+			_page = 0
+		_:
+			_page += 1
+	if _page >= _pages.size():
+		close()
+	else:
+		_apply_page()
+	get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:

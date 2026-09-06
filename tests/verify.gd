@@ -42,6 +42,7 @@ func run() -> void:
 	await _check_audio()
 	await _check_menus()
 	await _check_touch_quality()
+	await _check_dialogue_touch()
 
 	print("")
 	if _failures.is_empty():
@@ -1820,3 +1821,92 @@ func _check_touch_quality() -> void:
 	Settings.set_quality("high")
 	_ok((world._lights[0]["light"] as PointLight2D).visible, "high turns the torch glows on")
 	Settings.set_quality("high")
+
+func _check_dialogue_touch() -> void:
+	print("== dialogue touch ==")
+	Game.change_state(Game.State.PLAYING)
+	# shop: a tap selects a row, a second tap on it buys (no keyboard needed)
+	var dlg := DialogueUI.new()
+	add_child(dlg)
+	await get_tree().process_frame
+	var npc := NPC.new()
+	npc.role_name = "merchant"
+	npc.display_name = "Test Merchant"
+	npc.npc_index = 7
+	dlg.npc = npc
+	dlg._make_shop()
+	dlg._pages = [{"text": "", "mode": "shop"}]
+	dlg._page = 0
+	dlg._apply_page()
+	dlg.visible = true
+	await get_tree().process_frame
+	Stats.reset_run()
+	Stats.add_gold(5000)
+	var row2_y := 206.0 + 2 * 11.0 + 3.0
+	var tap := InputEventMouseButton.new()
+	tap.button_index = MOUSE_BUTTON_LEFT
+	tap.pressed = true
+	tap.position = Vector2(240, row2_y)
+	Input.parse_input_event(tap)
+	await get_tree().process_frame
+	var tap_up := InputEventMouseButton.new()
+	tap_up.button_index = MOUSE_BUTTON_LEFT
+	tap_up.pressed = false
+	tap_up.position = Vector2(240, row2_y)
+	Input.parse_input_event(tap_up)
+	await get_tree().process_frame
+	_ok(dlg._shop_sel == 2 and not bool(dlg._shop_offers[2]["sold"]),
+		"first shop tap only selects the tapped row")
+	var gold_before := Stats.gold
+	var price2 := int(dlg._shop_offers[2]["price"])
+	var tap2 := InputEventMouseButton.new()
+	tap2.button_index = MOUSE_BUTTON_LEFT
+	tap2.pressed = true
+	tap2.position = Vector2(240, row2_y)
+	Input.parse_input_event(tap2)
+	await get_tree().process_frame
+	var tap2_up := InputEventMouseButton.new()
+	tap2_up.button_index = MOUSE_BUTTON_LEFT
+	tap2_up.pressed = false
+	tap2_up.position = Vector2(240, row2_y)
+	Input.parse_input_event(tap2_up)
+	await get_tree().process_frame
+	_ok(Stats.gold == gold_before - price2 and bool(dlg._shop_offers[2]["sold"]),
+		"a second tap on the picked row buys it (%d -> %d)" % [gold_before, Stats.gold])
+	# a tap on a plain talk page advances it exactly once (no double-advance)
+	dlg.close()
+	dlg.npc = npc   # close() clears the npc, _apply_page needs it again
+	dlg._pages = [{"text": "first page", "mode": "talk"},
+		{"text": "second page", "mode": "talk"}]
+	dlg._page = 0
+	dlg._apply_page()
+	dlg._reveal = 400.0   # _apply_page resets the typewriter, so reveal AFTER it
+	dlg.visible = true
+	await get_tree().process_frame
+	var ttap := InputEventMouseButton.new()
+	ttap.button_index = MOUSE_BUTTON_LEFT
+	ttap.pressed = true
+	ttap.position = Vector2(240, 220)
+	Input.parse_input_event(ttap)
+	await get_tree().process_frame
+	var ttap_up := InputEventMouseButton.new()
+	ttap_up.button_index = MOUSE_BUTTON_LEFT
+	ttap_up.pressed = false
+	ttap_up.position = Vector2(240, 220)
+	Input.parse_input_event(ttap_up)
+	await get_tree().process_frame
+	_ok(dlg._page == 1 and dlg.visible,
+		"one tap advances one talk page (page %d)" % dlg._page)
+	# hints on touch devices never advertise keyboard keys
+	var dlg_ok := true
+	for loc in ["en", "fa"]:
+		I18N.set_locale(loc)
+		if I18N.tr_str("shop.touch") == "shop.touch" or I18N.tr_str("ui.tap") == "ui.tap":
+			dlg_ok = false
+	I18N.set_locale("en")
+	_ok(dlg_ok, "dialogue touch-hint strings resolve in EN and FA")
+	dlg.queue_free()
+	npc.free()
+	Stats.reset_run()
+	Inventory.reset_run()
+	QuestLog.reset_run()
