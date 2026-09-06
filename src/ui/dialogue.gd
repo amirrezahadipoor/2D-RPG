@@ -141,6 +141,8 @@ func close() -> void:
 
 func _compose_pages() -> Array:
 	var pages := []
+	if npc.is_resident:
+		return _compose_resident_pages()
 	pages.append({"text": "%s\n%s" % [
 		I18N.tr_str("npc.role." + npc.role_name),
 		I18N.tr_str("npc.hello." + npc.role_name)], "mode": "talk"})
@@ -177,6 +179,20 @@ func _compose_pages() -> Array:
 				else:
 					pages.append({"text": I18N.tr_str("quest.gate") % I18N.num(int(m["level_gate"])) +
 						"\n" + QuestDB.desc_of(m), "mode": "talk"})
+	pages.append({"text": "...", "mode": "bye"})
+	return pages
+
+## A house resident (P4/R0.2): not a quest-giver, just a person who is home.
+## Picks one of several seeded lines so re-visiting does not always read the
+## exact same sentence, and greets differently by house tier (cottage vs
+## town house vs palace steward).
+func _compose_resident_pages() -> Array:
+	var pages := []
+	var role_key := "npc.role." + npc.role_name
+	var line_count := 8
+	var pick := (npc.npc_index * 2654435761 + Game.day() * 131) % line_count
+	var hello_key := "npc.hello.%s.%d" % [npc.role_name, pick]
+	pages.append({"text": "%s\n%s" % [I18N.tr_str(role_key), I18N.tr_str(hello_key)], "mode": "talk"})
 	pages.append({"text": "...", "mode": "bye"})
 	return pages
 

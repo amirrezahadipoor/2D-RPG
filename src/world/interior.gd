@@ -32,6 +32,7 @@ var exit_stairs: Stairs = null
 var _grid := PackedByteArray()
 var _furniture: Node2D
 var _lights: Array = []
+var resident: NPC = null   # the person who actually lives here (P4/R0.2)
 
 signal exited()
 
@@ -44,6 +45,7 @@ func build(kind_value: String, house_id: int, seed_value: int) -> void:
 	_grid.resize(MAP_W * MAP_H)
 	_generate_floor(seed_value)
 	_build_layers(house_id, seed_value)
+	_place_resident(house_id, seed_value)
 	print("[Interior] kind=%s house=%d room=%s" % [kind, house_id, room])
 
 # ------------------------------------------------------------- layout ------
@@ -152,6 +154,23 @@ func _build_layers(house_id: int, seed_value: int) -> void:
 	add_child(light)
 	light.global_position = cell_center(hearth)
 	_lights.append(light)
+
+# ------------------------------------------------------------ resident -----
+## The person who lives here (P4/R0.2): stands by the hearth, wears gear that
+## matches the house tier, and has a few seeded lines instead of nobody at
+## all. A settlement's own villagers/merchant/guard stay outside on their
+## normal day schedule; this is a distinct, always-present character.
+func _place_resident(house_id: int, seed_value: int) -> void:
+	var role_key := "resident_" + kind
+	resident = NPC.new()
+	resident.name = "Resident"
+	actors.add_child(resident)
+	var stand: Vector2i = Vector2i(CORRIDOR_X + 3, room.end.y - 2)
+	resident.setup(role_key, {"index": house_id}, house_id)
+	resident.global_position = cell_center(stand)
+	resident.home = resident.global_position
+	resident.plaza = resident.global_position
+	resident.field = resident.global_position
 
 func _block_visual(t: Vector2i, color: Color, w: int = 1, h: int = 1) -> void:
 	for y in range(t.y, t.y + h):

@@ -39,13 +39,23 @@ func deserialize(data: Dictionary) -> void:
 ## (depths regenerate deterministically from world_seed, so every re-entry
 ## respawns the same secret chest). Now a claimed-out secret chest pays only
 ## its bonus gold, same as any other empty chest.
+## Each of the 3 hidden relics carries its own fixed legendary effect (not a
+## random roll like ItemGen's legendaries): they are unique, hand-placed
+## items, so their identity should always be the same across every run.
+const ARTIFACT_EFFECTS := {
+	"amulet_of_depths": "fortune",
+	"idol_of_embers": "haste",
+	"dragonfang_talisman": "vampiric",
+}
+
 func claim_artifact() -> Dictionary:
 	for aid in ItemDB.ARTIFACTS:
 		if not artifacts_found.has(aid):
 			artifacts_found.append(aid)
 			return {"id": aid, "slot": "accessory", "rarity": 4, "prefix": "",
 				"suffix": "", "dmg": 0, "armor": ItemDB.armor_of(aid),
-				"weight": ItemDB.weight_of(aid), "qty": 1}
+				"weight": ItemDB.weight_of(aid), "qty": 1,
+				"effect": ARTIFACT_EFFECTS.get(aid, "")}
 	return {}
 
 func reset_run() -> void:
@@ -87,7 +97,10 @@ func on_hero_gear(gear: Dictionary) -> void:
 		changed.emit()
 
 func roll_entry(item_id: String, luck: float = 0.0) -> Dictionary:
-	return ItemGen.roll(item_id, rng, luck)
+	# a worn "fortune" legendary nudges every future roll upward - the one
+	# place every loot source (chest/enemy/shop/craft) funnels through, so
+	# the bonus applies everywhere at once instead of needing per-call wiring
+	return ItemGen.roll(item_id, rng, minf(1.0, luck + loot_luck_bonus()))
 
 # ---------------------------------------------------------------- stats -----
 func armor_bonus() -> int:
@@ -105,6 +118,21 @@ func attack_bonus() -> int:
 		if e is Dictionary and e["slot"] == "weapon":
 			total += int(e["dmg"]) - WeaponDB.attack_power(e["id"])
 	return total
+
+## R4: whether any currently-worn legendary carries the named effect
+## ("vampiric" / "haste" / "fortune"). Hero and Stats read this instead of
+## re-walking `equipped` themselves, so the three effects stay in one place.
+func has_effect(effect: String) -> bool:
+	for slot: String in equipped:
+		var e = equipped[slot]
+		if e is Dictionary and int(e.get("rarity", 0)) == 4 and e.get("effect", "") == effect:
+			return true
+	return false
+
+## "fortune" legendaries raise the hero's own future drop luck a little,
+## stacking with the per-source luck already passed into ItemGen.roll().
+func loot_luck_bonus() -> float:
+	return 0.08 if has_effect("fortune") else 0.0
 
 func total_weight() -> int:
 	var w := 0

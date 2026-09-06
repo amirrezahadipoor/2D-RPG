@@ -537,7 +537,11 @@ func _sweep_attack(weapon: Dictionary, heavy: bool = false) -> int:
 			continue
 		if absf(offset.dot(side)) > arc:
 			continue
-		enemy.take_damage(amount, dir * knock, crit)
+		var landed := enemy.take_damage(amount, dir * knock, crit)
+		# "vampiric" legendary: a slice of real damage dealt comes back as HP,
+		# a genuine gameplay hook rather than just a rarer number/colour
+		if landed > 0 and Inventory.has_effect("vampiric"):
+			Stats.heal(maxi(1, int(round(landed * 0.15))))
 		hits += 1
 	for node in get_tree().get_nodes_in_group("breakable"):
 		var offset: Vector2 = node.global_position - global_position

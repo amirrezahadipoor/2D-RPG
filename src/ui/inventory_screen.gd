@@ -290,6 +290,9 @@ func _refresh_text() -> void:
 			lines.append("%s: %s" % [I18N.tr_str("inv.damage"), I18N.num(int(entry["dmg"]))])
 		if int(entry["armor"]) > 0:
 			lines.append("%s: %s" % [I18N.tr_str("inv.armor"), I18N.num(int(entry["armor"]))])
+		var eff_name := ItemGen.effect_name(entry)
+		if eff_name != "":
+			lines.append("%s: %s" % [I18N.tr_str("inv.effect"), eff_name])
 		lines.append("%s: %s" % [I18N.tr_str("inv.weight"), I18N.num(int(entry["weight"]))])
 		lines.append("%s" % (I18N.tr_str("inv.equip") if selected < COLS * ROWS else I18N.tr_str("inv.unequip")))
 		_tip_stats.text = "  ".join(lines)

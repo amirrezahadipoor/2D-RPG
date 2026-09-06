@@ -5,13 +5,23 @@
 # Base numbers come from ItemDB/WeaponDB; affixes and rarity stack on top.
 class_name ItemGen
 
-const RARITY_NAMES := ["common", "uncommon", "rare", "epic"]
+# R4 (score-report fix): a 5th rarity tier above epic. Unlike common..epic,
+# which are only ever numeric (bigger dmg/armor), a legendary item also
+# carries a named `effect` that changes how the hero actually plays - see
+# LEGENDARY_EFFECTS below and where Hero/Inventory read entry["effect"].
+const RARITY_NAMES := ["common", "uncommon", "rare", "epic", "legendary"]
 const RARITY_COLORS := [
 	Color(0.78, 0.78, 0.82),
 	Color(0.35, 0.85, 0.4),
 	Color(0.3, 0.6, 1.0),
 	Color(0.75, 0.35, 0.95),
+	Color(1.0, 0.72, 0.15),
 ]
+
+## Real gameplay hooks, not just a name/colour. See:
+##   Inventory.has_effect() / Inventory.loot_luck_bonus()
+##   Hero._sweep_attack() (vampiric), Stats.speed_mult() (haste)
+const LEGENDARY_EFFECTS := ["vampiric", "haste", "fortune"]
 
 # dmg / armor / weight deltas granted by each affix
 const PREFIXES := {
@@ -31,6 +41,13 @@ const SUFFIXES := {
 # rarity roll thresholds (cumulative): common / uncommon / rare / epic
 const RARITY_CHANCES := [0.58, 0.85, 0.96, 1.01]
 
+## Legendary never comes from the base 0..3 roll at all - it is a separate,
+## tiny bonus chance gated entirely on `luck`, so it stays true to
+## docs/BALANCE.md's "low drop chance" promise: only strong sources (elite
+## kills, chests, the dragon) ever pass a non-zero luck in, and even then the
+## ceiling is ~0.75% per roll (luck maxes out around 0.25 across the game).
+const LEGENDARY_LUCK_SCALE := 0.03
+
 static func slot_of(item_id: String) -> String:
 	for slot: String in ArtIndex.EQUIPMENT_IDS:
 		if ArtIndex.EQUIPMENT_IDS[slot].has(item_id):
@@ -41,6 +58,8 @@ static func slot_of(item_id: String) -> String:
 ## enemies and chests produce visibly better gear without breaking the base
 ## distribution at luck = 0.
 static func roll_rarity(rng: RandomNumberGenerator, luck: float = 0.0) -> int:
+	if luck > 0.0 and rng.randf() < luck * LEGENDARY_LUCK_SCALE:
+		return 4
 	var r := rng.randf()
 	if rng.randf() < luck:
 		r = maxf(r, rng.randf_range(0.55, 1.0))
@@ -58,8 +77,8 @@ static func roll(item_id: String, rng: RandomNumberGenerator, luck: float = 0.0)
 	var affix_count := 0
 	match rarity:
 		1: affix_count = 1
-		2: affix_count = 2
-		3: affix_count = 2
+		2, 3: affix_count = 2
+		4: affix_count = 2
 	if affix_count >= 1:
 		prefix = PREFIXES.keys()[rng.randi_range(0, PREFIXES.size() - 1)]
 	if affix_count >= 2:
@@ -77,9 +96,16 @@ static func roll(item_id: String, rng: RandomNumberGenerator, luck: float = 0.0)
 		dmg += int(table.get("dmg", 0))
 		armor += int(table.get("armor", 0))
 		weight += int(table.get("w", 0))
-	if rarity == 3:
+	if rarity >= 3:
 		dmg += 1
 		armor += 1
+	# a legendary rolls a second, bigger bonus AND a named effect that
+	# actually changes gameplay (see Inventory.has_effect() callers)
+	var effect := ""
+	if rarity == 4:
+		dmg += 2
+		armor += 1
+		effect = LEGENDARY_EFFECTS[rng.randi_range(0, LEGENDARY_EFFECTS.size() - 1)]
 	weight = maxi(1, weight)
 
 	return {
@@ -91,6 +117,7 @@ static func roll(item_id: String, rng: RandomNumberGenerator, luck: float = 0.0)
 		"dmg": dmg,
 		"armor": armor,
 		"weight": weight,
+		"effect": effect,
 	}
 
 ## Localized display name, e.g. "Sharp Iron Sword of the Bear" /
@@ -114,10 +141,17 @@ static func name_of(entry: Dictionary) -> String:
 	return out
 
 static func rarity_color(entry: Dictionary) -> Color:
-	return RARITY_COLORS[clampi(int(entry.get("rarity", 0)), 0, 3)]
+	return RARITY_COLORS[clampi(int(entry.get("rarity", 0)), 0, 4)]
 
 static func rarity_name(entry: Dictionary) -> String:
-	return I18N.tr_str("rarity." + RARITY_NAMES[clampi(int(entry.get("rarity", 0)), 0, 3)])
+	return I18N.tr_str("rarity." + RARITY_NAMES[clampi(int(entry.get("rarity", 0)), 0, 4)])
+
+## Localized name of a legendary's special effect, or "" for non-legendaries.
+static func effect_name(entry: Dictionary) -> String:
+	var eff: String = entry.get("effect", "")
+	if eff == "":
+		return ""
+	return I18N.tr_str("effect." + eff)
 
 ## A random equipment id, optionally biased towards a slot.
 static func random_id(rng: RandomNumberGenerator, slot: String = "") -> String:

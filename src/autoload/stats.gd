@@ -47,7 +47,10 @@ func rank_up(key: String) -> bool:
 	return true
 
 func speed_mult() -> float:
-	return 1.0 + 0.03 * float(talents["swift"])
+	var mult := 1.0 + 0.03 * float(talents["swift"])
+	if Inventory.has_effect("haste"):
+		mult += 0.12
+	return mult
 
 func might_bonus() -> int:
 	return 2 * int(talents["might"])

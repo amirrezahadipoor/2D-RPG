@@ -5,7 +5,7 @@ extends CharacterBody2D
 
 const SPEED := 34.0
 
-enum Role { VILLAGER, ELDER, MERCHANT, GUARD, KING }
+enum Role { VILLAGER, ELDER, MERCHANT, GUARD, KING, RESIDENT }
 
 var role: Role = Role.VILLAGER
 var role_name := "villager"
@@ -24,18 +24,31 @@ var _stuck_timer := 0.0
 var _last_pos := Vector2.ZERO
 var _fidget := 0.0
 
+## The person who actually lives in a given house interior (R0.2 / P4): stays
+## put at a fixed spot in their own room instead of walking a plaza/field
+## schedule that makes no sense inside four walls.
+var is_resident := false
+
 var ROLE_GEAR := {
 	"elder":    {"helmet": "shadow_hood", "chest": "mage_robe", "legs": "cloth_pants", "boots": "cloth_shoes", "weapon": "oak_staff", "accessory": "royal_cloak"},
 	"merchant": {"helmet": "leather_cap", "chest": "leather_vest", "legs": "leather_pants", "boots": "leather_boots", "weapon": "", "accessory": "red_cloak"},
 	"guard":    {"helmet": "iron_helm", "chest": "iron_plate", "legs": "iron_greaves", "boots": "iron_boots", "weapon": "iron_sword", "accessory": ""},
 	"villager": {"helmet": "", "chest": "tunic_cloth", "legs": "cloth_pants", "boots": "cloth_shoes", "weapon": "", "accessory": ""},
 	"king":    {"helmet": "golden_crown", "chest": "royal_plate", "legs": "iron_greaves", "boots": "iron_boots", "weapon": "golden_sword", "accessory": "royal_cloak"},
+	# house residents (P4): distinct outfits so a cottage owner, a shopkeeper's
+	# family and a palace steward do not all look the same indoors
+	"resident_home":       {"helmet": "", "chest": "tunic_cloth", "legs": "cloth_pants", "boots": "cloth_shoes", "weapon": "", "accessory": "forest_cloak"},
+	"resident_town_house": {"helmet": "leather_cap", "chest": "leather_vest", "legs": "leather_pants", "boots": "leather_boots", "weapon": "", "accessory": ""},
+	"resident_palace":     {"helmet": "wizard_hat", "chest": "mage_robe", "legs": "cloth_pants", "boots": "cloth_shoes", "weapon": "", "accessory": "royal_cloak"},
 }
 
 func setup(role_str: String, settlement: Dictionary, index: int) -> void:
 	role_name = role_str
 	role = {"villager": Role.VILLAGER, "elder": Role.ELDER,
 		"merchant": Role.MERCHANT, "guard": Role.GUARD, "king": Role.KING}.get(role_str, Role.VILLAGER)
+	is_resident = role_str.begins_with("resident_")
+	if is_resident:
+		role = Role.RESIDENT
 	sett_index = int(settlement.get("index", 0))
 	npc_index = index
 	# a wider, seeded name pool so no two settlements share a full crowd of
@@ -115,6 +128,18 @@ func _physics_process(delta: float) -> void:
 		doll.position.y = sin(_bob_t * 2.2 + float(npc_index)) * 0.6
 	if Game.state != Game.State.PLAYING:
 		return
+	if is_resident:
+		# a resident stays inside their own four walls: small idle fidget in
+		# place instead of chasing a plaza/field schedule that only makes
+		# sense out on the open map
+		velocity = Vector2.ZERO
+		_fidget += delta
+		if _fidget > 3.0:
+			_fidget = 0.0
+			facing = ["down", "left", "right"][randi() % 3]
+		doll.play(facing, "idle", int(_fidget * 2.0))
+		_check_talk_prompt()
+		return
 	_target = schedule_target(Game.hour())
 	var to := _target - global_position
 	if to.length() > 6.0:
@@ -142,8 +167,11 @@ func _physics_process(delta: float) -> void:
 			_fidget = 0.0
 			facing = ["down", "left", "right", "up"][randi() % 4]
 		doll.play(facing, "idle", int(_fidget * 2.5))
+	_check_talk_prompt()
 
-	# talk prompt
+## Desktop-testing fallback: a keyboard press near the NPC opens dialogue.
+## Touch play uses Hero.interact() directly instead (see hero.gd _touch_think).
+func _check_talk_prompt() -> void:
 	var hero := get_tree().get_first_node_in_group("player") as Node2D
 	if hero == null:
 		return

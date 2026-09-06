@@ -607,9 +607,87 @@ func _check_inventory() -> void:
 	rng.seed = 1234
 	var entry: Dictionary = ItemGen.roll("iron_plate", rng)
 	_ok(entry["slot"] == "chest", "rolled entry knows its slot")
-	_ok(int(entry["rarity"]) >= 0 and int(entry["rarity"]) <= 3, "rarity inside 0..3")
+	_ok(int(entry["rarity"]) >= 0 and int(entry["rarity"]) <= 4, "rarity inside 0..4 (legendary added)")
 	_ok(int(entry["weight"]) >= 1, "weight never below 1")
 	_ok(int(entry["armor"]) >= ItemDB.armor_of("iron_plate"), "affixes only add armor")
+
+	# --- R4: legendary rarity is real, rare, and comes with an effect ---
+	var leg_rng := RandomNumberGenerator.new()
+	leg_rng.seed = 77
+	var legendary_seen := false
+	var legendary_count := 0
+	var legendary_effects_ok := true
+	for i in 20000:
+		var e: Dictionary = ItemGen.roll("iron_sword", leg_rng, 1.0)
+		if int(e["rarity"]) == 4:
+			legendary_seen = true
+			legendary_count += 1
+			if not (String(e.get("effect", "")) in ItemGen.LEGENDARY_EFFECTS):
+				legendary_effects_ok = false
+	_ok(legendary_seen, "legendary rarity is actually reachable")
+	_ok(legendary_effects_ok, "every legendary roll carries a real effect")
+	# even at luck=1.0 (the max any single source ever passes) legendary must
+	# stay rare - this is the low-drop-chance promise from docs/BALANCE.md
+	var legendary_rate := float(legendary_count) / 20000.0
+	_ok(legendary_rate < 0.06, "legendary stays rare even at max luck (rate=%.4f)" % legendary_rate)
+	var never_luck_rng := RandomNumberGenerator.new()
+	never_luck_rng.seed = 5
+	var zero_luck_legendary := false
+	for i in 5000:
+		if int(ItemGen.roll("iron_sword", never_luck_rng).get("rarity", 0)) == 4:
+			zero_luck_legendary = true
+	_ok(not zero_luck_legendary, "legendary never drops with zero luck")
+
+	# --- R4: legendary effects actually change gameplay, not just colour ---
+	Inventory.reset_run()
+	var vamp_entry: Dictionary = ItemGen.roll("red_cloak", leg_rng)
+	vamp_entry["rarity"] = 4
+	vamp_entry["effect"] = "vampiric"
+	Inventory.add(vamp_entry)
+	Inventory.equip_index(0)
+	await get_tree().process_frame
+	_ok(Inventory.has_effect("vampiric"), "has_effect finds the worn legendary's effect")
+	_ok(not Inventory.has_effect("haste"), "has_effect does not false-positive on other effects")
+	Stats.hp = Stats.max_hp - 20
+	var hp_before_vamp := Stats.hp
+	hero.global_position = Vector2(9000, 9000)
+	var vamp_target := Enemy.new()
+	world.actors.add_child(vamp_target)
+	vamp_target.setup("slime", 1)
+	vamp_target.global_position = hero.global_position + Vector2(8, 0)
+	await get_tree().physics_frame
+	hero.facing = "right"
+	hero._sweep_attack(WeaponDB.stats_for(hero.current_weapon_id()))
+	_ok(Stats.hp > hp_before_vamp, "vampiric legendary heals the hero on a landed hit")
+	vamp_target.queue_free()
+	Inventory.unequip_slot("accessory")
+	Inventory.reset_run()
+
+	var haste_entry: Dictionary = ItemGen.roll("forest_cloak", leg_rng)
+	haste_entry["rarity"] = 4
+	haste_entry["effect"] = "haste"
+	Inventory.add(haste_entry)
+	var mult_before := Stats.speed_mult()
+	Inventory.equip_index(0)
+	_ok(Stats.speed_mult() > mult_before, "haste legendary raises move speed")
+	Inventory.unequip_slot("accessory")
+	Inventory.reset_run()
+
+	var fortune_entry: Dictionary = ItemGen.roll("royal_cloak", leg_rng)
+	fortune_entry["rarity"] = 4
+	fortune_entry["effect"] = "fortune"
+	Inventory.add(fortune_entry)
+	Inventory.equip_index(0)
+	_ok(Inventory.loot_luck_bonus() > 0.0, "fortune legendary raises future loot luck")
+	Inventory.unequip_slot("accessory")
+	Inventory.reset_run()
+	hero.global_position = Vector2(0, 0)
+
+	var relic_effects_ok := true
+	for aid in ItemDB.ARTIFACTS:
+		if String(Inventory.ARTIFACT_EFFECTS.get(aid, "")) == "":
+			relic_effects_ok = false
+	_ok(relic_effects_ok, "every hidden relic ships with a fixed legendary effect")
 	var locale_ok := true
 	for key in ItemGen.PREFIXES.keys():
 		for loc in ["en", "fa"]:
@@ -837,6 +915,23 @@ func _check_houses() -> void:
 			if it._grid[c.y * Interior.MAP_W + c.x] == 1:
 				rooms += 1
 		_ok(rooms > 40, "%s interior paints a real floor (%d walkable tiles)" % [kind, rooms])
+		# P4/R0.2: houses used to be furniture-only - a hero could walk in
+		# and find literally nobody home. Every interior now spawns a
+		# resident who actually lives there and can be talked to.
+		_ok(it.resident != null and is_instance_valid(it.resident),
+			"%s interior has a resident living in it" % kind)
+		if it.resident != null:
+			_ok(it.resident.is_resident and it.resident.role_name == "resident_" + kind,
+				"%s resident wears the matching house-tier role" % kind)
+			_ok(it.is_walkable_at(it.resident.global_position),
+				"%s resident stands on walkable floor" % kind)
+			var dlg := DialogueUI.new()
+			add_child(dlg)
+			dlg.open_with(it.resident)
+			var pages: Array = dlg._pages
+			_ok(pages.size() >= 1 and String(pages[0]["text"]) != "",
+				"%s resident actually has something to say" % kind)
+			dlg.queue_free()
 		it.queue_free()
 		await get_tree().physics_frame
 	var keys_ok := true
