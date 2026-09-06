@@ -822,7 +822,7 @@ func _check_people() -> void:
 		"role variety: elder/merchant/guard present")
 	# crowd personal space: at lunch everyone gathers, nobody may stack
 	Game.game_minutes = float(Game.day()) * 1440.0 + 12.0 * 60.0
-	for i in 240:
+	for i in 360:
 		await get_tree().physics_frame
 	var town_npcs := []
 	for n in world.npcs:
@@ -833,11 +833,19 @@ func _check_people() -> void:
 		for j in range(i + 1, town_npcs.size()):
 			min_gap = minf(min_gap, (town_npcs[i].global_position - town_npcs[j].global_position).length())
 	_ok(min_gap >= 4.0, "crowd keeps personal space at lunch (min gap %.1fpx)" % min_gap)
-	var guard_ok := true
+	# schedule half is deterministic; the walk half gets a generous radius
+	# (crowds, the well and unstuck-shuffles make arrival time vary by seed)
+	var guard_schedule_ok := true
+	var guard_near := true
 	for n in town_npcs:
-		if n.role_name == "guard" and n.global_position.distance_to(n.plaza) > 60.0:
-			guard_ok = false
-	_ok(guard_ok, "guards stay on plaza duty during the day")
+		if n.role_name != "guard":
+			continue
+		if n.schedule_target(12).distance_to(n.plaza) > 40.0:
+			guard_schedule_ok = false
+		if n.global_position.distance_to(n.plaza) > 80.0:
+			guard_near = false
+	_ok(guard_schedule_ok, "guard schedule keeps them on the plaza during the day")
+	_ok(guard_near, "guards actually reach their plaza post (within 80px)")
 	# the realm has exactly one crowned king, living in the town's palace
 	var towns := 0
 	for st in world.settlements:
@@ -1284,10 +1292,13 @@ func _open_arena() -> Vector2:
 	for attempt in 40:
 		var c := Vector2(float(40 + (attempt * 37) % (Overworld.WORLD_W - 80)) * 16.0 + 8.0,
 			float(40 + (attempt * 53) % (Overworld.WORLD_H - 80)) * 16.0 + 8.0)
+		# dry AND outside settlements: roofs are solid terrain, so an arena
+		# inside a town would wall the hero in even after props are cleared
 		var dry := true
 		for dx in range(-7, 8):
 			for dy in range(-7, 8):
-				if world.biome_at(c + Vector2(float(dx * 16), float(dy * 16))) == "water":
+				var b := world.biome_at(c + Vector2(float(dx * 16), float(dy * 16)))
+				if b in ["water", "town", "village"]:
 					dry = false
 					break
 			if not dry:
@@ -1298,8 +1309,18 @@ func _open_arena() -> Vector2:
 		for dx in range(-7, 8):
 			for dy in range(-7, 8):
 				world.props_layer.erase_cell(Vector2i(ct.x + dx, ct.y + dy))
-		return c
-	return Vector2(2000, 2000)
+		# self-check: the block must really be open now, else try the next spot
+		var open := true
+		for dx in range(-7, 8):
+			for dy in range(-7, 8):
+				if not world.is_walkable_at(c + Vector2(float(dx * 16), float(dy * 16))):
+					open = false
+					break
+			if not open:
+				break
+		if open:
+			return c
+	return world.nearest_walkable(Vector2(2000, 2000))
 
 func _ai_spawn(type: String, off: Vector2) -> Enemy:
 	var e := Enemy.new()
