@@ -22,7 +22,7 @@ func _ready() -> void:
 	_prompt.add_theme_color_override("font_color", Color(1, 0.9, 0.4))
 	_prompt.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 	_prompt.add_theme_constant_override("outline_size", 2)
-	_prompt.text = "[E] " + I18N.tr_str("bench.prompt")
+	_prompt.text = I18N.tr_str("bench.prompt")
 	_prompt.position = Vector2(-24, -34)
 	_prompt.visible = false
 	add_child(_prompt)

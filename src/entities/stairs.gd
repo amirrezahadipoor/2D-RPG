@@ -28,7 +28,7 @@ func _ready() -> void:
 	_prompt.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 	_prompt.add_theme_constant_override("outline_size", 3)
 	_prompt.position = Vector2(-6, -26)
-	_prompt.text = "[E]"
+	_prompt.text = I18N.tr_str("ui.tap")
 	_prompt.visible = false
 	_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_prompt)
