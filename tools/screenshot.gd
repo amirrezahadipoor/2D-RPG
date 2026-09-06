@@ -345,6 +345,7 @@ func run() -> void:
 			for i in 6:
 				await get_tree().process_frame
 			await _grab("17_shop")
+			dlg2.close()
 
 		# ---- crafting bench book (Phase C3) ----
 		var cui: Node = get_tree().get_first_node_in_group("craft_ui")
@@ -356,7 +357,6 @@ func run() -> void:
 				await get_tree().process_frame
 			await _grab("17b_craft")
 			cui.close()
-			dlg2.close()
 
 	# ---- hidden chamber: cracked wall shattered, relic chest glowing ----
 	if main_node and main_node.dungeon == null and hero:
