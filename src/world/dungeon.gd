@@ -28,6 +28,7 @@ var _spawn_timer := 0.0
 var _rng := RandomNumberGenerator.new()
 var _seed := 0
 var secret_walls: Array = []   # Vector2i cracked-wall tiles
+var edge_painter: EdgePainter
 var secret_rooms: Array = []   # Rect2i hidden chambers
 
 signal secret_opened()
@@ -194,6 +195,9 @@ func _build_tileset_and_layer() -> void:
 	shade_layer.collision_enabled = false
 	shade_layer.modulate = Color(1, 1, 1, 0.35)
 	add_child(shade_layer)
+	edge_painter = EdgePainter.new()
+	edge_painter.name = "WallRims"
+	add_child(edge_painter)
 
 func _paint() -> void:
 	for y in H:
@@ -212,6 +216,7 @@ func _paint() -> void:
 		for x in W:
 			if _grid[y * W + x] == 1 and y > 0 and _grid[(y - 1) * W + x] == 0:
 				shade_layer.set_cell(Vector2i(x, y), 0, shade_atlas)
+	_paint_edges()
 
 func is_walkable_at(world_pos: Vector2) -> bool:
 	var t := Vector2i(floori(world_pos.x / float(TILE)), floori(world_pos.y / float(TILE)))
@@ -333,3 +338,22 @@ func _dungeon_spawn(delta: float) -> void:
 func _on_enemy_died(enemy: Enemy) -> void:
 	Stats.add_kill()
 	QuestLog.on_kill(enemy.enemy_type, "caves")
+
+## Readability pass (Phase 3.5): faint floor checker so tiles read as tiles,
+## and a warm rim on every wall face that looks at floor (lantern catch).
+func _paint_edges() -> void:
+	edge_painter.edges.clear()
+	for y in H:
+		for x in W:
+			var p := Vector2(x * 16.0, y * 16.0)
+			if _grid[y * W + x] == 1:
+				if (x + y) % 2 == 0:
+					edge_painter.edges.append([Rect2(p, Vector2(16, 16)), Color(0, 0, 0, 0.07)])
+				continue
+			if y + 1 < H and _grid[(y + 1) * W + x] == 1:
+				edge_painter.edges.append([Rect2(p + Vector2(0, 14), Vector2(16, 2)), Color(1, 0.85, 0.6, 0.12)])
+			if x + 1 < W and _grid[y * W + x + 1] == 1:
+				edge_painter.edges.append([Rect2(p + Vector2(14, 0), Vector2(2, 16)), Color(1, 0.85, 0.6, 0.08)])
+			if x > 0 and _grid[y * W + x - 1] == 1:
+				edge_painter.edges.append([Rect2(p, Vector2(2, 16)), Color(1, 0.85, 0.6, 0.08)])
+	edge_painter.rebuild()

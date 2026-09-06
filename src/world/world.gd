@@ -19,6 +19,7 @@ const SOLID_PROPS := {"tree": Rect2(0, 10, 16, 6), "rock": Rect2(0, 6, 16, 10),
 var terrain_layer: TileMapLayer
 var props_layer: TileMapLayer
 var shade_layer: TileMapLayer
+var edge_painter: EdgePainter
 var decals: Node2D
 var _water_cells: Array = []
 var _water_phase := 0
@@ -51,6 +52,7 @@ func build(seed_value: int) -> void:
 	_carve_roads()
 	_build_tileset_and_layers()
 	_paint()
+	_paint_roof_edges()
 	_spawn_actors_root()
 	_spawn_hero()
 	_spawn_spawner()
@@ -232,6 +234,9 @@ func _build_tileset_and_layers() -> void:
 	shade_layer.collision_enabled = false
 	shade_layer.modulate = Color(1, 1, 1, 0.32)
 	add_child(shade_layer)
+	edge_painter = EdgePainter.new()
+	edge_painter.name = "RoofEdges"
+	add_child(edge_painter)
 	decals = Node2D.new()
 	decals.name = "Decals"
 	add_child(decals)
@@ -488,6 +493,39 @@ func is_walkable_at(world_pos: Vector2) -> bool:
 		return tile[1] == "" or not SOLID_PROPS.has(tile[1])
 	var prop := _prop_at(biome, t.x, t.y)
 	return prop == "" or not SOLID_PROPS.has(prop)
+
+## Readable silhouettes: eave shadow under every roof edge, a light kiss on
+## the top edge, dark rims on the sides (Phase 3.4).
+func _paint_roof_edges() -> void:
+	edge_painter.edges.clear()
+	var roof: int = ArtIndex.TERRAIN_INDEX["roof"]
+	for st in settlements:
+		var r: Rect2i = st["rect"]
+		for y in range(r.position.y - 1, r.end.y + 1):
+			for x in range(r.position.x - 1, r.end.x + 1):
+				var t := Vector2i(x, y)
+				if not _is_roof_tile(t):
+					continue
+				var p := Vector2(x * 16.0, y * 16.0)
+				if not _is_roof_tile(t + Vector2i(0, 1)):
+					edge_painter.edges.append([Rect2(p + Vector2(0, 13), Vector2(16, 3)), Color(0, 0, 0, 0.38)])
+					edge_painter.edges.append([Rect2(p + Vector2(0, 16), Vector2(16, 2)), Color(0, 0, 0, 0.22)])
+				if not _is_roof_tile(t + Vector2i(0, -1)):
+					edge_painter.edges.append([Rect2(p, Vector2(16, 1)), Color(1, 1, 1, 0.16)])
+				if not _is_roof_tile(t + Vector2i(-1, 0)):
+					edge_painter.edges.append([Rect2(p, Vector2(1, 16)), Color(0, 0, 0, 0.30)])
+				if not _is_roof_tile(t + Vector2i(1, 0)):
+					edge_painter.edges.append([Rect2(p + Vector2(15, 0), Vector2(1, 16)), Color(0, 0, 0, 0.30)])
+	edge_painter.rebuild()
+
+func _is_roof_tile(t: Vector2i) -> bool:
+	if t.x < 0 or t.y < 0 or t.x >= WORLD_W or t.y >= WORLD_H:
+		return false
+	var s := _settlement_at_tile(t)
+	if s.is_empty():
+		return false
+	var tile: Array = _settlement_tile(s, t)
+	return int(tile[0]) == ArtIndex.TERRAIN_INDEX["roof"]
 
 func biome_at(world_pos: Vector2) -> String:
 	var t := tile_at(world_pos)

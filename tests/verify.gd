@@ -34,6 +34,7 @@ func run() -> void:
 	await _check_world_map()
 	await _check_houses()
 	await _check_pois()
+	_check_edges()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -894,6 +895,17 @@ func _check_pois() -> void:
 	mo.hide_map()
 	mo.queue_free()
 	await get_tree().process_frame
+
+func _check_edges() -> void:
+	print("== readable edges ==")
+	_ok(world.edge_painter != null and world.edge_painter.edges.size() >= 100,
+		"roofs carry eave shadows and rim light (%d accents)" % world.edge_painter.edges.size())
+	var d := Dungeon.new()
+	add_child(d)
+	d.build(1, 4242)
+	_ok(d.edge_painter != null and d.edge_painter.edges.size() >= 50,
+		"dungeon walls carry lantern rims (%d accents)" % d.edge_painter.edges.size())
+	d.queue_free()
 
 func _check_people() -> void:
 	print("== people ==")
