@@ -23,6 +23,9 @@ var edge_painter: EdgePainter
 var shadow_layer: EntityShadows
 var decals: Node2D
 var _water_cells: Array = []
+var _shore_cells: Array = []
+var _foam_on := true
+var _blend_count := 0
 var _water_phase := 0
 var _shimmer_t := 0.0
 var actors: Node2D
@@ -282,9 +285,26 @@ func _paint() -> void:
 			var biome := _biome_grid[i]
 			var tidx := _terrain_tile(biome, x, y)
 			var prop := _prop_at(biome, x, y)
+			# dithered biome blends: half the edge tiles borrow the neighbour's
+			# ground so biomes melt into each other instead of hard lines
+			if biome not in ["village", "town", "water"] and x > 0 and y > 0:
+				var wb: String = _biome_grid[i - 1]
+				var nb: String = _biome_grid[i - WORLD_W]
+				if wb == "water" or nb == "water":
+					pass   # shores stay hard; the foam line softens them
+				elif wb != biome and wb not in ["village", "town"] and _hash2(x, y) < 0.5:
+					tidx = _terrain_tile(wb, x, y)
+					_blend_count += 1
+				elif nb != biome and nb not in ["village", "town"] and _hash2(x + 7, y) < 0.5:
+					tidx = _terrain_tile(nb, x, y)
+					_blend_count += 1
 			if _road_grid[i] == 1 and biome not in ["village", "town"]:
 				tidx = ArtIndex.TERRAIN_INDEX["cobble"]
 				prop = ""
+			elif prop == "" and biome not in ["village", "town", "water"] and _hash2(x + 3, y + 5) < 0.10 \
+					and (_road_grid[i - 1] == 1 or _road_grid[i + 1] == 1
+					or _road_grid[i - WORLD_W] == 1 or _road_grid[i + WORLD_W] == 1):
+				prop = "flower"
 			if biome == "village" or biome == "town":
 				var st: Dictionary = _settlement_at_tile(Vector2i(x, y))
 				var override: Array = _settlement_tile(st, Vector2i(x, y))
@@ -317,10 +337,24 @@ func _paint_shade() -> void:
 
 func _collect_water() -> void:
 	var water := ArtIndex.TERRAIN_INDEX["water"]
+	_shore_cells.clear()
 	for cell in terrain_layer.get_used_cells():
 		var atlas: Vector2i = terrain_layer.get_cell_atlas_coords(cell)
 		if atlas.y * 8 + atlas.x == water:
 			_water_cells.append(cell)
+			var i := cell.y * WORLD_W + cell.x
+			if cell.y > 0 and _biome_grid[i - WORLD_W] != "water":
+				_shore_cells.append(cell)
+	_apply_foam()
+
+## Animated surf: a dithered foam line breathes on every north shore.
+func _apply_foam() -> void:
+	var name: String = "foam" if _foam_on else "foam2"
+	var foam_at := Vector2i(ArtIndex.PROP_INDEX[name] % 8, ArtIndex.PROP_INDEX[name] / 8)
+	for cell in _shore_cells:
+		if cell_prop.has(cell):
+			continue
+		props_layer.set_cell(cell, 1, foam_at)
 
 ## Sparse ground dressing per biome: flowers, pebbles, puddles, snow drifts.
 func _spawn_decals() -> void:
@@ -466,18 +500,22 @@ func _prop_at(biome: String, x: int, y: int) -> String:
 			if h < 0.075: return "tree"
 			if h < 0.10: return "bush"
 			if h < 0.12: return "flower"
+			if h < 0.16: return "tuft"
+			if h < 0.18: return "pebble"
 		"snow":
 			if h < 0.03: return "tree"
 			if h < 0.05: return "rock"
 		"desert":
 			if h < 0.035: return "rock"
 			if h < 0.045: return "sign"
+			if h < 0.075: return "pebble"
 		"caves":
 			if h < 0.06: return "rock"
 			if h < 0.075: return "torch"
 		"swamp":
 			if h < 0.05: return "bush"
 			if h < 0.07: return "tree"
+			if h < 0.11: return "tuft"
 		"graveyard":
 			if h < 0.16: return "tomb"
 			if h < 0.20: return "fence"
@@ -1046,6 +1084,8 @@ func _process(delta: float) -> void:
 	_shimmer_t += delta
 	if _shimmer_t >= 0.7 and not _water_cells.is_empty():
 		_shimmer_t = 0.0
+		_foam_on = not _foam_on
+		_apply_foam()
 		_water_phase = 1 - _water_phase
 		var atlas := Vector2i(ArtIndex.TERRAIN_INDEX["water" if _water_phase == 0 else "water2"] % 8,
 			ArtIndex.TERRAIN_INDEX["water" if _water_phase == 0 else "water2"] / 8)

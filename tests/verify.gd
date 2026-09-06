@@ -39,6 +39,7 @@ func run() -> void:
 	_check_houses_art()
 	_check_shadows()
 	_check_landmarks()
+	_check_ground()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -973,6 +974,28 @@ func _check_landmarks() -> void:
 		if lm["type"] == "ruin":
 			_ok(not world.is_walkable_at(Vector2((lm["pos"].x + 2) * 16 + 8, lm["pos"].y * 16 + 8)),
 				"ruin rubble blocks walking")
+
+func _check_ground() -> void:
+	print("== ground detail A3 ==")
+	_ok(world._blend_count > 200, "biome edges dither into each other (%d blend tiles)" % world._blend_count)
+	_ok(world._shore_cells.size() > 30, "lakes have animated shore foam (%d shore tiles)" % world._shore_cells.size())
+	var tufts := 0
+	var tuft_at := Vector2i(ArtIndex.PROP_INDEX["tuft"] % 8, ArtIndex.PROP_INDEX["tuft"] / 8)
+	for cell in world.props_layer.get_used_cells():
+		if world.props_layer.get_cell_atlas_coords(cell) == tuft_at:
+			tufts += 1
+	_ok(tufts > 100, "ground dressing: grass tufts and pebbles (%d tufts)" % tufts)
+	var shore0: Vector2i = world._shore_cells[0]
+	var foam_at := Vector2i(ArtIndex.PROP_INDEX["foam"] % 8, ArtIndex.PROP_INDEX["foam"] / 8)
+	var at_now: Vector2i = world.props_layer.get_cell_atlas_coords(shore0)
+	world._foam_on = not world._foam_on
+	world._apply_foam()
+	var at_after: Vector2i = world.props_layer.get_cell_atlas_coords(shore0)
+	var foam2_at := Vector2i(ArtIndex.PROP_INDEX["foam2"] % 8, ArtIndex.PROP_INDEX["foam2"] / 8)
+	_ok((at_now == foam_at or at_now == foam2_at) and at_after != at_now,
+		"foam line breathes with the water shimmer")
+	world._foam_on = not world._foam_on
+	world._apply_foam()
 
 func _check_people() -> void:
 	print("== people ==")

@@ -103,7 +103,11 @@
     "tomb",
     "fence",
     "well",
-    "chimney"
+    "chimney",
+    "pebble",
+    "tuft",
+    "foam",
+    "foam2"
   ],
   "enemies": {
     "slime": {

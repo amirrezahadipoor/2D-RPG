@@ -218,6 +218,14 @@ func run() -> void:
 				await get_tree().physics_frame
 			await _grab("12e_landmark")
 
+		# ---- animated shore foam + biome blend (Phase A3) ----
+		if world and not world._shore_cells.is_empty():
+			var sh: Vector2i = world._shore_cells[world._shore_cells.size() / 2]
+			hero.global_position = Vector2(sh.x * 16.0 + 8.0, (sh.y - 2) * 16.0)
+			for i in 45:
+				await get_tree().physics_frame
+			await _grab("12f_shore")
+
 		# ---- dialogue with the first NPC ----
 		var dlg: DialogueUI = main_node.get_node_or_null("DialogueUI") if main_node else null
 		if dlg and not world.npcs.is_empty():

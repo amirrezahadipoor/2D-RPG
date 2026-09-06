@@ -882,7 +882,7 @@ def make_tileset():
 def make_props():
     """Overlay props drawn on top of terrain."""
     names = ["tree", "rock", "bush", "flower", "chest", "stairs", "sign", "torch",
-             "tomb", "fence", "well", "chimney"]
+             "tomb", "fence", "well", "chimney", "pebble", "tuft", "foam", "foam2"]
     # 8 columns x 2 rows: matches the (i % 8, i / 8) atlas coords used in-game
     sheet = Canvas(8 * TILE, 2 * TILE)
     for i, name in enumerate(names):
@@ -964,6 +964,30 @@ def make_props():
             c.hline(3, 8, 10, PAL["leath_d"])
             c.vline(3, 3, 6, PAL["leath_l"]); c.vline(12, 3, 6, PAL["leath_d"])
             c.hline(5, 5, 6, PAL["leath_d"]); c.hline(5, 7, 4, PAL["leath_d"])
+        elif name == "pebble":
+            c.rect(4, 10, 3, 3, PAL["stone_m"])
+            c.px(4, 10, PAL["stone_l"]); c.px(6, 12, PAL["stone_d"])
+            c.rect(9, 11, 2, 2, PAL["stone_d"])
+            c.rect(7, 12, 2, 2, PAL["stone_m"])
+        elif name == "tuft":
+            c.vline(6, 9, 5, PAL["leaf_m"])
+            c.vline(8, 8, 6, PAL["leaf_l"])
+            c.vline(10, 10, 4, PAL["leaf_m"])
+            c.px(5, 11, PAL["leaf_d"]); c.px(11, 12, PAL["leaf_d"])
+        elif name == "foam":
+            for x in range(0, 16, 2):
+                c.px(x, 0, PAL["white"])
+            for x in range(1, 16, 4):
+                c.px(x, 1, PAL["white"])
+            for x in range(0, 16, 6):
+                c.px(x, 2, PAL["water_l"])
+        elif name == "foam2":
+            for x in range(1, 16, 2):
+                c.px(x, 0, PAL["white"])
+            for x in range(3, 16, 4):
+                c.px(x, 1, PAL["white"])
+            for x in range(2, 16, 6):
+                c.px(x, 2, PAL["water_l"])
         elif name == "chimney":
             c.rect(5, 5, 6, 10, PAL["stone_d"])
             c.vline(5, 5, 10, PAL["stone_m"])
