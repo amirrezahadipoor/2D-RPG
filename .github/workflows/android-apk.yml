@@ -128,7 +128,15 @@ jobs:
           mkdir -p android/build
           unzip -q "$TPL_DIR/android_source.zip" -d android/build
           test -f android/build/build.gradle.kts -o -f android/build/build.gradle
-          echo "android/build/ populated from android_source.zip"
+          # Godot also writes a sibling android/.build_version file (the exact
+          # engine version string, e.g. "4.4.1.stable") when the editor does
+          # this install, and refuses to build without a match ("no version
+          # info for it exists... reinstall from the Project menu").
+          # gradle_build/gradle_build_directory is empty in
+          # export_presets.cfg, so the build dir is the default
+          # res://android/build, i.e. the version file goes in res://android/.
+          basename "$TPL_DIR" > android/.build_version
+          echo "android/build/ populated from android_source.zip, .build_version stamped: $(cat android/.build_version)"
 
       - name: Gate — automated checks must pass before shipping
         run: |
