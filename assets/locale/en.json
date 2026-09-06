@@ -118,7 +118,7 @@
  "journal.main": "Main story",
  "journal.side": "Side quests",
  "journal.title": "Journal",
- "map.hint": "Tap a town to travel there  ·  tap empty ground to close",
+ "map.hint": "Tap a place to travel · drag to pan · corner chip zooms · outside closes",
  "map.title": "Realm Map",
  "menu.continue": "Continue",
  "menu.done": "Done",

@@ -52,6 +52,7 @@ func run() -> void:
 	await _check_touch_settings()
 	await _check_safe_rails()
 	await _check_tutorial()
+	await _check_map_pan()
 	await _check_dialogue_touch()
 	await _check_act_card()
 
@@ -747,7 +748,7 @@ func _check_world_map() -> void:
 		"map marks every settlement plus the cave mouth (%d markers)" % mo._markers.size())
 	_ok(town_dots == 1 and village_dots == 3, "map draws one town and three villages")
 	var rect: Rect2 = mo._map_tex.get_global_rect()
-	var hero_px: Vector2 = mo._hero_dot.position + mo._hero_dot.size / 2.0
+	var hero_px: Vector2 = mo._hero_dot.get_global_rect().get_center()
 	_ok(rect.grow(4.0).has_point(hero_px), "the hero dot sits on the map")
 	# an active deliver quest paints an objective dot on its settlement
 	QuestLog.reset_run()
@@ -2452,6 +2453,101 @@ func _check_tutorial() -> void:
 				tut_ok = false
 	I18N.set_locale("en")
 	_ok(tut_ok, "tutorial copy resolves in EN and FA")
+	await get_tree().process_frame
+
+func _check_map_pan() -> void:
+	print("== map pan & zoom ==")
+	var mo := MapOverlay.new()
+	add_child(mo)
+	await get_tree().process_frame
+	mo.show_map(world)
+	await get_tree().process_frame
+	_ok(mo.visible and mo.zoom == 1.0 and mo._off == Vector2.ZERO,
+		"the map opens fitted to its panel")
+	var trav := [0]   # GDScript lambdas capture by value: box the counter
+	mo.travel_requested.connect(func(_i: int) -> void: trav[0] += 1)
+	var ct := mo._root.get_canvas_transform()
+	var stw := get_viewport().get_screen_transform()
+	var P := func(p: Vector2) -> Vector2: return stw * (ct * p)
+	var chip_c := mo._zoom_chip.position + mo._zoom_chip.size * 0.5
+	_g_touch(true, P.call(chip_c), 51)
+	_g_touch(false, P.call(chip_c), 51)
+	var zin := false
+	for i in 6:
+		await get_tree().process_frame
+		if mo.zoom == 2.0:
+			zin = true
+			break
+	_ok(zin, "the corner chip zooms the map in")
+	# one-finger drag pans, grab-the-map: finger left slides the realm left
+	var hd0 := mo._hero_dot.position
+	var p0 := Vector2(240, 135)
+	_g_touch(true, P.call(p0), 52)
+	for k in 3:
+		_g_drag(P.call(p0 - Vector2(float(10 * (k + 1)), 0)), 52)
+	_g_touch(false, P.call(p0 - Vector2(30, 0)), 52)
+	var panned := false
+	for i in 6:
+		await get_tree().process_frame
+		if mo._off.x > 20.0:
+			panned = true
+			break
+	_ok(panned, "a one-finger drag pans the zoomed map (%.0fpx)" % mo._off.x)
+	_ok(mo._hero_dot.position.x < hd0.x, "and the hero dot slides with the realm")
+	# centre the view on settlement 0 so its marker is guaranteed on-screen
+	var loc0: Vector2 = mo._markers[0][2]
+	mo._off = loc0 * mo.zoom - MapOverlay.MAP_PX * 0.5
+	mo._clamp_off()
+	mo._apply_view()
+	await get_tree().process_frame
+	# a drag that starts on a settlement must NOT fast-travel
+	var mk: Vector2 = (mo._markers[0][2] as Vector2) * mo.zoom - mo._off + MapOverlay.PANEL_POS
+	_g_touch(true, P.call(mk), 53)
+	for k in 3:
+		_g_drag(P.call(mk + Vector2(0, float(10 * (k + 1)))), 53)
+	_g_touch(false, P.call(mk + Vector2(0, 30)), 53)
+	await get_tree().process_frame
+	_ok(trav[0] == 0, "dragging off a settlement does not fast-travel")
+	# ...but a clean tap on it still does (re-aim: the map panned since)
+	var tapped := false
+	for i in 6:
+		mk = (mo._markers[0][2] as Vector2) * mo.zoom - mo._off + MapOverlay.PANEL_POS
+		_g_touch(true, P.call(mk), 54)
+		_g_touch(false, P.call(mk), 54)
+		for j in 3:
+			await get_tree().process_frame
+		if trav[0] == 1:
+			tapped = true
+			break
+	_ok(tapped, "a clean tap on a settlement still fast-travels")
+	# panning stays inside the map edges
+	mo._pan_by(Vector2(9999, 9999))
+	_ok(mo._off == Vector2.ZERO, "panning clamps at the map edge")
+	mo._pan_by(Vector2(-9999, -9999))
+	_ok(mo._off.x <= 240.0 and mo._off.y <= 160.0, "and at the far edge")
+	# zoom out recentres
+	var zout := false
+	for i in 6:
+		_g_touch(true, P.call(chip_c), 55)
+		_g_touch(false, P.call(chip_c), 55)
+		for j in 3:
+			await get_tree().process_frame
+		if mo.zoom == 1.0 and mo._off == Vector2.ZERO:
+			zout = true
+			break
+	_ok(zout, "zooming out refits the realm")
+	# a tap on the dark outside dismisses
+	var gone := false
+	for i in 6:
+		_g_touch(true, P.call(Vector2(20, 20)), 56)
+		_g_touch(false, P.call(Vector2(20, 20)), 56)
+		for j in 3:
+			await get_tree().process_frame
+		if not mo.visible:
+			gone = true
+			break
+	_ok(gone, "tapping outside the map closes it")
+	mo.queue_free()
 	await get_tree().process_frame
 
 func _check_dialogue_touch() -> void:

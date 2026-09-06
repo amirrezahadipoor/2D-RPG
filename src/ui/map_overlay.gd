@@ -1,7 +1,10 @@
 # Overworld map: a baked 240x160 render of the whole realm (biomes + roads)
 # with the hero, every settlement, the cave mouth and the current objective.
 # Opens over the frozen world; tapping a settlement fast-travels the hero
-# there, tapping empty map closes it. Built for touch first.
+# there, tapping empty map closes it. Built for touch first:
+#   one finger drag  -> pans the zoomed map (grab-the-map feel)
+#   corner chip      -> toggles fit / 2x zoom
+#   tap (no drag)    -> travel on a settlement, dismiss elsewhere
 class_name MapOverlay
 extends CanvasLayer
 
@@ -9,16 +12,25 @@ signal travel_requested(settlement_index: int)
 
 const MAP_PX := Vector2(240, 160)
 const PANEL_POS := Vector2(120, 55)
+const ZOOM_FIT := 1.0
+const ZOOM_IN := 2.0
 
 var world: Overworld = null
+var zoom := ZOOM_FIT
+var _off := Vector2.ZERO          # top-left corner of the view, in map px
 var _root: Control
+var _clip: Control
 var _map_tex: TextureRect
 var _hero_dot: ColorRect
 var _obj_dot: ColorRect
-var _markers: Array = []      # [sett_index, ColorRect]
+var _markers: Array = []          # [sett_index, ColorRect, map_local]
+var _hero_local := Vector2.ZERO
+var _obj_local := Vector2.ZERO
 var _baked_seed := -1
 var _title: Label
 var _hint: Label
+var _zoom_chip: Control
+var _zoom_lbl: Label
 
 func _ready() -> void:
 	layer = 35
@@ -32,7 +44,7 @@ func _build() -> void:
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.process_mode = Node.PROCESS_MODE_ALWAYS
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
-	_root.gui_input.connect(_on_tap)
+	_root.gui_input.connect(_on_gui)
 	add_child(_root)
 
 	var dim := ColorRect.new()
@@ -48,19 +60,53 @@ func _build() -> void:
 	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(border)
 
+	_clip = Control.new()
+	_clip.position = PANEL_POS
+	_clip.size = MAP_PX
+	_clip.clip_contents = true
+	_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_clip)
+
 	_map_tex = TextureRect.new()
-	_map_tex.position = PANEL_POS
+	_map_tex.position = Vector2.ZERO
 	_map_tex.size = MAP_PX
-	_map_tex.stretch_mode = TextureRect.STRETCH_KEEP
+	_map_tex.stretch_mode = TextureRect.STRETCH_SCALE
 	_map_tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_map_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(_map_tex)
+	_clip.add_child(_map_tex)
 
 	_title = _label(Vector2(0, 6), Color(1, 0.86, 0.4), 12)
-	_hint = _label(Vector2(0, 244), Color(0.62, 0.64, 0.72), 8)
+	_hint = _label(Vector2(0, 224), Color(0.62, 0.64, 0.72), 7)
 
 	_hero_dot = _dot(Color(1, 0.92, 0.55), 4)
 	_obj_dot = _dot(Color(1, 0.6, 0.2), 5)
+
+	# zoom chip, top-right corner of the panel
+	_zoom_chip = Control.new()
+	_zoom_chip.size = Vector2(18, 14)
+	_zoom_chip.position = PANEL_POS + Vector2(MAP_PX.x - 20.0, 2.0)
+	_zoom_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_zoom_chip)
+	var zb := ColorRect.new()
+	zb.color = Color(0.5, 0.42, 0.28, 0.95)
+	zb.size = Vector2(18, 14)
+	zb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_zoom_chip.add_child(zb)
+	var zbg := ColorRect.new()
+	zbg.color = Color(0.08, 0.08, 0.12, 0.95)
+	zbg.position = Vector2(1, 1)
+	zbg.size = Vector2(16, 12)
+	zbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_zoom_chip.add_child(zbg)
+	_zoom_lbl = Label.new()
+	_zoom_lbl.add_theme_font_size_override("font_size", 7)
+	_zoom_lbl.add_theme_font_override("font", load(I18N.FONT_REGULAR_PATH))
+	_zoom_lbl.add_theme_color_override("font_color", Color(1, 0.9, 0.6))
+	_zoom_lbl.position = Vector2(0, 2)
+	_zoom_lbl.size = Vector2(18, 10)
+	_zoom_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_zoom_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_zoom_chip.add_child(_zoom_lbl)
 
 func _label(pos: Vector2, col: Color, size: int) -> Label:
 	var l := Label.new()
@@ -78,30 +124,70 @@ func _dot(col: Color, px: int) -> ColorRect:
 	d.color = col
 	d.size = Vector2(px, px)
 	d.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(d)
+	_clip.add_child(d)
 	return d
 
 func show_map(w: Overworld) -> void:
 	world = w
 	_bake_if_needed()
+	zoom = ZOOM_FIT
+	_off = Vector2.ZERO
 	_title.text = I18N.tr_str("map.title")
 	_hint.text = I18N.tr_str("map.hint")
 	I18N.tag(_title)
 	I18N.tag(_hint)
 	_place_markers()
+	_apply_view()
 	visible = true
 
 func hide_map() -> void:
 	visible = false
 
-## Map pixel for a world pixel: the map is 240x160 over a 384x256-tile world,
-## so one map pixel is 25.6 world px in both axes.
-func _to_map(world_pos: Vector2) -> Vector2:
-	return Vector2(world_pos.x / 25.6, world_pos.y / 25.6) + PANEL_POS
+## Map pixel for a world pixel (un-zoomed, panel-relative): the map is
+## 240x160 over a 384x256-tile world, so one map px is 25.6 world px.
+func _to_local(world_pos: Vector2) -> Vector2:
+	return Vector2(world_pos.x / 25.6, world_pos.y / 25.6)
 
-func _to_world(map_pos: Vector2) -> Vector2:
-	var p := map_pos - PANEL_POS
-	return Vector2(p.x * 25.6, p.y * 25.6)
+# ---------------------------------------------------------------- view ------
+func set_zoom(z: float) -> void:
+	var nz := ZOOM_IN if z > (ZOOM_FIT + ZOOM_IN) * 0.5 else ZOOM_FIT
+	if nz == zoom:
+		return
+	var center := (_off + MAP_PX * 0.5) / zoom
+	zoom = nz
+	if nz == ZOOM_FIT:
+		_off = Vector2.ZERO     # fit shows the whole realm, centred
+	else:
+		_off = center * zoom - MAP_PX * 0.5
+		_clamp_off()
+	_apply_view()
+
+func toggle_zoom() -> void:
+	set_zoom(ZOOM_FIT if zoom > ZOOM_FIT else ZOOM_IN)
+
+## Grab-the-map pan: the view follows the finger, clamped to the map edges.
+func _pan_by(delta_panel: Vector2) -> void:
+	if zoom <= ZOOM_FIT:
+		return
+	_off -= delta_panel
+	_clamp_off()
+	_apply_view()
+
+func _clamp_off() -> void:
+	var max_off := MAP_PX * zoom - MAP_PX
+	_off.x = clampf(_off.x, 0.0, maxf(0.0, max_off.x))
+	_off.y = clampf(_off.y, 0.0, maxf(0.0, max_off.y))
+
+func _apply_view() -> void:
+	_map_tex.position = -_off
+	_map_tex.size = MAP_PX * zoom
+	_hero_dot.position = _hero_local * zoom - _off - _hero_dot.size * 0.5
+	_obj_dot.position = _obj_local * zoom - _off - _obj_dot.size * 0.5
+	_obj_dot.visible = _obj_local.x >= 0.0
+	for m in _markers:
+		if is_instance_valid(m[1]):
+			(m[1] as ColorRect).position = (m[2] as Vector2) * zoom - _off - (m[1] as ColorRect).size * 0.5
+	_zoom_lbl.text = "x2" if zoom > ZOOM_FIT else "x1"
 
 # ------------------------------------------------------------- baking -------
 const BIOME_COLORS := {
@@ -138,10 +224,7 @@ func _bake_if_needed() -> void:
 func _place_markers() -> void:
 	if world == null:
 		return
-	# hero
-	var hp := _to_map(world.hero.global_position)
-	_hero_dot.position = hp - _hero_dot.size / 2.0
-	# settlements + cave mouth
+	_hero_local = _to_local(world.hero.global_position)
 	for m in _markers:
 		if is_instance_valid(m[1]):
 			m[1].free()
@@ -150,21 +233,13 @@ func _place_markers() -> void:
 		var col := Color(0.95, 0.85, 0.45) if st["type"] == "town" else Color(0.9, 0.8, 0.6)
 		var d := _dot(col, 3 if st["type"] == "village" else 5)
 		var plaza := Vector2(st["plaza"].x * 16.0 + 8.0, st["plaza"].y * 16.0 + 8.0)
-		d.position = _to_map(plaza) - d.size / 2.0
-		_markers.append([int(st["index"]), d])
-	# cave mouth
+		_markers.append([int(st["index"]), d, _to_local(plaza)])
 	var cave := world.find_child("CaveEntrance", true, false)
 	if cave != null:
 		var cd := _dot(Color(0.6, 0.5, 0.95), 3)
-		cd.position = _to_map(cave.global_position) - cd.size / 2.0
-		_markers.append([-1, cd])
-	# current objective (a place worth going to right now)
+		_markers.append([-1, cd, _to_local(cave.global_position)])
 	var obj := _objective_world_pos()
-	if obj.x >= 0.0:
-		_obj_dot.position = _to_map(obj) - _obj_dot.size / 2.0
-		_obj_dot.visible = true
-	else:
-		_obj_dot.visible = false
+	_obj_local = _to_local(obj) if obj.x >= 0.0 else Vector2(-1, -1)
 
 ## Where the player should head right now: a ready turn-in, a talk target, a
 ## deliver target - otherwise nowhere (the map still shows settlements).
@@ -181,8 +256,11 @@ func _objective_world_pos() -> Vector2:
 		if int(m.get("progress", 0)) >= int(m["goal"]):
 			return _nearest_settlement_pos()
 		if m.get("kind", "") == "talk":
-			return _settlement_pos(int(m.get("settlement", 0)))
+			return _settlement_pos(int(q_log_int(m, "settlement")))
 	return Vector2(-1, -1)
+
+func q_log_int(m: Dictionary, key: String) -> int:
+	return int(m.get(key, 0))
 
 func _settlement_pos(index: int) -> Vector2:
 	for st in world.settlements:
@@ -204,37 +282,80 @@ func _nearest_settlement_pos() -> Vector2:
 			best = pos
 	return best
 
-# ------------------------------------------------------------- tapping ------
-var _tap_frame := -1
+# --------------------------------------------------- touch: pan then tap ----
+var _down_ok := false
+var _down_p := Vector2.ZERO
+var _last_p := Vector2.ZERO
+var _moved_pan := 0.0
 
-func _on_tap(event: InputEvent) -> void:
+func _panel_point(event_pos: Vector2) -> Vector2:
+	return _root.get_canvas_transform().affine_inverse() * event_pos
+
+func _on_gui(event: InputEvent) -> void:
 	if not visible:
 		return
-	var pressed := false
-	var p := Vector2.ZERO
-	if event is InputEventMouseButton:
+	if event is InputEventScreenTouch:
+		var t: InputEventScreenTouch = event
+		_last_touch_ms = Time.get_ticks_msec()
+		if t.pressed:
+			_down_ok = true
+			_down_p = _panel_point(t.position)
+			_last_p = _down_p
+			_moved_pan = 0.0
+		elif _down_ok:
+			_down_ok = false
+			if _moved_pan <= 6.0:
+				_tap_at(_down_p)
+	elif event is InputEventScreenDrag:
+		var d: InputEventScreenDrag = event
+		if not _down_ok:
+			return
+		var p := _panel_point(d.position)
+		var delta := p - _last_p
+		_last_p = p
+		_moved_pan += delta.length()
+		if _moved_pan > 6.0:
+			_pan_by(delta)
+	elif event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event
-		pressed = mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT
-		p = mb.position
-	elif event is InputEventScreenTouch:
-		var st: InputEventScreenTouch = event
-		pressed = st.pressed
-		p = st.position
-	if not pressed:
-		return
+		if mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		# a mouse click right after a touch is the touch emulation: skip it,
+		# otherwise every finger tap acts twice
+		if Time.get_ticks_msec() - _last_touch_ms < 900:
+			return
+		if mb.pressed:
+			_down_ok = true
+			_down_p = _panel_point(mb.position)
+			_last_p = _down_p
+			_moved_pan = 0.0
+		elif _down_ok:
+			_down_ok = false
+			if _moved_pan <= 6.0:
+				_tap_at(_down_p)
+
+var _tap_frame := -1
+var _last_touch_ms := -1000
+
+func _tap_at(p: Vector2) -> void:
+	# a touch and its emulated mouse click arrive together (or a frame apart):
+	# act once per gesture, never twice
 	if Engine.get_process_frames() == _tap_frame:
 		return
 	_tap_frame = Engine.get_process_frames()
+	if Rect2(_zoom_chip.position, _zoom_chip.size).has_point(p):
+		toggle_zoom()
+		return
 	var panel := Rect2(PANEL_POS, MAP_PX)
 	if not panel.has_point(p):
-		# tapped the dark outside: dismiss
-		close_request()
+		close_request()   # tapped the dark outside: dismiss
 		return
-	# inside the map: did we hit a settlement? travel there, else dismiss
+	# a settlement marker? travel there
 	for m in _markers:
 		if int(m[0]) >= 0 and is_instance_valid(m[1]):
 			var r: Rect2 = (m[1] as ColorRect).get_global_rect()
-			if r.grow(3.0).has_point(p):
+			var q := _root.get_canvas_transform() * p
+			if r.grow(3.0).has_point(q):
 				travel_requested.emit(int(m[0]))
 				return
 	close_request()
