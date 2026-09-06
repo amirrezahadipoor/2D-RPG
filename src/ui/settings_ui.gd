@@ -51,7 +51,7 @@ func _build() -> void:
 	_add_row(Row.LANGUAGE, "settings.language", 240)
 	_add_row(Row.DONE, "menu.done", 258)
 	_ver = Label.new()
-	_ver.text = "v1.0.0-mobile · 2026-09-06 fixed-world 20260906"
+	_ver.text = "v1.2.0-mobile · 2026-09-06 fixed-world 20260906"
 	_ver.size = Vector2(480, 10)
 	_ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_ver.add_theme_font_size_override("font_size", 6)

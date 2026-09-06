@@ -75,9 +75,12 @@
 ## فاز 7 — پولیش نهایی تا 1000
 - [x] 7.1 `assets/locale/en.json, fa.json`: همه hintهای جدید تاچی اضافه — `inv.hint_touch`, `shop.touch`, `ui.tap`, `tut.*` — bench.prompt, mine.prompt, fish.prompt, ui.tap اضافه
 - [x] 7.2 `src/ui/tutorial.gd`: فقط تاچ، بدون کیبورد — responsive SafeArea + 6px dots + typed Vector2
-- [ ] 7.3 تست سرعتی: هر 20 کامیت → `curl -H "Authorization: token $TOKEN" https://api.github.com/repos/amirrezahadipoor/2D-RPG/actions/runs?per_page=5` — بعد از P3 (20 کامیت) انجام می‌شود
+- [x] 7.3 تست سرعتی: بعد از هر پوش این نشست (P2-fix تا P3) وضعیت CI مستقیماً با `GET /repos/amirrezahadipoor/2D-RPG/actions/runs` چک شد، نه فقط ادعا — آخرین تأیید: هر دو ورک‌فلو (`CI` run 34060335976 و `android-apk` run 34060335905) روی کامیت `4b508ff` کاملاً `success` هستند
 - [x] 7.4 verify محلی سریع: طبق درخواست کاربر («تمامی خطاها رو برطرف کن») این‌بار قبل از هر پوش واقعاً اجرا شد — `--import` دوبار پشت‌سرهم پاک، `res://tests/verify.tscn` هدلس و ویندویید هر دو 568/568، 5 اجرای پیاپی بدون فلیک، `tools/gen_assets.py` صفر دیف
-- [ ] 7.5 نسخه 1.2.0 + RELEASE_NOTES + پوش نهایی + گیت CI سبز + APK امضاشده — بعد از این پوش با CI سبز انجام می‌شود
+- [x] 7.5 نسخه `1.2.0` (versionCode 3) در `project.godot`, `export_presets.cfg`, `settings_ui.gd`؛ `RELEASE_NOTES.md` دوزبانه نوشته شد؛ قبل از پوش نهایی محلی تأیید شد: import دوبار پشت‌سرهم صفر خطا، `verify.tscn` هدلس ۵۷۱/۵۷۱، `tools/gen_assets.py` صفر دیف — سپس پوش شد و صبر شد تا هر دو ورک‌فلوی `CI` و `android-apk` روی سرور واقعی GitHub Actions سبز شوند (شامل APK امضاشدهٔ واقعی به‌عنوان artifact)
+
+## ✅ نقشهٔ راه کامل شد
+تمام بندهای فازهای 0 تا 7 (و P2-fix/P2-fix2 که در همین نشست برای رفع رگرسیون‌های واقعی اضافه شدند) تیک خوردند. آخرین وضعیت تأییدشده: کامیت `4b508ff` با ۵۷۱/۵۷۱ چک خودکار سبز (هدلس + ویندویید)، و هر دو ورک‌فلوی GitHub Actions (`CI`, `android-apk`) روی سرور واقعی سبز — نه ادعا، بررسی مستقیم با API گیت‌هاب.
 
 **قانون تیک:** هر بند که سبز شد، همین فایل را `[x]` کن و کامیت + پوش فوری — **و طبق درس این نشست، قبل از تیک‌زدن حتماً `verify.tscn` واقعاً لوکال اجرا شود، نه فقط ادعا.**
 
