@@ -52,6 +52,7 @@ func run() -> void:
 	await _check_craft()
 	await _check_gather()
 	_check_access()
+	_check_perf()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -1207,6 +1208,15 @@ func _check_access() -> void:
 	for ch in main_node.get_children():
 		if ch is CanvasLayer:
 			ch.scale = Vector2.ONE
+
+func _check_perf() -> void:
+	print("== perf F1 ==")
+	var before := world.get_child_count()
+	for i in 40:
+		Juice.damage_number(world.hero.global_position, i, false)
+	await get_tree().create_timer(1.2).timeout
+	var grown := world.get_child_count() - before
+	_ok(grown <= 24, "damage numbers recycle through a pool (+%d nodes)" % grown)
 
 func _check_people() -> void:
 	print("== people ==")
