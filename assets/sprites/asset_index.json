@@ -107,7 +107,9 @@
     "pebble",
     "tuft",
     "foam",
-    "foam2"
+    "foam2",
+    "bones",
+    "crack"
   ],
   "enemies": {
     "slime": {

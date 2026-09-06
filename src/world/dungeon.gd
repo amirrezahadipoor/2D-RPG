@@ -23,7 +23,10 @@ var boss: Enemy = null
 
 var _grid: PackedByteArray = PackedByteArray()
 var _lights: Array = []
-var _dark: CanvasModulate = null
+var _dark: CanvasModulate = null   # legacy handle kept null; tint lives on layers
+var props_layer: TileMapLayer
+var torch_cells: Array = []
+var bone_cells: Array = []
 var _spawn_timer := 0.0
 var _rng := RandomNumberGenerator.new()
 var _seed := 0
@@ -46,12 +49,10 @@ func build(depth_value: int, seed_value: int) -> void:
 	_grid.resize(W * H)
 	_gen_rooms()
 	_build_tileset_and_layer()
+	_build_props_layer()
 	_paint()
-	# darkness: the whole canvas dims while a dungeon is in the tree, so the
-	# torches and the hero's lantern are what you actually see by
-	_dark = CanvasModulate.new()
-	_dark.name = "Darkness"
-	add_child(_dark)
+	# depth mood: the tile layers themselves carry the tint, so actors and
+	# lantern light stay readable on top of it (Phase A5)
 	apply_quality()
 	Settings.settings_changed.connect(apply_quality)
 	actors = Node2D.new()
@@ -63,10 +64,20 @@ func build(depth_value: int, seed_value: int) -> void:
 
 # ------------------------------------------------------------- generate -----
 ## Low quality keeps dungeons readable with a lighter dim and no torch glows.
+## Phase A5: every depth owns a mood — mossy brown, cold blue, hellish red.
+func _depth_tint() -> Color:
+	match depth:
+		2: return Color(0.17, 0.20, 0.28)
+		3: return Color(0.27, 0.15, 0.17)
+		_: return Color(0.20, 0.19, 0.25)
+
 func apply_quality() -> void:
-	if _dark != null:
-		_dark.color = Color(0.2, 0.19, 0.25) if Settings.quality == "high" \
-			else Color(0.55, 0.53, 0.6)
+	var tint := _depth_tint()
+	if Settings.quality != "high":
+		tint = tint.lerp(Color(0.62, 0.60, 0.66), 0.65)
+	for layer in [terrain_layer, props_layer, shade_layer, edge_painter]:
+		if layer != null:
+			layer.modulate = tint
 	for entry in _lights:
 		entry["light"].visible = Settings.quality == "high"
 
@@ -217,6 +228,7 @@ func _paint() -> void:
 			if _grid[y * W + x] == 1 and y > 0 and _grid[(y - 1) * W + x] == 0:
 				shade_layer.set_cell(Vector2i(x, y), 0, shade_atlas)
 	_paint_edges()
+	_scatter_dungeon_props()
 
 func is_walkable_at(world_pos: Vector2) -> bool:
 	var t := Vector2i(floori(world_pos.x / float(TILE)), floori(world_pos.y / float(TILE)))
@@ -341,6 +353,60 @@ func _on_enemy_died(enemy: Enemy) -> void:
 
 ## Readability pass (Phase 3.5): faint floor checker so tiles read as tiles,
 ## and a warm rim on every wall face that looks at floor (lantern catch).
+func _build_props_layer() -> void:
+	props_layer = TileMapLayer.new()
+	props_layer.name = "Props"
+	var pset := TileSet.new()
+	pset.tile_size = Vector2i(16, 16)
+	var psrc := TileSetAtlasSource.new()
+	psrc.texture = load("res://assets/sprites/tiles/props.png")
+	psrc.texture_region_size = Vector2i(16, 16)
+	for i in ArtIndex.PROP_INDEX.size():
+		psrc.create_tile(Vector2i(i % 8, i / 8))
+	pset.add_source(psrc)
+	props_layer.tile_set = pset
+	props_layer.y_sort_enabled = true
+	add_child(props_layer)
+
+## Wall torches with real glow, bone piles and cracks: the floor tells
+## stories even before the first skeleton rounds the corner (Phase A5).
+func _scatter_dungeon_props() -> void:
+	torch_cells.clear()
+	bone_cells.clear()
+	var torch_at := Vector2i(ArtIndex.PROP_INDEX["torch"] % 8, ArtIndex.PROP_INDEX["torch"] / 8)
+	var bones_at := Vector2i(ArtIndex.PROP_INDEX["bones"] % 8, ArtIndex.PROP_INDEX["bones"] / 8)
+	var crack_at := Vector2i(ArtIndex.PROP_INDEX["crack"] % 8, ArtIndex.PROP_INDEX["crack"] / 8)
+	for y in H:
+		for x in W:
+			var i := y * W + x
+			if _grid[i] == 1:
+				var r := _rng.randf()
+				if r < 0.025:
+					props_layer.set_cell(Vector2i(x, y), 0, bones_at)
+					bone_cells.append(Vector2i(x, y))
+				elif r < 0.07:
+					props_layer.set_cell(Vector2i(x, y), 0, crack_at)
+				continue
+			if y + 1 < H and _grid[(y + 1) * W + x] == 1 and _rng.randf() < 0.12:
+				props_layer.set_cell(Vector2i(x, y), 0, torch_at)
+				torch_cells.append(Vector2i(x, y))
+				if _lights.size() < 10 and Settings.quality == "high":
+					var tp := Vector2(x * 16.0 + 8.0, y * 16.0 + 8.0)
+					var light := PointLight2D.new()
+					light.texture = load("res://assets/sprites/fx/glow.png")
+					light.color = Color(1.0, 0.72, 0.35)
+					light.energy = 0.8
+					light.scale = Vector2(1.6, 1.6)
+					add_child(light)
+					light.global_position = tp
+					var flame := Sprite2D.new()
+					flame.texture = load("res://assets/sprites/fx/flame.png")
+					flame.hframes = 2
+					flame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+					add_child(flame)
+					flame.global_position = tp + Vector2(0, -4)
+					_lights.append({"light": light, "phase": _rng.randf() * TAU, "flame": flame})
+
 func _paint_edges() -> void:
 	edge_painter.edges.clear()
 	for y in H:

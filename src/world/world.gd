@@ -305,7 +305,9 @@ func _paint() -> void:
 			if _road_grid[i] == 1 and biome not in ["village", "town"]:
 				tidx = ArtIndex.TERRAIN_INDEX["cobble"]
 				prop = ""
-			elif prop == "" and biome not in ["village", "town", "water"] and _hash2(x + 3, y + 5) < 0.10 \
+			elif prop == "" and biome not in ["village", "town", "water"] \
+					and x > 0 and y > 0 and x < WORLD_W - 1 and y < WORLD_H - 1 \
+					and _hash2(x + 3, y + 5) < 0.10 \
 					and (_road_grid[i - 1] == 1 or _road_grid[i + 1] == 1
 					or _road_grid[i - WORLD_W] == 1 or _road_grid[i + WORLD_W] == 1):
 				prop = "flower"

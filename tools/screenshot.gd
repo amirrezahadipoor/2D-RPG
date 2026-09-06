@@ -36,6 +36,8 @@ func run() -> void:
 		await _grab("00_tutorial")
 		tut0.close()
 
+	# captures always show the game at its best: full quality tier
+	Settings.set_quality("high")
 	# deterministic capture: the world is populated by hand further down
 	var world: Overworld = _world()
 	if world and world.spawner:

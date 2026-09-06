@@ -41,6 +41,7 @@ func run() -> void:
 	_check_landmarks()
 	_check_ground()
 	_check_night_grade()
+	_check_dungeon_art()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -1012,6 +1013,22 @@ func _check_night_grade() -> void:
 	_ok(not world._win_lit, "windows sleep at noon")
 	Game.game_minutes = keep
 	world._apply_night()
+
+func _check_dungeon_art() -> void:
+	print("== dungeon art A5 ==")
+	var d2 := Dungeon.new()
+	add_child(d2)
+	d2.build(2, 999)
+	var d3 := Dungeon.new()
+	add_child(d3)
+	d3.build(3, 999)
+	_ok(d2.terrain_layer.modulate != d3.terrain_layer.modulate, "each depth owns a mood tint")
+	_ok(d3.terrain_layer.modulate.r > d3.terrain_layer.modulate.b, "depth 3 burns hellish red")
+	_ok(d2.torch_cells.size() > 2, "wall torches line the corridors (%d)" % d2.torch_cells.size())
+	_ok(ArtIndex.PROP_INDEX.has("bones") and ArtIndex.PROP_INDEX.has("crack"),
+		"bone piles and cracks exist in the atlas")
+	d2.queue_free()
+	d3.queue_free()
 
 func _check_people() -> void:
 	print("== people ==")

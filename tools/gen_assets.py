@@ -882,9 +882,10 @@ def make_tileset():
 def make_props():
     """Overlay props drawn on top of terrain."""
     names = ["tree", "rock", "bush", "flower", "chest", "stairs", "sign", "torch",
-             "tomb", "fence", "well", "chimney", "pebble", "tuft", "foam", "foam2"]
-    # 8 columns x 2 rows: matches the (i % 8, i / 8) atlas coords used in-game
-    sheet = Canvas(8 * TILE, 2 * TILE)
+             "tomb", "fence", "well", "chimney", "pebble", "tuft", "foam", "foam2", "bones", "crack"]
+    # 8 columns x as many rows as needed: (i % 8, i / 8) atlas coords in-game
+    rows = (len(names) + 7) // 8
+    sheet = Canvas(8 * TILE, rows * TILE)
     for i, name in enumerate(names):
         ox = (i % 8) * TILE
         oy = (i // 8) * TILE
@@ -988,6 +989,15 @@ def make_props():
                 c.px(x, 1, PAL["white"])
             for x in range(2, 16, 6):
                 c.px(x, 2, PAL["water_l"])
+        elif name == "bones":
+            c.rect(4, 11, 5, 2, PAL["white"])
+            c.px(4, 10, PAL["white"]); c.px(8, 10, PAL["white"])
+            c.rect(10, 9, 3, 3, PAL["white"])
+            c.px(11, 10, PAL["black"]); c.px(12, 12, PAL["stone_d"])
+        elif name == "crack":
+            for i in range(8):
+                c.px(3 + i, 4 + (i // 2), PAL["black"])
+                c.px(4 + i, 5 + (i // 2), PAL["stone_d"])
         elif name == "chimney":
             c.rect(5, 5, 6, 10, PAL["stone_d"])
             c.vline(5, 5, 10, PAL["stone_m"])
