@@ -378,11 +378,14 @@ func _settlement_tile(st: Dictionary, t: Vector2i) -> Array:
 	# plaza props
 	if t == plaza:
 		return [ArtIndex.TERRAIN_INDEX["cobble"], "well"]
-	if t == plaza + Vector2i(2, 0) or t == plaza + Vector2i(-2, 0):
+	# the free cross around the well is row plaza.y and columns plaza.x..x+1;
+	# every furniture offset must stay inside it (audit P0-2: chests and
+	# torches used to be painted onto house roofs)
+	if t == plaza + Vector2i(1, 0) or t == plaza + Vector2i(-1, 0):
 		return [ArtIndex.TERRAIN_INDEX["cobble"], "torch"]
 	if t == plaza + Vector2i(0, 2):
 		return [ArtIndex.TERRAIN_INDEX["cobble"], "sign"]
-	if t == plaza + Vector2i(3, 2):
+	if t == plaza + Vector2i(0, -2):
 		return [ArtIndex.TERRAIN_INDEX["cobble"], "chest"]
 	if t == rect.position + Vector2i(1, h - 1):
 		return [ArtIndex.TERRAIN_INDEX["cobble"], "torch"]
@@ -398,8 +401,10 @@ func _house_rects(st: Dictionary) -> Array:
 	var rect: Rect2i = st["rect"]
 	var houses := []
 	if st["type"] == "town":
+		# rows hug the top and bottom; the middle band (y6..y11) stays open so
+		# the plaza, its furniture and the story spawn never land on a roof
 		for hx in [2, 9, 17]:
-			for hy in [2, 9]:
+			for hy in [2, 12]:
 				houses.append(Rect2i(rect.position + Vector2i(hx, hy), Vector2i(5, 4)))
 	else:
 		houses.append(Rect2i(rect.position + Vector2i(2, 2), Vector2i(4, 3)))
@@ -452,6 +457,22 @@ func _hash2(x: int, y: int) -> float:
 # ---------------------------------------------------------------- query -----
 ## True when an entity can stand here: in bounds, not water, not inside a
 ## solid prop, not inside a house roof.
+## Nearest walkable tile centre, spiral-searched out to `radius` tiles.
+## Every spawn (hero, NPC homes and fields) goes through here so nobody can
+## ever start the game embedded in a roof, a well or a tree (audit P0-2).
+func nearest_walkable(pos: Vector2, radius: int = 8) -> Vector2:
+	var c := tile_at(pos)
+	for r in range(0, radius + 1):
+		for dy in range(-r, r + 1):
+			for dx in range(-r, r + 1):
+				if maxi(absi(dx), absi(dy)) != r:
+					continue
+				var t := Vector2i(c.x + dx, c.y + dy)
+				var centre := Vector2(t.x * TILE + 8.0, t.y * TILE + 8.0)
+				if is_walkable_at(centre):
+					return centre
+	return pos
+
 func is_walkable_at(world_pos: Vector2) -> bool:
 	var t := tile_at(world_pos)
 	if t.x < 0 or t.y < 0 or t.x >= WORLD_W or t.y >= WORLD_H:
@@ -499,7 +520,8 @@ func _spawn_hero() -> void:
 	actors.add_child(hero)
 	if not settlements.is_empty():
 		var plaza: Vector2i = settlements[0]["plaza"]
-		hero.global_position = Vector2(plaza.x * TILE + 8.0, (plaza.y + 1) * TILE + 8.0)
+		hero.global_position = nearest_walkable(
+			Vector2(plaza.x * TILE + 8.0, (plaza.y + 1) * TILE + 8.0))
 	else:
 		hero.global_position = Vector2(WORLD_W * TILE * 0.5, WORLD_H * TILE * 0.5)
 	hero.cam.limit_left = 0
@@ -522,6 +544,9 @@ func _spawn_npcs() -> void:
 				plaza.y * TILE + 8 + sin(angle) * 18.0)
 			npc.global_position = npc.home
 			npc.setup(roles[i], st, i)
+			npc.home = nearest_walkable(npc.home)
+			npc.field = nearest_walkable(npc.field)
+			npc.global_position = npc.home
 			npcs.append(npc)
 		# the realm's sovereign rules from the town's palace: a unique, named
 		# presence rather than one more copy of the eight generic villagers
@@ -533,6 +558,8 @@ func _spawn_npcs() -> void:
 			king.home = Vector2((door_tile.x) * TILE + 8.0, (door_tile.y + 1) * TILE + 8.0)
 			king.global_position = king.home
 			king.setup("king", st, 99)
+			king.home = nearest_walkable(king.home)
+			king.global_position = king.home
 			king.display_name = I18N.tr_str("npc.name.king")
 			npcs.append(king)
 

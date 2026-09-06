@@ -76,7 +76,8 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventScreenDrag:
 		# a finger swipe scrolls the journal just like the virtual stick; this
 		# is read at _input level so mobile drags always arrive (unhandled does
-		# not reliably deliver raw drags)
+		# not reliably deliver raw drags). Like `position`, `relative` arrives
+		# already converted into canvas (design) pixels by the viewport.
 		_drag_y += (event as InputEventScreenDrag).relative.y
 		if absf(_drag_y) >= 12.0:
 			_scroll += -1 if _drag_y > 0 else 1

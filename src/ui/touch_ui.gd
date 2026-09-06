@@ -23,6 +23,8 @@ const BUTTONS := {
 const TOGGLE_ACTIONS := {"inventory": 1, "quests": 1, "talents": 1, "pause": 1, "map": 1}
 
 var enabled := false
+var auto := false            # enabled by _ready() on real mobile builds
+var _blocked := false        # a modal / pause / cutscene owns the screen
 var _root: Control
 var _stick_id := -1
 var _stick_vec := Vector2.ZERO
@@ -48,13 +50,17 @@ func _ready() -> void:
 	# auto-enable only on real mobile builds: desktop touchscreens and X
 	# servers without pads report phantom touch devices
 	if OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile"):
+		auto = true
 		set_enabled(true)
 
 func set_enabled(on: bool) -> void:
 	enabled = on
-	visible = on
+	_sync_visible()
 	if not on:
 		_release_all()
+
+func _sync_visible() -> void:
+	visible = enabled and not _blocked
 
 func _release_all() -> void:
 	for action in _move_state:
@@ -67,7 +73,29 @@ func _release_all() -> void:
 	_stick_id = -1
 	_stick_vec = Vector2.ZERO
 
+## The gameplay overlay must never float above (or fire inside) a menu:
+## any modal, the pause/menu state, the map or a cutscene takes the whole
+## screen and the whole input stream (audit P0-3).
+func _gate() -> void:
+	var blocked := Game.state != Game.State.PLAYING or get_tree().paused
+	if not blocked:
+		for ui in get_tree().get_nodes_in_group("modal_ui"):
+			if ui.visible:
+				blocked = true
+				break
+	if not blocked:
+		var cs := get_tree().get_first_node_in_group("cutscene")
+		if cs != null and bool(cs.get("active")):
+			blocked = true
+	if blocked == _blocked:
+		return
+	_blocked = blocked
+	if blocked:
+		_release_all()
+	_sync_visible()
+
 func _process(delta: float) -> void:
+	_gate()
 	for action in _auto_release.keys():
 		_auto_release[action] = float(_auto_release[action]) - delta
 		if _auto_release[action] <= 0.0:
@@ -76,19 +104,22 @@ func _process(delta: float) -> void:
 			_auto_release.erase(action)
 
 func _input(event: InputEvent) -> void:
-	if not enabled:
+	if not enabled or _blocked:
 		return
-	var inv := _root.get_canvas_transform().affine_inverse()
+	# Positions arriving at _input are ALREADY in canvas (design) space: the
+	# viewport applies the stretch + letterbox transform before delivery
+	# (measured at 16:9 and 20:9 windows). Re-transforming them here used to
+	# shrink every finger position by the scale factor on real windows.
 	if event is InputEventScreenTouch:
 		var t: InputEventScreenTouch = event
 		if t.pressed:
-			_press(inv * t.position, t.index)
+			_press(t.position, t.index)
 		else:
 			_lift(t.index)
 	elif event is InputEventScreenDrag:
 		var d: InputEventScreenDrag = event
 		if d.index == _stick_id:
-			_update_stick(inv * d.position)
+			_update_stick(d.position)
 
 func _press(pos: Vector2, index: int) -> void:
 	if pos.distance_to(STICK_CENTER) < STICK_RADIUS * 1.8:

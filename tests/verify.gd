@@ -100,6 +100,29 @@ func _check_world() -> void:
 	# "camera is a sibling and never follows" bug)
 	_ok(world.hero.cam.get_parent() == world.hero, "camera is child of hero")
 
+	# regression (audit P0-2): the story spawn must stand on walkable ground
+	# on fresh seeds, and plaza furniture must never be painted onto a roof
+	var spawn_ok := true
+	for k in 6:
+		var w2 := Overworld.new()
+		w2.forced_seed = 4242 + k * 131
+		add_child(w2)
+		await get_tree().physics_frame
+		if not w2.is_walkable_at(w2.hero.global_position):
+			spawn_ok = false
+		w2.queue_free()
+		await get_tree().process_frame
+	_ok(spawn_ok, "hero spawn is walkable on 6 fresh seeds")
+	var st0: Dictionary = world.settlements[0]
+	var plaza: Vector2i = st0["plaza"]
+	var roof := ArtIndex.TERRAIN_INDEX["roof"]
+	var furn_ok := true
+	for off in [Vector2i(0, 0), Vector2i(1, 0), Vector2i(-1, 0),
+			Vector2i(0, 2), Vector2i(0, -2), Vector2i(0, 1)]:
+		if int(world._settlement_tile(st0, plaza + off)[0]) == roof:
+			furn_ok = false
+	_ok(furn_ok, "plaza furniture and the spawn tile never sit on a roof")
+
 # ------------------------------------------------------------- paper doll ---
 func _check_paper_doll() -> void:
 	print("== paper doll ==")
@@ -1236,19 +1259,28 @@ func _clear_enemies_now() -> void:
 		await get_tree().physics_frame
 
 func _open_arena() -> Vector2:
-	for attempt in 400:
-		var p := Vector2(float(30 + randi() % (Overworld.WORLD_W - 60)) * 16.0 + 8.0,
-			float(30 + randi() % (Overworld.WORLD_H - 60)) * 16.0 + 8.0)
-		var open := true
+	# A REAL 15x15 arena: pick dry ground, then clear every prop inside it.
+	# Scanning for a naturally tree-free block is hopeless - forests put a
+	# tree on ~7.5% of tiles, so a 15x15 without one essentially never occurs
+	# and the old scanner always silently fell back to one fixed point.
+	for attempt in 40:
+		var c := Vector2(float(40 + (attempt * 37) % (Overworld.WORLD_W - 80)) * 16.0 + 8.0,
+			float(40 + (attempt * 53) % (Overworld.WORLD_H - 80)) * 16.0 + 8.0)
+		var dry := true
 		for dx in range(-7, 8):
 			for dy in range(-7, 8):
-				if not world.is_walkable_at(p + Vector2(float(dx * 16), float(dy * 16))):
-					open = false
+				if world.biome_at(c + Vector2(float(dx * 16), float(dy * 16))) == "water":
+					dry = false
 					break
-			if not open:
+			if not dry:
 				break
-		if open:
-			return p
+		if not dry:
+			continue
+		var ct := world.tile_at(c)
+		for dx in range(-7, 8):
+			for dy in range(-7, 8):
+				world.props_layer.erase_cell(Vector2i(ct.x + dx, ct.y + dy))
+		return c
 	return Vector2(2000, 2000)
 
 func _ai_spawn(type: String, off: Vector2) -> Enemy:
@@ -1767,10 +1799,11 @@ func _check_menus() -> void:
 	await get_tree().process_frame
 	tl.toggle()
 	_ok(tl.visible, "talents screen opens for testing")
+	var tst := get_viewport().get_screen_transform()
 	var t1 := InputEventMouseButton.new()
 	t1.button_index = MOUSE_BUTTON_LEFT
 	t1.pressed = true
-	t1.position = Vector2(250, 104 + 2 * 18 + 4)
+	t1.position = tst * Vector2(250, 104 + 2 * 18 + 4)
 	Input.parse_input_event(t1)
 	await get_tree().process_frame
 	_ok(tl._sel == 2, "tap selects the third talent row")
@@ -1778,20 +1811,20 @@ func _check_menus() -> void:
 	var mrel := InputEventMouseButton.new()
 	mrel.button_index = MOUSE_BUTTON_LEFT
 	mrel.pressed = false
-	mrel.position = Vector2(250, 146)
+	mrel.position = tst * Vector2(250, 146)
 	Input.parse_input_event(mrel)
 	await get_tree().process_frame
 	# a second tap on the chosen row spends a point (pure touch events: parsed
 	# mouse clicks synthesise an extra touch, and the handler dedupes per frame)
 	var tp_before := Stats.talent_points
 	var ts2 := InputEventScreenTouch.new()
-	ts2.position = Vector2(250, 146)
+	ts2.position = tst * Vector2(250, 146)
 	ts2.pressed = true
 	ts2.index = 4
 	Input.parse_input_event(ts2)
 	await get_tree().process_frame
 	var ts2u := InputEventScreenTouch.new()
-	ts2u.position = Vector2(250, 146)
+	ts2u.position = tst * Vector2(250, 146)
 	ts2u.pressed = false
 	ts2u.index = 4
 	Input.parse_input_event(ts2u)
@@ -1813,9 +1846,9 @@ func _check_touch_quality() -> void:
 	await get_tree().process_frame
 	touch.set_enabled(true)
 	_ok(touch.visible, "touch overlay can be forced on for testing")
-	var xform := touch._root.get_canvas_transform()
+	var st := get_viewport().get_screen_transform()
 	# stick: press right of center -> move_right action is held
-	var right_pos: Vector2 = xform * (TouchUI.STICK_CENTER + Vector2(20, 0))
+	var right_pos: Vector2 = st * (TouchUI.STICK_CENTER + Vector2(20, 0))
 	var down := InputEventScreenTouch.new()
 	down.position = right_pos
 	down.pressed = true
@@ -1833,7 +1866,7 @@ func _check_touch_quality() -> void:
 	_ok(not Input.is_action_pressed("move_right"), "lifting the stick releases move_right")
 	# attack button: tap holds the action while pressed
 	var atk: Dictionary = TouchUI.BUTTONS["attack"]
-	var atk_pos: Vector2 = xform * atk["pos"]
+	var atk_pos: Vector2 = st * (atk["pos"] as Vector2)
 	var tap := InputEventScreenTouch.new()
 	tap.position = atk_pos
 	tap.pressed = true
@@ -1841,6 +1874,7 @@ func _check_touch_quality() -> void:
 	Input.parse_input_event(tap)
 	await get_tree().process_frame
 	_ok(Input.is_action_pressed("attack"), "touch attack button presses the attack action")
+
 	var tap_up := InputEventScreenTouch.new()
 	tap_up.position = atk_pos
 	tap_up.pressed = false
@@ -1848,6 +1882,77 @@ func _check_touch_quality() -> void:
 	Input.parse_input_event(tap_up)
 	await get_tree().process_frame
 	_ok(not Input.is_action_pressed("attack"), "and releases it on lift")
+	# regression (audit P0-1): a finger is not a mouse - a bare tap on empty
+	# ground must never press the attack action
+	var empty_win: Vector2 = st * Vector2(240, 60)
+	var leak := InputEventScreenTouch.new()
+	leak.position = empty_win
+	leak.pressed = true
+	leak.index = 77
+	Input.parse_input_event(leak)
+	await get_tree().process_frame
+	_ok(not Input.is_action_pressed("attack"), "a bare tap never triggers the attack action")
+	var leak_up := InputEventScreenTouch.new()
+	leak_up.position = empty_win
+	leak_up.pressed = false
+	leak_up.index = 77
+	Input.parse_input_event(leak_up)
+	await get_tree().process_frame
+	_ok(Input.is_action_pressed("attack") == false, "and the leak stays gone after lift")
+	# regression (audit P0-1): holding the stick must really walk the hero.
+	# Isolate the measurement: no roaming enemies may shove or kill the hero
+	# mid-walk, and the arena is a guaranteed 15x15 walkable clearing.
+	Game.change_state(Game.State.PLAYING)
+	var spawn_was := world.spawner.spawn_enabled
+	world.spawner.spawn_enabled = false
+	await _clear_enemies_now()
+	world.hero.global_position = _open_arena()
+	world.hero.velocity = Vector2.ZERO
+	for i in 3:
+		await get_tree().physics_frame
+	var p0 := world.hero.global_position
+	var stick_win: Vector2 = st * (TouchUI.STICK_CENTER + Vector2(20, 0))
+	var sd := InputEventScreenTouch.new()
+	sd.position = stick_win
+	sd.pressed = true
+	sd.index = 78
+	Input.parse_input_event(sd)
+	for i in 45:
+		await get_tree().physics_frame
+	var walked := (world.hero.global_position - p0).length()
+	world.spawner.spawn_enabled = spawn_was
+	var su := InputEventScreenTouch.new()
+	su.position = stick_win
+	su.pressed = false
+	su.index = 78
+	Input.parse_input_event(su)
+	await get_tree().process_frame
+	_ok(walked > 30.0, "holding the virtual stick walks the hero (%.1fpx)" % walked)
+	# regression (audit P0-3): a modal takes the screen AND the input stream
+	var gate_ui := JournalUI.new()
+	add_child(gate_ui)
+	await get_tree().process_frame
+	gate_ui.toggle()
+	await get_tree().process_frame
+	_ok(not touch.visible, "opening a modal hides the touch overlay")
+	var gw: Vector2 = st * (TouchUI.BUTTONS["attack"]["pos"] as Vector2)
+	var gt := InputEventScreenTouch.new()
+	gt.position = gw
+	gt.pressed = true
+	gt.index = 79
+	Input.parse_input_event(gt)
+	await get_tree().process_frame
+	_ok(not Input.is_action_pressed("attack"), "taps are inert while a modal owns the screen")
+	var gtu := InputEventScreenTouch.new()
+	gtu.position = gw
+	gtu.pressed = false
+	gtu.index = 79
+	Input.parse_input_event(gtu)
+	await get_tree().process_frame
+	gate_ui.toggle()
+	gate_ui.queue_free()
+	await get_tree().process_frame
+	_ok(touch.visible, "closing the modal brings the overlay back")
 	touch.set_enabled(false)
 	_ok(not Input.is_action_pressed("move_right") and not Input.is_action_pressed("attack"),
 		"disabling the overlay releases every synthetic action")
@@ -1871,18 +1976,20 @@ func _check_touch_quality() -> void:
 	await get_tree().process_frame
 	_ok(jr._scroll == before + 1, "mouse wheel scrolls the journal (%d -> %d)" % [before, jr._scroll])
 	jr._scroll = 3
+	var jst := get_viewport().get_screen_transform()
 	var jt := InputEventScreenTouch.new()
-	jt.position = Vector2(300, 120)
+	jt.position = jst * Vector2(300, 120)
 	jt.pressed = true
 	jt.index = 5
 	Input.parse_input_event(jt)
 	var jd := InputEventScreenDrag.new()
-	jd.position = Vector2(300, 80)
-	jd.relative = Vector2(0, -40)   # finger slides up = newer entries
+	jd.position = jst * Vector2(300, 80)
+	# `relative` is window pixels: express a 40-design-px swipe at this scale
+	jd.relative = Vector2(0, -40.0 * jst.get_scale().y)   # finger slides up
 	jd.index = 5
 	Input.parse_input_event(jd)
 	var jl := InputEventScreenTouch.new()
-	jl.position = Vector2(300, 80)
+	jl.position = jst * Vector2(300, 80)
 	jl.pressed = false
 	jl.index = 5
 	Input.parse_input_event(jl)
@@ -1926,16 +2033,17 @@ func _check_dialogue_touch() -> void:
 	Stats.reset_run()
 	Stats.add_gold(5000)
 	var row2_y := 206.0 + 2 * 11.0 + 3.0
+	var dst := get_viewport().get_screen_transform()
 	var tap := InputEventMouseButton.new()
 	tap.button_index = MOUSE_BUTTON_LEFT
 	tap.pressed = true
-	tap.position = Vector2(240, row2_y)
+	tap.position = dst * Vector2(240, row2_y)
 	Input.parse_input_event(tap)
 	await get_tree().process_frame
 	var tap_up := InputEventMouseButton.new()
 	tap_up.button_index = MOUSE_BUTTON_LEFT
 	tap_up.pressed = false
-	tap_up.position = Vector2(240, row2_y)
+	tap_up.position = dst * Vector2(240, row2_y)
 	Input.parse_input_event(tap_up)
 	await get_tree().process_frame
 	_ok(dlg._shop_sel == 2 and not bool(dlg._shop_offers[2]["sold"]),
@@ -1945,13 +2053,13 @@ func _check_dialogue_touch() -> void:
 	var tap2 := InputEventMouseButton.new()
 	tap2.button_index = MOUSE_BUTTON_LEFT
 	tap2.pressed = true
-	tap2.position = Vector2(240, row2_y)
+	tap2.position = dst * Vector2(240, row2_y)
 	Input.parse_input_event(tap2)
 	await get_tree().process_frame
 	var tap2_up := InputEventMouseButton.new()
 	tap2_up.button_index = MOUSE_BUTTON_LEFT
 	tap2_up.pressed = false
-	tap2_up.position = Vector2(240, row2_y)
+	tap2_up.position = dst * Vector2(240, row2_y)
 	Input.parse_input_event(tap2_up)
 	await get_tree().process_frame
 	_ok(Stats.gold == gold_before - price2 and bool(dlg._shop_offers[2]["sold"]),
@@ -1969,13 +2077,13 @@ func _check_dialogue_touch() -> void:
 	var ttap := InputEventMouseButton.new()
 	ttap.button_index = MOUSE_BUTTON_LEFT
 	ttap.pressed = true
-	ttap.position = Vector2(240, 220)
+	ttap.position = dst * Vector2(240, 220)
 	Input.parse_input_event(ttap)
 	await get_tree().process_frame
 	var ttap_up := InputEventMouseButton.new()
 	ttap_up.button_index = MOUSE_BUTTON_LEFT
 	ttap_up.pressed = false
-	ttap_up.position = Vector2(240, 220)
+	ttap_up.position = dst * Vector2(240, 220)
 	Input.parse_input_event(ttap_up)
 	await get_tree().process_frame
 	_ok(dlg._page == 1 and dlg.visible,

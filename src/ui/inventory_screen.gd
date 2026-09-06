@@ -27,6 +27,7 @@ var _tip_stats: Label
 
 func _ready() -> void:
 	layer = 20
+	add_to_group("modal_ui")
 	_build()
 	visible = false
 	Inventory.changed.connect(func(): if visible: _refresh())
