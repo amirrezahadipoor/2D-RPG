@@ -5,7 +5,7 @@ extends CanvasLayer
 
 signal closed
 
-enum Row { MASTER, MUSIC, SFX, QUALITY, LANGUAGE, DONE }
+enum Row { MASTER, MUSIC, SFX, QUALITY, PANSPEED, TAPRADIUS, AUTOCOMBAT, LANGUAGE, DONE }
 
 var _sel: int = Row.MASTER
 var _root: Control
@@ -35,8 +35,8 @@ func _build() -> void:
 	_root.add_child(dim)
 	_panel = ColorRect.new()
 	_panel.color = Color(0.08, 0.07, 0.12, 0.97)
-	_panel.position = Vector2(110, 44)
-	_panel.size = Vector2(260, 182)
+	_panel.position = Vector2(110, 30)
+	_panel.size = Vector2(260, 214)
 	_root.add_child(_panel)
 	var title := _mk_label(Vector2(0, 52), 12, Color(1, 0.86, 0.4))
 	title.text = I18N.tr_str("menu.settings")
@@ -44,8 +44,11 @@ func _build() -> void:
 	_add_row(Row.MUSIC, "settings.music", 96)
 	_add_row(Row.SFX, "settings.sfx", 114)
 	_add_row(Row.QUALITY, "settings.quality", 132)
-	_add_row(Row.LANGUAGE, "settings.language", 150)
-	_add_row(Row.DONE, "menu.done", 176)
+	_add_row(Row.PANSPEED, "settings.pan", 150)
+	_add_row(Row.TAPRADIUS, "settings.tap_radius", 168)
+	_add_row(Row.AUTOCOMBAT, "settings.auto_combat", 186)
+	_add_row(Row.LANGUAGE, "settings.language", 204)
+	_add_row(Row.DONE, "menu.done", 230)
 	_refresh()
 
 func _mk_label(pos: Vector2, size: int, col: Color) -> Label:
@@ -102,6 +105,12 @@ func _refresh() -> void:
 				value.text = _bar(Settings.sfx)
 			Row.QUALITY:
 				value.text = I18N.tr_str("quality." + Settings.quality)
+			Row.PANSPEED:
+				value.text = "%d%%" % int(Settings.pan_speed * 100.0)
+			Row.TAPRADIUS:
+				value.text = "%dpx" % int(Settings.tap_radius)
+			Row.AUTOCOMBAT:
+				value.text = I18N.tr_str("settings.on" if Settings.auto_combat else "settings.off")
 			Row.LANGUAGE:
 				value.text = "فارسی / EN" if I18N.locale == "en" else "EN / فارسی"
 			Row.DONE:
@@ -149,7 +158,7 @@ func _row_at(canvas_y: float) -> int:
 			best_d = d
 			best = int(row)
 	# only when the tap actually lands on the panel body
-	if canvas_y < 70.0 or canvas_y > 196.0:
+	if canvas_y < 70.0 or canvas_y > 240.0:
 		return -1
 	return best
 
@@ -161,7 +170,7 @@ func _pointer_press(event_pos: Vector2) -> void:
 	_sel = row
 	_refresh()
 	# volume rows scrub on the value column; everything else acts on tap
-	if row == Row.DONE or row == Row.LANGUAGE or row == Row.QUALITY:
+	if row in [Row.DONE, Row.LANGUAGE, Row.QUALITY, Row.AUTOCOMBAT]:
 		Sfx.play("click")
 		_activate()
 	elif p.x >= 258.0:
@@ -179,6 +188,10 @@ func _scrub_value(x: float) -> void:
 			Settings.set_music(target)
 		Row.SFX:
 			Settings.set_sfx(target)
+		Row.PANSPEED:
+			Settings.set_pan_speed(0.5 + target * 1.5)
+		Row.TAPRADIUS:
+			Settings.set_tap_radius(8.0 + target * 20.0)
 	_refresh()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -220,6 +233,15 @@ func _adjust(dir: int) -> void:
 			var i := (Settings.QUALITIES.find(Settings.quality) + dir + 3) % 3
 			Settings.set_quality(Settings.QUALITIES[i])
 			Sfx.play("click")
+		Row.PANSPEED:
+			Settings.set_pan_speed(Settings.pan_speed + 0.1 * dir)
+			Sfx.play("click", -12.0, 0.02)
+		Row.TAPRADIUS:
+			Settings.set_tap_radius(Settings.tap_radius + 2.0 * dir)
+			Sfx.play("click", -12.0, 0.02)
+		Row.AUTOCOMBAT:
+			Settings.set_auto_combat(not Settings.auto_combat)
+			Sfx.play("click")
 		Row.LANGUAGE:
 			I18N.toggle_locale()
 			Sfx.play("click")
@@ -234,6 +256,10 @@ func _activate() -> void:
 		Row.QUALITY:
 			var i := (Settings.QUALITIES.find(Settings.quality) + 1) % 3
 			Settings.set_quality(Settings.QUALITIES[i])
+			Sfx.play("click")
+			_refresh()
+		Row.AUTOCOMBAT:
+			Settings.set_auto_combat(not Settings.auto_combat)
 			Sfx.play("click")
 			_refresh()
 		Row.DONE:

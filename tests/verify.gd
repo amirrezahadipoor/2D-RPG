@@ -49,6 +49,7 @@ func run() -> void:
 	await _check_audio()
 	await _check_menus()
 	await _check_touch_quality()
+	await _check_touch_settings()
 	await _check_dialogue_touch()
 	await _check_act_card()
 
@@ -2199,6 +2200,148 @@ func func_reset_t(hero_t) -> void:
 		hero_t.act = hero_t.Act.NONE
 		hero_t.act_timer = 0.0
 	Game.change_state(Game.State.PLAYING)
+
+func _check_touch_settings() -> void:
+	print("== touch settings ==")
+	var touch_s := TouchUI.new()
+	add_child(touch_s)
+	await get_tree().process_frame
+	touch_s.set_enabled(true)
+	var hero_t := world.hero
+	Game.change_state(Game.State.PLAYING)
+	var spawn_was := world.spawner.spawn_enabled
+	world.spawner.spawn_enabled = false
+	await _clear_enemies_now()
+	func_reset_t(hero_t)
+	hero_t.global_position = _open_arena()
+	hero_t.cam.reset_smoothing()
+	for i in 4:
+		await get_tree().physics_frame
+
+	# auto-combat OFF: a goblin breathing down our neck must stay unharmed
+	Settings.set_auto_combat(false)
+	var foe_t := Enemy.new()
+	world.actors.add_child(foe_t)
+	foe_t.setup("goblin", 2)
+	foe_t.global_position = hero_t.global_position + Vector2(26, 0)
+	foe_t.state = foe_t.State.CHASE
+	var hp0 := foe_t.hp
+	for i in 90:
+		await get_tree().physics_frame
+	_ok(foe_t.hp == hp0, "auto-combat off leaves a chasing foe unharmed")
+	# ...but a tapped foe is an explicit order and still gets engaged
+	var tap_w := foe_t.global_position
+	_g_touch(true, _g_screen_at(tap_w), 21)
+	_g_touch(false, _g_screen_at(tap_w), 21)
+	for i in 2:
+		await get_tree().process_frame
+	_ok(hero_t._enemy_target == foe_t, "tapping a foe still engages it with auto-combat off")
+	func_reset_t(hero_t)
+	foe_t.queue_free()
+	await _clear_enemies_now()
+	Settings.set_auto_combat(true)
+	var foe2 := Enemy.new()
+	world.actors.add_child(foe2)
+	foe2.setup("goblin", 2)
+	foe2.global_position = hero_t.global_position + Vector2(26, 0)
+	foe2.state = foe2.State.CHASE
+	var hp1 := foe2.hp
+	var hit2 := false
+	for i in 120:
+		await get_tree().physics_frame
+		if not is_instance_valid(foe2) or foe2.hp < hp1:
+			hit2 = true
+			break
+	_ok(hit2, "auto-combat on swings at a foe in reach")
+	if is_instance_valid(foe2):
+		foe2.queue_free()
+	await _clear_enemies_now()
+
+	# tap radius: a wide radius forgives a sloppy tap on loot
+	Inventory.reset_run()
+	Settings.set_tap_radius(28.0)
+	var grng2 := RandomNumberGenerator.new()
+	grng2.seed = 7
+	var pk2 := Pickup.new()
+	world.actors.add_child(pk2)
+	pk2.setup(ItemGen.roll("leather_boots", grng2))
+	pk2.global_position = hero_t.global_position + Vector2(90, 0)
+	hero_t.cam.reset_smoothing()
+	for i in 3:
+		await get_tree().physics_frame
+	var sloppy := pk2.global_position + Vector2(24, 0)
+	_g_touch(true, _g_screen_at(sloppy), 22)
+	_g_touch(false, _g_screen_at(sloppy), 22)
+	for i in 2:
+		await get_tree().process_frame
+	_ok(hero_t._interact_pending == pk2, "a wide tap radius forgives a sloppy tap")
+	Settings.set_tap_radius(8.0)
+	func_reset_t(hero_t)
+	_g_touch(true, _g_screen_at(sloppy), 23)
+	_g_touch(false, _g_screen_at(sloppy), 23)
+	for i in 2:
+		await get_tree().process_frame
+	_ok(hero_t._interact_pending == null and hero_t._has_move_to,
+		"a narrow tap radius walks to the sloppy spot instead")
+	pk2.queue_free()
+	Inventory.reset_run()
+	Settings.set_tap_radius(16.0)
+
+	# pan speed: the same drag travels the camera further at 200%
+	var st_p := get_viewport().get_screen_transform()
+	func_reset_t(hero_t)
+	for i in 3:
+		await get_tree().physics_frame
+	var pc := st_p * Vector2(300, 180)
+	Settings.set_pan_speed(2.0)
+	_g_touch(true, pc, 24)
+	for k in 3:
+		await get_tree().process_frame
+		_g_drag(pc + Vector2(float(40 * (k + 1)) * st_p.get_scale().x, 0), 24)
+	for i in 10:
+		await get_tree().physics_frame
+	var fast_x := absf(hero_t.cam.position.x)
+	for i in 8:
+		await get_tree().process_frame
+	_g_touch(false, pc + Vector2(120.0 * st_p.get_scale().x, 0), 24)
+	for i in 40:
+		await get_tree().physics_frame
+	Settings.set_pan_speed(0.5)
+	func_reset_t(hero_t)
+	for i in 3:
+		await get_tree().physics_frame
+	_g_touch(true, pc, 25)
+	for k in 3:
+		await get_tree().process_frame
+		_g_drag(pc + Vector2(float(40 * (k + 1)) * st_p.get_scale().x, 0), 25)
+	for i in 10:
+		await get_tree().physics_frame
+	var slow_x := absf(hero_t.cam.position.x)
+	for i in 8:
+		await get_tree().process_frame
+	_g_touch(false, pc + Vector2(120.0 * st_p.get_scale().x, 0), 25)
+	for i in 40:
+		await get_tree().physics_frame
+	_ok(fast_x > slow_x + 4.0, "pan speed scales camera travel (%.0f vs %.0f px)" % [fast_x, slow_x])
+	Settings.set_pan_speed(1.0)
+	func_reset_t(hero_t)
+	world.spawner.spawn_enabled = spawn_was
+
+	# the settings screen itself: tapping the auto-combat row toggles it
+	var su := SettingsUI.new()
+	add_child(su)
+	await get_tree().process_frame
+	su.open()
+	await get_tree().process_frame
+	var before := Settings.auto_combat
+	su._pointer_press(Vector2(150, 193))
+	_ok(Settings.auto_combat != before, "tapping the auto-combat row toggles it")
+	su._pointer_press(Vector2(150, 193))
+	su.close()
+	su.queue_free()
+	touch_s.set_enabled(false)
+	touch_s.queue_free()
+	await get_tree().process_frame
 
 func _check_dialogue_touch() -> void:
 	print("== dialogue touch ==")

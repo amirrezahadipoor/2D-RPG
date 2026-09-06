@@ -161,7 +161,7 @@ func _physics_process(delta: float) -> void:
 		)
 
 	move_and_slide()
-	cam.position = cam.position.move_toward(cam_pan_target, 480.0 * delta)
+	cam.position = cam.position.move_toward(cam_pan_target, 480.0 * Settings.pan_speed * delta)
 	_animate(delta, drive)
 	_update_lantern(delta)
 
@@ -214,7 +214,7 @@ func _set_move_to(p: Vector2) -> void:
 
 func _tap_target(p: Vector2) -> Node2D:
 	var best: Node2D = null
-	var best_d := 16.0
+	var best_d := Settings.tap_radius
 	for g in ["enemy", "npc", "pickup", "interact", "breakable"]:
 		for node in get_tree().get_nodes_in_group(g):
 			var n := node as Node2D
@@ -287,6 +287,8 @@ func _auto_foe() -> Enemy:
 		if t != null and t.state != Enemy.State.DEAD:
 			if (t.global_position - global_position).length() <= reach + 4.0:
 				return t
+	if not Settings.auto_combat:
+		return null     # the player opted out: only tapped foes get fought
 	var best: Enemy = null
 	var best_d := reach
 	for node in get_tree().get_nodes_in_group("enemy"):
@@ -519,9 +521,10 @@ func hurt(amount: int, from: Node = null) -> int:
 			I18N.tr_str("toast.parried"), Color(1.0, 0.9, 0.4), 9)
 		Juice.shake(2.0)
 		return 0
-	_retaliate_t = 2.5
-	if _enemy_target == null and from != null and from.is_in_group("enemy"):
-		_enemy_target = from
+	if Settings.auto_combat:
+		_retaliate_t = 2.5
+		if _enemy_target == null and from != null and from.is_in_group("enemy"):
+			_enemy_target = from
 	return Stats.damage(amount)
 
 func _on_gear_changed(gear: Dictionary) -> void:
