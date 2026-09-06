@@ -11,6 +11,7 @@ var _prompt: Label
 var _hero: Node2D = null
 
 func _ready() -> void:
+	add_to_group("interact")
 	_spr = Sprite2D.new()
 	_spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_spr.centered = false
@@ -30,6 +31,12 @@ func _ready() -> void:
 	_prompt.visible = false
 	_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_prompt)
+
+## Touch hook (see npc.gd).
+func interact() -> void:
+	if Game.state == Game.State.PLAYING:
+		_prompt.visible = false
+		used.emit(direction)
 
 func _process(_delta: float) -> void:
 	if _hero == null or not is_instance_valid(_hero):

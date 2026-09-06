@@ -54,6 +54,11 @@ func _process(_delta: float) -> void:
 		if Input.is_action_just_pressed("interact"):
 			break_open()
 
+## Touch hook (see npc.gd).
+func interact() -> void:
+	if Game.state == Game.State.PLAYING:
+		break_open()
+
 ## Called by melee sweeps as well as the interact key.
 func break_open() -> void:
 	if not is_inside_tree():

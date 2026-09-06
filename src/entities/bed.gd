@@ -8,6 +8,7 @@ var _prompt: Label
 var _hero: Node2D = null
 
 func _ready() -> void:
+	add_to_group("interact")
 	_prompt = Label.new()
 	_prompt.add_theme_font_size_override("font_size", 8)
 	_prompt.add_theme_color_override("font_color", Color(0.7, 0.95, 1.0))
@@ -33,6 +34,11 @@ func _process(_delta: float) -> void:
 	if near and not modal and Game.state == Game.State.PLAYING:
 		if Input.is_action_just_pressed("interact"):
 			_rest()
+
+## Touch hook (see npc.gd).
+func interact() -> void:
+	if Game.state == Game.State.PLAYING:
+		_rest()
 
 func _rest() -> void:
 	for child in get_tree().root.get_children():

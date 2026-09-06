@@ -23,6 +23,8 @@ var _last_biome := ""
 var _root: Control
 var _grade: TextureRect
 var _vignette: ColorRect
+var _chips: Array[Control] = []
+var _chip_rects: Array[Rect2] = []
 var _toast: Label
 var _last_level := 1
 var _clock: Label
@@ -126,10 +128,47 @@ func _build() -> void:
 	# --- prompts (bottom-left) ---
 	_prompts = _label(Vector2(6, 0), Color(0.6, 0.62, 0.7))
 	_prompts.size = Vector2(300, 30)
+	_prompts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+	# --- quick chips (right edge) ---
+	# The ONLY on-screen buttons: tiny, dim, out of the way of the world.
+	# Everything else is a gesture on the map itself.
+	var defs := [["use_potion", "H"], ["inventory", "B"], ["quests", "J"],
+			["map", "M"], ["pause", "II"]]
+	for d in defs:
+		var chip := Control.new()
+		chip.size = Vector2(24, 24)
+		chip.custom_minimum_size = Vector2(24, 24)
+		chip.mouse_filter = Control.MOUSE_FILTER_STOP
+		var border := ColorRect.new()
+		border.color = Color(0.55, 0.5, 0.4, 0.8)
+		border.size = Vector2(24, 24)
+		border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(border)
+		var bg := ColorRect.new()
+		bg.color = Color(0.09, 0.09, 0.13, 0.92)
+		bg.position = Vector2(1, 1)
+		bg.size = Vector2(22, 22)
+		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(bg)
+		var gl := Label.new()
+		gl.text = String(d[1])
+		gl.add_theme_font_override("font", load(I18N.FONT_REGULAR_PATH))
+		gl.add_theme_font_size_override("font_size", 8)
+		gl.add_theme_color_override("font_color", Color(0.95, 0.9, 0.8))
+		gl.position = Vector2(0, 6)
+		gl.size = Vector2(24, 12)
+		gl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		gl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		chip.add_child(gl)
+		chip.gui_input.connect(_on_chip_gui.bind(String(d[0])))
+		_root.add_child(chip)
+		_chips.append(chip)
 
 	# Anchor presets with equal opposite anchors collapse the Control's size to
 	# zero (Godot recomputes size from the anchors), which silently hid the
 	# biome label and the prompts. Layout is therefore done explicitly.
+	add_to_group("hud")
 	_layout()
 	get_viewport().size_changed.connect(_layout)
 
@@ -153,9 +192,37 @@ func _layout() -> void:
 	if _night:
 		_night.position = Vector2.ZERO
 		_night.size = vp
+	_chip_rects.clear()
+	for i in _chips.size():
+		_chips[i].position = Vector2(vp.x - 28, vp.y * 0.42 + float(i) * 26.0)
+		_chip_rects.append(Rect2(_chips[i].position, _chips[i].size))
 	if _clock:
 		_clock.position = Vector2(0, 6)
 		_clock.size = Vector2(vp.x, 10)
+
+## True when a design-space point lands on one of the quick chips
+## (TouchUI uses this to let taps on chips pass through to the GUI).
+func chip_hit(design_pos: Vector2) -> bool:
+	for r in _chip_rects:
+		if r.has_point(design_pos):
+			return true
+	return false
+
+func _on_chip_gui(ev: InputEvent, action: String) -> void:
+	if (ev is InputEventScreenTouch and ev.pressed) or (ev is InputEventMouseButton
+			and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT):
+		_fire_action(action)
+
+## Fire a UI action exactly like the matching key press would.
+func _fire_action(action: String) -> void:
+	var down := InputEventAction.new()
+	down.action = action
+	down.pressed = true
+	Input.parse_input_event(down)
+	var up := InputEventAction.new()
+	up.action = action
+	up.pressed = false
+	Input.parse_input_event(up)
 
 func _bar(pos: Vector2, w: float, h: float, col: Color) -> ColorRect:
 	var r := ColorRect.new()
@@ -282,6 +349,11 @@ func _refresh_text() -> void:
 		I18N.tag(_biome_label)
 	_on_level(Stats.level, Stats.xp, Stats.xp_next)
 	_on_gold(Stats.gold)
+	if DisplayServer.is_touchscreen_available():
+		_prompts.text = I18N.tr_str("hud.gestures")
+		I18N.tag(_prompts)
+		I18N.tag(_biome_label)
+		return
 	_prompts.text = "%s [J]  %s [K]  %s [I]  %s [U]  %s [T]  %s [H]  %s [L]" % [
 		I18N.tr_str("hud.prompt.attack"),
 		I18N.tr_str("hud.prompt.dodge"),

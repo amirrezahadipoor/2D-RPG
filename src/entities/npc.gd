@@ -156,6 +156,12 @@ func _physics_process(delta: float) -> void:
 		if Input.is_action_just_pressed("interact"):
 			_open_dialogue()
 
+## Touch hook: the hero walks over and calls this directly instead of
+## synthesising the interact key (which is physics-order dependent).
+func interact() -> void:
+	if Game.state == Game.State.PLAYING:
+		_open_dialogue()
+
 func _open_dialogue() -> void:
 	for child in get_tree().root.get_children():
 		var dlg := child.get_node_or_null("DialogueUI")

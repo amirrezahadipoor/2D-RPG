@@ -7,6 +7,12 @@ extends Node
 
 var _failures: Array[String] = []
 var _checks: int = 0
+var _action_log: Array[String] = []
+
+func _unhandled_input(event: InputEvent) -> void:
+	# records HUD chip presses: chips fire InputEventAction like a real key
+	if event is InputEventAction and event.pressed:
+		_action_log.append(event.action)
 
 func _ready() -> void:
 	run.call_deferred()
@@ -358,11 +364,22 @@ func _check_combat() -> void:
 	await _clear_enemies_call()
 	Stats.hp = 40
 	Stats.set_armor(0)
-	var biter := world.spawner.spawn("slime", hero.global_position + Vector2(8, 0), 1)
-	for i in 60:
+	var biter := world.spawner.spawn("slime", hero.global_position + Vector2(8, 0), 3)
+	var hp_b := biter.hp
+	var hurt_seen := false
+	var bite_back := false
+	for i in 150:
 		await get_tree().physics_frame
-	_ok(Stats.hp < 40, "enemy attack damages the hero (hp=%d)" % Stats.hp)
-	_ok(is_instance_valid(biter), "attacking enemy stays alive")
+		if Stats.hp < 40:
+			hurt_seen = true
+		if not is_instance_valid(biter):
+			bite_back = true
+			break
+		if biter.hp < hp_b:
+			bite_back = true
+	_ok(hurt_seen, "enemy attack damages the hero (hp=%d)" % Stats.hp)
+	# touch-native rule: no key pressed, yet the hero fights back on its own
+	_ok(bite_back, "being attacked makes the hero retaliate automatically")
 	await _clear_enemies_call()
 
 func _clear_enemies_call() -> void:
@@ -645,10 +662,16 @@ func _check_inventory() -> void:
 	chest.global_position = hero.global_position + Vector2(12, 0)
 	for i in 4:
 		await get_tree().physics_frame
-	Input.action_press("interact")
-	for i in 4:
-		await get_tree().physics_frame
-	Input.action_release("interact")
+	# two presses: just_pressed sampling races the renderer on real windows
+	for pulse in 2:
+		Input.action_press("interact")
+		for i in 3:
+			await get_tree().physics_frame
+		Input.action_release("interact")
+		for i in 2:
+			await get_tree().physics_frame
+		if chest.opened:
+			break
 	_ok(chest.opened, "chest opens on interact")
 	var drops := get_tree().get_nodes_in_group("pickup").size()
 	_ok(drops >= 2 or Stats.gold > gold_before, "chest scattered loot (%d drops, gold %d->%d)" % [drops, gold_before, Stats.gold])
@@ -1884,118 +1907,208 @@ func _check_touch_quality() -> void:
 	add_child(touch)
 	await get_tree().process_frame
 	touch.set_enabled(true)
-	_ok(touch.visible, "touch overlay can be forced on for testing")
-	var st := get_viewport().get_screen_transform()
-	# stick: press right of center -> move_right action is held
-	var right_pos: Vector2 = st * (TouchUI.STICK_CENTER + Vector2(20, 0))
-	var down := InputEventScreenTouch.new()
-	down.position = right_pos
-	down.pressed = true
-	down.index = 7
-	Input.parse_input_event(down)
-	await get_tree().process_frame
-	_ok(Input.is_action_pressed("move_right"), "virtual stick right holds move_right")
-	_ok(not Input.is_action_pressed("move_left"), "and not move_left")
-	var up := InputEventScreenTouch.new()
-	up.position = right_pos
-	up.pressed = false
-	up.index = 7
-	Input.parse_input_event(up)
-	await get_tree().process_frame
-	_ok(not Input.is_action_pressed("move_right"), "lifting the stick releases move_right")
-	# attack button: tap holds the action while pressed
-	var atk: Dictionary = TouchUI.BUTTONS["attack"]
-	var atk_pos: Vector2 = st * (atk["pos"] as Vector2)
-	var tap := InputEventScreenTouch.new()
-	tap.position = atk_pos
-	tap.pressed = true
-	tap.index = 9
-	Input.parse_input_event(tap)
-	await get_tree().process_frame
-	_ok(Input.is_action_pressed("attack"), "touch attack button presses the attack action")
+	_ok(not touch.visible, "the gesture layer draws no on-screen buttons")
+	_ok(touch.get_child_count() == 0, "no Sega-style stick/button overlay exists")
 
-	var tap_up := InputEventScreenTouch.new()
-	tap_up.position = atk_pos
-	tap_up.pressed = false
-	tap_up.index = 9
-	Input.parse_input_event(tap_up)
-	await get_tree().process_frame
-	_ok(not Input.is_action_pressed("attack"), "and releases it on lift")
-	# regression (audit P0-1): a finger is not a mouse - a bare tap on empty
-	# ground must never press the attack action
-	var empty_win: Vector2 = st * Vector2(240, 60)
-	var leak := InputEventScreenTouch.new()
-	leak.position = empty_win
-	leak.pressed = true
-	leak.index = 77
-	Input.parse_input_event(leak)
-	await get_tree().process_frame
-	_ok(not Input.is_action_pressed("attack"), "a bare tap never triggers the attack action")
-	var leak_up := InputEventScreenTouch.new()
-	leak_up.position = empty_win
-	leak_up.pressed = false
-	leak_up.index = 77
-	Input.parse_input_event(leak_up)
-	await get_tree().process_frame
-	_ok(Input.is_action_pressed("attack") == false, "and the leak stays gone after lift")
-	# regression (audit P0-1): holding the stick must really walk the hero.
-	# Isolate the measurement: no roaming enemies may shove or kill the hero
-	# mid-walk, and the arena is a guaranteed 15x15 walkable clearing.
+	var hero_t := world.hero
 	Game.change_state(Game.State.PLAYING)
 	var spawn_was := world.spawner.spawn_enabled
 	world.spawner.spawn_enabled = false
 	await _clear_enemies_now()
-	world.hero.global_position = _open_arena()
-	world.hero.velocity = Vector2.ZERO
-	for i in 3:
+	# a DialogueUI the NPCs can find (verify builds the world by hand)
+	var dlg_t := DialogueUI.new()
+	dlg_t.name = "DialogueUI"
+	add_child(dlg_t)
+
+	func_reset_t(hero_t)
+	hero_t.global_position = _open_arena()
+	var arena_c := hero_t.global_position
+	hero_t.cam.reset_smoothing()
+	for i in 5:
 		await get_tree().physics_frame
-	var p0 := world.hero.global_position
-	var stick_win: Vector2 = st * (TouchUI.STICK_CENTER + Vector2(20, 0))
-	var sd := InputEventScreenTouch.new()
-	sd.position = stick_win
-	sd.pressed = true
-	sd.index = 78
-	Input.parse_input_event(sd)
-	for i in 45:
+
+	# --- 1. tap the ground: the hero walks there ---
+	var goal_t := world.nearest_walkable(hero_t.global_position + Vector2(56, 0))
+	_g_touch(true, _g_screen_at(goal_t), 11)
+	_g_touch(false, _g_screen_at(goal_t), 11)
+	# parse_input_event flushes on the NEXT frame's input phase
+	for i in 2:
+		await get_tree().process_frame
+	_ok(hero_t._has_move_to, "a tap on the ground gives the hero a walk target")
+	for i in 160:
 		await get_tree().physics_frame
-	var walked := (world.hero.global_position - p0).length()
-	world.spawner.spawn_enabled = spawn_was
-	var su := InputEventScreenTouch.new()
-	su.position = stick_win
-	su.pressed = false
-	su.index = 78
-	Input.parse_input_event(su)
+	var d_walk := (hero_t.global_position - goal_t).length()
+	_ok(d_walk < 20.0, "tap-to-move walks the hero to the tapped spot (%.0fpx left)" % d_walk)
+
+	# --- 2. tap an NPC: the hero walks over and talks ---
+	var npc_t := NPC.new()
+	world.actors.add_child(npc_t)
+	npc_t.setup("villager", {"index": 0, "plaza": Vector2i(
+		int(hero_t.global_position.x / 16.0), int(hero_t.global_position.y / 16.0))}, 1)
+	npc_t.global_position = world.nearest_walkable(hero_t.global_position + Vector2(46, 10))
+	npc_t.home = npc_t.global_position
+	hero_t.cam.reset_smoothing()
+	for i in 4:
+		await get_tree().physics_frame
+	_g_touch(true, _g_screen_at(npc_t.global_position), 12)
+	_g_touch(false, _g_screen_at(npc_t.global_position), 12)
+	var talked := false
+	for i in 300:
+		await get_tree().physics_frame
+		if dlg_t.visible and dlg_t.npc == npc_t:
+			talked = true
+			break
+	_ok(talked, "tapping an NPC walks the hero over and opens dialogue")
+	if talked:
+		dlg_t.close()
+		await get_tree().process_frame
+	Game.change_state(Game.State.PLAYING)
+	npc_t.queue_free()
 	await get_tree().process_frame
-	_ok(walked > 30.0, "holding the virtual stick walks the hero (%.1fpx)" % walked)
-	# regression (audit P0-3): a modal takes the screen AND the input stream
-	var gate_ui := JournalUI.new()
-	add_child(gate_ui)
+
+	# --- 3. tap loot: the hero walks over and picks it up ---
+	func_reset_t(hero_t)
+	Inventory.reset_run()
+	var grng := RandomNumberGenerator.new()
+	grng.seed = 99
+	var pk_t := Pickup.new()
+	world.actors.add_child(pk_t)
+	pk_t.setup(ItemGen.roll("leather_boots", grng))
+	pk_t.global_position = world.nearest_walkable(hero_t.global_position + Vector2(80, 0))
+	hero_t.cam.reset_smoothing()
+	for i in 4:
+		await get_tree().physics_frame
+	_g_touch(true, _g_screen_at(pk_t.global_position), 13)
+	_g_touch(false, _g_screen_at(pk_t.global_position), 13)
+	var got_it := false
+	for i in 240:
+		await get_tree().physics_frame
+		if not is_instance_valid(pk_t) or pk_t.is_queued_for_deletion():
+			got_it = true
+			break
+	_ok(got_it, "tapping loot walks the hero over and picks it up")
+	Inventory.reset_run()
+
+	# --- 4. flick: a fast swipe dodges in that direction ---
+	func_reset_t(hero_t)
+	await get_tree().physics_frame
+	Stats.stamina = float(Stats.max_stamina)
+	var st_g := get_viewport().get_screen_transform()
+	var ctr := st_g * Vector2(300, 180)
+	_g_touch(true, ctr, 14)
+	for k in 4:
+		_g_drag(ctr + Vector2(float(15 * (k + 1)) * st_g.get_scale().x, 0), 14)
+	_g_touch(false, ctr + Vector2(60.0 * st_g.get_scale().x, 0), 14)
+	var dodged := false
+	for i in 10:
+		await get_tree().process_frame
+		if hero_t.act == hero_t.Act.DODGE:
+			dodged = true
+			break
+	_ok(dodged, "a flick swipe makes the hero dodge-dash")
+	for i in 40:
+		await get_tree().physics_frame
+
+	# --- 5. drag: pans the camera, lift brings it home ---
+	func_reset_t(hero_t)
+	hero_t.cam.position = Vector2.ZERO
+	hero_t.cam_pan_target = Vector2.ZERO
+	for i in 4:
+		await get_tree().physics_frame
+	var pan_c := st_g * Vector2(300, 180)
+	_g_touch(true, pan_c, 15)
+	for k in 3:
+		await get_tree().process_frame
+		_g_drag(pan_c + Vector2(float(12 * (k + 1)) * st_g.get_scale().x, 0), 15)
+	for i in 10:
+		await get_tree().physics_frame
+	_ok(hero_t.cam.position.x < -5.0,
+		"hold+drag pans the camera around the hero (%.1fpx)" % hero_t.cam.position.x)
+	for i in 8:
+		await get_tree().process_frame   # finger rests: pan, not flick
+	_g_touch(false, pan_c + Vector2(36.0 * st_g.get_scale().x, 0), 15)
+	for i in 60:
+		await get_tree().physics_frame
+	_ok(hero_t.cam.position.length() < 5.0,
+		"lifting the finger slides the camera back to the hero (%.1fpx)" % hero_t.cam.position.length())
+
+	# --- 6. auto-combat: a chasing foe in reach gets swung at ---
+	func_reset_t(hero_t)
+	Stats.hp = Stats.max_hp
+	await _clear_enemies_now()
+	# back to the middle of the cleared arena: earlier checks walked the hero
+	# near its edge, where a spawned foe could get stuck behind scenery
+	hero_t.global_position = arena_c
+	var foe_t := Enemy.new()
+	world.actors.add_child(foe_t)
+	foe_t.setup("goblin", 2)
+	foe_t.global_position = arena_c + Vector2(50, 0)
+	foe_t.state = foe_t.State.CHASE
+	hero_t.cam.reset_smoothing()
+	for i in 4:
+		await get_tree().physics_frame
+	var hp0 := foe_t.hp
+	var auto_hit := false
+	for i in 200:
+		await get_tree().physics_frame
+		if not is_instance_valid(foe_t):
+			auto_hit = true
+			break
+		if foe_t.hp < hp0:
+			auto_hit = true
+			break
+	_ok(auto_hit, "a foe that closes in gets auto-attacked")
+	if is_instance_valid(foe_t):
+		foe_t.queue_free()
+	await _clear_enemies_now()
+	Stats.hp = Stats.max_hp
+
+	# --- 7. a modal owns the screen: world taps go inert ---
+	func_reset_t(hero_t)
+	var gate_t := JournalUI.new()
+	add_child(gate_t)
 	await get_tree().process_frame
-	gate_ui.toggle()
+	gate_t.toggle()
 	await get_tree().process_frame
-	_ok(not touch.visible, "opening a modal hides the touch overlay")
-	var gw: Vector2 = st * (TouchUI.BUTTONS["attack"]["pos"] as Vector2)
-	var gt := InputEventScreenTouch.new()
-	gt.position = gw
-	gt.pressed = true
-	gt.index = 79
-	Input.parse_input_event(gt)
+	_ok(touch._blocked, "opening a modal blocks the gesture layer")
+	var p_gate := hero_t.global_position
+	var goal2 := world.nearest_walkable(p_gate + Vector2(50, 30))
+	_g_touch(true, _g_screen_at(goal2), 16)
+	_g_touch(false, _g_screen_at(goal2), 16)
+	for i in 60:
+		await get_tree().physics_frame
+	_ok((hero_t.global_position - p_gate).length() < 6.0,
+		"world taps are inert while a modal owns the screen")
+	gate_t.toggle()
+	gate_t.queue_free()
+	for i in 2:
+		await get_tree().process_frame
+	if touch._blocked:
+		print("  [dbg] still blocked: state=", Game.state, " paused=", get_tree().paused)
+		for ui in get_tree().get_nodes_in_group("modal_ui"):
+			if ui.visible:
+				print("  [dbg] visible modal: ", ui)
+	_ok(not touch._blocked, "closing the modal hands the world back to gestures")
+
+	# --- 8. HUD chips: tiny buttons fire actions, never walk commands ---
+	var hud_t := Hud.new()
+	add_child(hud_t)
 	await get_tree().process_frame
-	_ok(not Input.is_action_pressed("attack"), "taps are inert while a modal owns the screen")
-	var gtu := InputEventScreenTouch.new()
-	gtu.position = gw
-	gtu.pressed = false
-	gtu.index = 79
-	Input.parse_input_event(gtu)
+	_ok(hud_t.chip_hit(hud_t._chip_rects[2].get_center()),
+		"the quick chips report their tap area")
+	_action_log.clear()
+	func_reset_t(hero_t)
+	var chip_scr: Vector2 = st_g * hud_t._chip_rects[2].get_center()
+	_g_touch(true, chip_scr, 17)
+	_g_touch(false, chip_scr, 17)
 	await get_tree().process_frame
-	gate_ui.toggle()
-	gate_ui.queue_free()
-	await get_tree().process_frame
-	_ok(touch.visible, "closing the modal brings the overlay back")
+	_ok(_action_log.has("quests"), "tapping the journal chip fires its action (%s)" % str(_action_log))
+	_ok(not hero_t._has_move_to, "a chip tap never turns into a walk command")
+	hud_t.queue_free()
 	touch.set_enabled(false)
-	_ok(not Input.is_action_pressed("move_right") and not Input.is_action_pressed("attack"),
-		"disabling the overlay releases every synthetic action")
 	touch.queue_free()
+	dlg_t.queue_free()
+	world.spawner.spawn_enabled = spawn_was
 	# the quest journal scrolls with the mouse wheel and finger swipes, not
 	# just the keyboard (mobile users need more than the virtual stick)
 	var jr := JournalUI.new()
@@ -2050,6 +2163,42 @@ func _check_touch_quality() -> void:
 	Settings.set_quality("high")
 	_ok((world._lights[0]["light"] as PointLight2D).visible, "high turns the torch glows on")
 	Settings.set_quality("high")
+
+## world position -> window pixels for synthetic touch events
+func _g_screen_at(world_pos: Vector2) -> Vector2:
+	var hero := get_tree().get_first_node_in_group("player") as Node2D
+	var st := get_viewport().get_screen_transform()
+	return st * (hero.get_canvas_transform() * world_pos)
+
+func _g_touch(pressed: bool, pos: Vector2, id: int) -> void:
+	var ev := InputEventScreenTouch.new()
+	ev.pressed = pressed
+	ev.position = pos
+	ev.index = id
+	Input.parse_input_event(ev)
+
+func _g_drag(pos: Vector2, id: int) -> void:
+	var ev := InputEventScreenDrag.new()
+	ev.position = pos
+	ev.index = id
+	Input.parse_input_event(ev)
+
+## put the hero back into a clean idle touch state between gesture checks
+func func_reset_t(hero_t) -> void:
+	hero_t.velocity = Vector2.ZERO
+	hero_t.cam.position = Vector2.ZERO
+	hero_t.cam.reset_smoothing()
+	hero_t._has_move_to = false
+	hero_t._enemy_target = null
+	hero_t._interact_pending = null
+	hero_t._retaliate_t = 0.0
+	hero_t._stuck_t = 0.0
+	hero_t._wiggle = 0.0
+	hero_t.cam_pan_target = Vector2.ZERO
+	if hero_t.act != hero_t.Act.NONE:
+		hero_t.act = hero_t.Act.NONE
+		hero_t.act_timer = 0.0
+	Game.change_state(Game.State.PLAYING)
 
 func _check_dialogue_touch() -> void:
 	print("== dialogue touch ==")

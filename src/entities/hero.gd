@@ -40,6 +40,17 @@ var _parry_window := 0.0
 var _counter_window := 0.0
 var _ring: Sprite2D = null
 
+# ---- touch-native command state (tap-to-move / tap-to-act / auto-combat) ----
+var _move_to := Vector2.ZERO
+var _has_move_to := false
+var _interact_pending: Node = null
+var _enemy_target: Node = null
+var _retaliate_t := 0.0
+var _stuck_t := 0.0
+var _wiggle := 0.0
+var _wiggle_dir := Vector2.ZERO
+var cam_pan_target := Vector2.ZERO
+
 const HEAVY_CHARGE := 0.45
 const HEAVY_STAMINA := 18.0
 const COMBO_WINDOW := 0.7
@@ -120,31 +131,178 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 	_attack_cooldown = maxf(0.0, _attack_cooldown - delta)
+	_retaliate_t = maxf(0.0, _retaliate_t - delta)
 	_handle_actions(delta)
 
 	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
+	if input.length() > 0.1:
+		# a real keyboard/gamepad takes over and cancels touch commands
+		_has_move_to = false
+		_enemy_target = null
+	_touch_think(delta)
+	var drive := input if input.length() > 0.1 else _touch_dir()
 	if act == Act.DODGE:
 		# dash keeps its launch velocity, no steering
 		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * 0.25 * delta)
 	elif act == Act.ATTACK:
 		velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
 	else:
-		if input.length() > 0.1:
-			velocity = velocity.move_toward(input * WALK_SPEED * Stats.speed_mult(), ACCEL * delta)
-			_update_facing(input)
+		if drive.length() > 0.1:
+			velocity = velocity.move_toward(drive * WALK_SPEED * Stats.speed_mult(), ACCEL * delta)
+			_update_facing(drive)
 		else:
 			velocity = velocity.move_toward(Vector2.ZERO, FRICTION * delta)
 
 		Stats.tick_stamina(
 			delta,
-			input.length() > 0.1,
+			drive.length() > 0.1,
 			6.0,
 			18.0
 		)
 
 	move_and_slide()
-	_animate(delta, input)
+	cam.position = cam.position.move_toward(cam_pan_target, 480.0 * delta)
+	_animate(delta, drive)
 	_update_lantern(delta)
+
+# ------------------------------------------------------- touch commands ----
+## One finger tap on the world: walk there, or walk to the thing under the
+## finger and use it (talk / pick / open / descend), or engage an enemy.
+func command_tap(world_pos: Vector2) -> void:
+	var node := _tap_target(world_pos)
+	if node != null and node.is_in_group("enemy"):
+		_enemy_target = node
+		_interact_pending = null
+		_has_move_to = false
+		return
+	if node != null:
+		_interact_pending = node
+		_enemy_target = null
+		var n2 := node as Node2D
+		var off := global_position - n2.global_position
+		off = off.normalized() * 10.0 if off.length() > 0.001 else Vector2(0, 10)
+		_set_move_to(n2.global_position + off)
+		return
+	_enemy_target = null
+	_interact_pending = null
+	var w := _world_node()
+	_set_move_to(w.nearest_walkable(world_pos) if w != null else world_pos)
+
+func command_dodge(dir: Vector2) -> void:
+	if act != Act.NONE or Game.state != Game.State.PLAYING:
+		return
+	if not Stats.spend_stamina(DODGE_STAMINA):
+		return
+	act = Act.DODGE
+	act_timer = DODGE_TIME
+	_update_facing(dir)
+	velocity = dir * DASH_SPEED
+	Juice.streak(global_position + Vector2(0, -8), dir)
+
+func cam_pan_add(d: Vector2) -> void:
+	cam_pan_target += d
+	if cam_pan_target.length() > 150.0:
+		cam_pan_target = cam_pan_target.normalized() * 150.0
+
+func cam_pan_return() -> void:
+	cam_pan_target = Vector2.ZERO
+
+func _set_move_to(p: Vector2) -> void:
+	_move_to = p
+	_has_move_to = true
+	_stuck_t = 0.0
+
+func _tap_target(p: Vector2) -> Node2D:
+	var best: Node2D = null
+	var best_d := 16.0
+	for g in ["enemy", "npc", "pickup", "interact", "breakable"]:
+		for node in get_tree().get_nodes_in_group(g):
+			var n := node as Node2D
+			if n == null or not n.is_visible_in_tree():
+				continue
+			var d := (n.global_position - p).length()
+			if d < best_d:
+				best = n
+				best_d = d
+	return best
+
+func _world_node() -> Node:
+	var w := get_parent()
+	while w != null and not w.has_method("is_walkable_at"):
+		w = w.get_parent()
+	return w
+
+## Steering for the current touch command, with an un-stick wiggle so a tap
+## behind a fence does not leave the hero head-butting it forever.
+func _touch_dir() -> Vector2:
+	if _wiggle > 0.0:
+		return _wiggle_dir
+	if is_instance_valid(_enemy_target):
+		var d := (_enemy_target as Node2D).global_position - global_position
+		var reach: float = float(WeaponDB.stats_for(current_weapon_id())["reach"])
+		if d.length() <= reach:
+			return Vector2.ZERO
+		return d.normalized()
+	if _has_move_to:
+		var d := _move_to - global_position
+		if d.length() <= 4.0:
+			return Vector2.ZERO
+		# ease off near the goal so the hero stops ON the tap, not past it
+		return d.normalized() * minf(1.0, d.length() / 20.0)
+	return Vector2.ZERO
+
+func _touch_think(delta: float) -> void:
+	if _has_move_to and (global_position - _move_to).length() < 5.0:
+		_has_move_to = false
+	if is_instance_valid(_interact_pending):
+		var n := _interact_pending as Node2D
+		if n != null and (n.global_position - global_position).length() < 17.0:
+			_interact_pending = null
+			_has_move_to = false
+			if n.has_method("interact"):
+				n.interact()
+			else:
+				Input.action_press("interact")
+				_release_interact.call_deferred()
+	if (_has_move_to or is_instance_valid(_enemy_target)) and velocity.length() < 8.0 and act == Act.NONE:
+		_stuck_t += delta
+	else:
+		_stuck_t = 0.0
+	_wiggle = maxf(0.0, _wiggle - delta)
+	if _stuck_t > 0.7:
+		_stuck_t = 0.0
+		_wiggle = 0.45
+		var cur := _touch_dir()
+		_wiggle_dir = cur.rotated(PI * 0.5) if cur.length() > 0.1 else Vector2(1, 0)
+
+func _release_interact() -> void:
+	Input.action_release("interact")
+
+## Auto-combat: an enemy we tapped, or any enemy that is on us (chasing,
+## winding up, or just landed a hit), gets swung at once we are in reach.
+func _auto_foe() -> Enemy:
+	var reach: float = float(WeaponDB.stats_for(current_weapon_id())["reach"]) + 3.0
+	if is_instance_valid(_enemy_target):
+		var t := _enemy_target as Enemy
+		if t != null and t.state != Enemy.State.DEAD:
+			if (t.global_position - global_position).length() <= reach + 4.0:
+				return t
+	var best: Enemy = null
+	var best_d := reach
+	for node in get_tree().get_nodes_in_group("enemy"):
+		var e := node as Enemy
+		if e == null or e.state == Enemy.State.DEAD:
+			continue
+		var d := (e.global_position - global_position).length()
+		if d > best_d:
+			continue
+		if e.state == Enemy.State.CHASE or e.state == Enemy.State.WINDUP or _retaliate_t > 0.0:
+			best = e
+			best_d = d
+	return best
+
+func _face_towards(p: Vector2) -> void:
+	_update_facing(p - global_position)
 
 ## Any full-screen UI (inventory, journal, talents, dialogue) freezes play.
 func _modal_open() -> bool:
@@ -203,6 +361,9 @@ func _handle_actions(delta: float) -> void:
 		var want_heavy := _charge >= HEAVY_CHARGE
 		if Input.is_action_just_pressed("attack") or want_heavy:
 			do_attack(want_heavy)
+		elif _auto_foe() != null:
+			_face_towards((_auto_foe() as Node2D).global_position)
+			do_attack(false)
 	if Input.is_action_just_pressed("dodge"):
 		if Stats.spend_stamina(DODGE_STAMINA):
 			act = Act.DODGE
@@ -358,6 +519,9 @@ func hurt(amount: int, from: Node = null) -> int:
 			I18N.tr_str("toast.parried"), Color(1.0, 0.9, 0.4), 9)
 		Juice.shake(2.0)
 		return 0
+	_retaliate_t = 2.5
+	if _enemy_target == null and from != null and from.is_in_group("enemy"):
+		_enemy_target = from
 	return Stats.damage(amount)
 
 func _on_gear_changed(gear: Dictionary) -> void:

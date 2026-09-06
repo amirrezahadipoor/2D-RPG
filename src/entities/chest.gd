@@ -13,6 +13,7 @@ var _hero: Node2D = null
 var _rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
+	add_to_group("interact")
 	_rng.randomize()
 	_spr = Sprite2D.new()
 	_spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -46,6 +47,11 @@ func _process(_delta: float) -> void:
 	if near and not Inventory.screen_open and Game.state == Game.State.PLAYING:
 		if Input.is_action_just_pressed("interact"):
 			open()
+
+## Touch hook (see npc.gd).
+func interact() -> void:
+	if not opened and Game.state == Game.State.PLAYING and not Inventory.screen_open:
+		open()
 
 func open() -> void:
 	opened = true

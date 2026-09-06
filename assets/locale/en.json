@@ -257,5 +257,6 @@
  "victory.menu": "Main Menu",
  "victory.new_run": "New Run",
  "victory.sub": "Ten chapters, a hundred deeds - every shard is yours again. Emberhold will sing of you.",
- "victory.title": "The Ember Crown is Whole"
+ "victory.title": "The Ember Crown is Whole",
+ "hud.gestures": "Tap: walk / talk / pick  ·  Drag: look  ·  Flick: dodge  ·  Near a foe: auto-fight"
 }
