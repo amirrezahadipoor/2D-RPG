@@ -21,7 +21,7 @@ locally فقط import/verify سریع با تایم‌اوت کوتاه.
 
 ## فاز C — عمق گیم‌پلی
 - [x] C1 باس per عمق سیاه‌چال با الگوهای telegraph شده
-- [ ] C2 درخت talento/talent UI لمسی
+- [x] C2 درخت talento/talent UI لمسی
 - [x] C3 کرفت: مواد از loot، recipe، میز کار در شهر
 - [x] C4 گره‌های معدن + نقطهٔ ماهیگیری (مینی‌گیم لمسی)
 
