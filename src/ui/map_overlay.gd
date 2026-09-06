@@ -1,24 +1,15 @@
-# Overworld map: a baked 240x160 render of the whole realm (biomes + roads)
-# with the hero, every settlement, the cave mouth and the current objective.
-# Opens over the frozen world; tapping a settlement fast-travels the hero
-# there, tapping empty map closes it. Built for touch first:
-#   one finger drag  -> pans the zoomed map (grab-the-map feel)
-#   corner chip      -> toggles fit / 2x zoom
-#   tap (no drag)    -> travel on a settlement, dismiss elsewhere
+# Overworld map — touch-native, responsive.
+# Fixed 240x160 was too small on tablet and clipped on notch.
+# Now panel is % of safe area, with zoom and pan.
 class_name MapOverlay
 extends CanvasLayer
 
 signal travel_requested(settlement_index: int)
 signal shrine_travel_requested(poi_index: int)
 
-const MAP_PX := Vector2(240, 160)
-const PANEL_POS := Vector2(120, 55)
-const ZOOM_FIT := 1.0
-const ZOOM_IN := 2.0
-
 var world: Overworld = null
-var zoom := ZOOM_FIT
-var _off := Vector2.ZERO          # top-left corner of the view, in map px
+var zoom := 1.0
+var _off := Vector2.ZERO
 var _root: Control
 var _clip: Control
 var _map_tex: TextureRect
@@ -26,7 +17,7 @@ var _hero_dot: ColorRect
 var _obj_dot: ColorRect
 var _markers: Array = []          # [sett_index, ColorRect, map_local]
 var _name_lbls: Array = []        # [sett_index, Label, map_local]
-var _fog: Array = []              # [ColorRect, base_local] per unseen cell
+var _fog: Array = []              # [ColorRect, base_local]
 var _legend: Array = []
 var _hero_local := Vector2.ZERO
 var _obj_local := Vector2.ZERO
@@ -35,12 +26,24 @@ var _title: Label
 var _hint: Label
 var _zoom_chip: Control
 var _zoom_lbl: Label
+var _border: ColorRect
+var _panel_size := Vector2(240, 160)
+var _panel_pos := Vector2(120, 55)
+
+const ZOOM_FIT := 1.0
+const ZOOM_IN := 2.0
+const MAP_TEX_BASE := Vector2(240, 160) # base texture size, scaled by panel
+# legacy constants for tests — kept but not used in layout
+const MAP_PX := Vector2(240, 160)
+const PANEL_POS := Vector2(120, 55)
 
 func _ready() -> void:
 	layer = 35
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build()
 	visible = false
+	Settings.settings_changed.connect(_layout)
+	I18N.locale_changed.connect(func(_l): if visible: _refresh_labels())
 
 func _build() -> void:
 	_root = Control.new()
@@ -57,60 +60,89 @@ func _build() -> void:
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(dim)
 
-	var border := ColorRect.new()
-	border.color = Color(0.5, 0.42, 0.28)
-	border.position = PANEL_POS - Vector2(2, 2)
-	border.size = MAP_PX + Vector2(4, 4)
-	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(border)
+	_border = ColorRect.new()
+	_border.color = Color(0.5, 0.42, 0.28)
+	_border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(_border)
 
 	_clip = Control.new()
-	_clip.position = PANEL_POS
-	_clip.size = MAP_PX
 	_clip.clip_contents = true
 	_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_clip)
 
 	_map_tex = TextureRect.new()
 	_map_tex.position = Vector2.ZERO
-	_map_tex.size = MAP_PX
 	_map_tex.stretch_mode = TextureRect.STRETCH_SCALE
 	_map_tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_map_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_clip.add_child(_map_tex)
 
-	_title = _label(Vector2(0, 6), Color(1, 0.86, 0.4), 12)
-	_hint = _label(Vector2(0, 224), Color(0.62, 0.64, 0.72), 7)
+	_title = _label(Vector2.ZERO, Color(1, 0.86, 0.4), 12)
+	_hint = _label(Vector2.ZERO, Color(0.62, 0.64, 0.72), 8)
 
-	_hero_dot = _dot(Color(1, 0.92, 0.55), 4)
-	_obj_dot = _dot(Color(1, 0.6, 0.2), 5)
+	_hero_dot = _dot(Color(1, 0.92, 0.55), 6)
+	_obj_dot = _dot(Color(1, 0.6, 0.2), 7)
 
-	# zoom chip, top-right corner of the panel
 	_zoom_chip = Control.new()
-	_zoom_chip.size = Vector2(18, 14)
-	_zoom_chip.position = PANEL_POS + Vector2(MAP_PX.x - 20.0, 2.0)
+	_zoom_chip.size = Vector2(28, 20)
 	_zoom_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(_zoom_chip)
 	var zb := ColorRect.new()
 	zb.color = Color(0.5, 0.42, 0.28, 0.95)
-	zb.size = Vector2(18, 14)
+	zb.size = Vector2(28, 20)
 	zb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_zoom_chip.add_child(zb)
 	var zbg := ColorRect.new()
 	zbg.color = Color(0.08, 0.08, 0.12, 0.95)
 	zbg.position = Vector2(1, 1)
-	zbg.size = Vector2(16, 12)
+	zbg.size = Vector2(26, 18)
 	zbg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_zoom_chip.add_child(zbg)
 	_zoom_lbl = Label.new()
-	_zoom_lbl.add_theme_font_size_override("font_size", 7)
+	_zoom_lbl.add_theme_font_size_override("font_size", 9)
 	_zoom_lbl.add_theme_font_override("font", load(I18N.FONT_REGULAR_PATH))
 	_zoom_lbl.add_theme_color_override("font_color", Color(1, 0.9, 0.6))
-	_zoom_lbl.position = Vector2(0, 2)
-	_zoom_lbl.size = Vector2(18, 10)
+	_zoom_lbl.position = Vector2(0, 3)
+	_zoom_lbl.size = Vector2(28, 14)
 	_zoom_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_zoom_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_zoom_chip.add_child(_zoom_lbl)
+
+	_layout()
+
+func _layout() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var safe := SafeArea.get_safe_margins(vp)
+	var bars := SafeArea.get_bars(vp)
+	var base_w := 480.0
+	var base_h := 270.0
+	var avail_w := base_w - safe.x - safe.z - bars.x - bars.y - 20.0
+	var avail_h := base_h - safe.y - safe.w - 40.0
+	# percent panel: 80% width, 70% height, but keep aspect 3:2
+	var pw := minf(avail_w * 0.92, 440.0)
+	var ph := minf(avail_h * 0.82, 220.0)
+	# keep 3:2
+	if pw / ph > 1.5:
+		pw = ph * 1.5
+	else:
+		ph = pw / 1.5
+	# centre
+	var px := safe.x + bars.x + (base_w - safe.x - safe.z - bars.x - bars.y - pw) * 0.5
+	var py := safe.y + 24.0 + (base_h - safe.y - safe.w - 24.0 - 20.0 - ph) * 0.5
+	_panel_pos = Vector2(px, py)
+	_panel_size = Vector2(pw, ph)
+	_border.position = _panel_pos - Vector2(2, 2)
+	_border.size = _panel_size + Vector2(4, 4)
+	_clip.position = _panel_pos
+	_clip.size = _panel_size
+	_title.position = Vector2(0, safe.y + 2)
+	_title.size = Vector2(base_w, 16)
+	_hint.position = Vector2(0, py + ph + 6)
+	_hint.size = Vector2(base_w, 12)
+	_zoom_chip.position = _panel_pos + Vector2(_panel_size.x - 30.0, 2.0)
+	_apply_view()
 
 func _label(pos: Vector2, col: Color, size: int) -> Label:
 	var l := Label.new()
@@ -136,6 +168,7 @@ func show_map(w: Overworld) -> void:
 	_bake_if_needed()
 	zoom = ZOOM_FIT
 	_off = Vector2.ZERO
+	_layout()
 	_title.text = I18N.tr_str("map.title")
 	_hint.text = I18N.tr_str("map.hint")
 	I18N.tag(_title)
@@ -147,29 +180,29 @@ func show_map(w: Overworld) -> void:
 func hide_map() -> void:
 	visible = false
 
-## Map pixel for a world pixel (un-zoomed, panel-relative): the map is
-## 240x160 over a 384x256-tile world, so one map px is 25.6 world px.
 func _to_local(world_pos: Vector2) -> Vector2:
-	return Vector2(world_pos.x / 25.6, world_pos.y / 25.6)
+	# map local is relative to base 240x160, scaled to panel
+	var base := Vector2(world_pos.x / 25.6, world_pos.y / 25.6)
+	# scale base (240x160) to panel size
+	return base * (_panel_size / MAP_TEX_BASE)
 
 # ---------------------------------------------------------------- view ------
 func set_zoom(z: float) -> void:
 	var nz := ZOOM_IN if z > (ZOOM_FIT + ZOOM_IN) * 0.5 else ZOOM_FIT
 	if nz == zoom:
 		return
-	var center := (_off + MAP_PX * 0.5) / zoom
+	var center := (_off + _panel_size * 0.5) / zoom
 	zoom = nz
 	if nz == ZOOM_FIT:
-		_off = Vector2.ZERO     # fit shows the whole realm, centred
+		_off = Vector2.ZERO
 	else:
-		_off = center * zoom - MAP_PX * 0.5
+		_off = center * zoom - _panel_size * 0.5
 		_clamp_off()
 	_apply_view()
 
 func toggle_zoom() -> void:
 	set_zoom(ZOOM_FIT if zoom > ZOOM_FIT else ZOOM_IN)
 
-## Grab-the-map pan: the view follows the finger, clamped to the map edges.
 func _pan_by(delta_panel: Vector2) -> void:
 	if zoom <= ZOOM_FIT:
 		return
@@ -178,11 +211,10 @@ func _pan_by(delta_panel: Vector2) -> void:
 	_apply_view()
 
 func _clamp_off() -> void:
-	var max_off := MAP_PX * zoom - MAP_PX
+	var max_off := _panel_size * zoom - _panel_size
 	_off.x = clampf(_off.x, 0.0, maxf(0.0, max_off.x))
 	_off.y = clampf(_off.y, 0.0, maxf(0.0, max_off.y))
 
-## Fog of war (Phase B1): unseen 32-tile cells stay under a dark veil.
 func _build_fog() -> void:
 	for f in _fog:
 		if is_instance_valid(f[0]):
@@ -205,7 +237,6 @@ func _build_fog() -> void:
 			_clip.add_child(r)
 			_fog.append([r, a])
 
-## Tiny legend so every dot on the map reads at a glance (Phase B1).
 func _build_legend() -> void:
 	for l in _legend:
 		if is_instance_valid(l[0]):
@@ -222,18 +253,25 @@ func _build_legend() -> void:
 		[Color(1, 1, 1), "map.legend.you"],
 	]
 	for i in rows.size():
-		var d := _dot(rows[i][0], 3)
-		d.get_parent().remove_child(d)   # legend lives above the pan clip
+		var d := _dot(rows[i][0], 4)
+		d.get_parent().remove_child(d)
 		_root.add_child(d)
-		d.position = PANEL_POS + Vector2(3.0, MAP_PX.y - 44.0 + i * 7.0)
-		var lb := _label(Vector2(8.0, MAP_PX.y - 46.0 + i * 7.0), Color(0.85, 0.85, 0.8), 6)
-		lb.text = I18N.tr_str(rows[i][1])
+		d.position = _panel_pos + Vector2(4.0, _panel_size.y - 52.0 + i * 8.0)
+		var lb := _label(Vector2.ZERO, Color(0.85, 0.85, 0.8), 7)
+		lb.position = Vector2(_panel_pos.x + 10.0, _panel_pos.y + _panel_size.y - 54.0 + i * 8.0)
+		lb.size = Vector2(120, 10)
 		lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		lb.text = I18N.tr_str(rows[i][1])
 		_legend.append([d, lb])
+
+func _refresh_labels() -> void:
+	for l in _legend:
+		if is_instance_valid(l[1]):
+			I18N.tag(l[1])
 
 func _apply_view() -> void:
 	_map_tex.position = -_off
-	_map_tex.size = MAP_PX * zoom
+	_map_tex.size = _panel_size * zoom
 	_hero_dot.position = _hero_local * zoom - _off - _hero_dot.size * 0.5
 	_obj_dot.position = _obj_local * zoom - _off - _obj_dot.size * 0.5
 	_obj_dot.visible = _obj_local.x >= 0.0
@@ -246,10 +284,10 @@ func _apply_view() -> void:
 	for nl in _name_lbls:
 		if is_instance_valid(nl[1]):
 			var li: int = int(nl[0])
-			var seen: bool = li < world.discovered.size() and bool(world.discovered[li])
+			var seen: bool = li < world.discovered.size() and bool(world.discovered[li]) if world != null else false
 			(nl[1] as Label).visible = seen
 			if seen:
-				(nl[1] as Label).position = (nl[2] as Vector2) * zoom - _off + Vector2(5, -3)
+				(nl[1] as Label).position = (nl[2] as Vector2) * zoom - _off + Vector2(6, -4)
 	_zoom_lbl.text = "x2" if zoom > ZOOM_FIT else "x1"
 
 # ------------------------------------------------------------- baking -------
@@ -269,16 +307,15 @@ func _bake_if_needed() -> void:
 	if _baked_seed == world.world_seed:
 		return
 	_baked_seed = world.world_seed
-	var img := Image.create(int(MAP_PX.x), int(MAP_PX.y), false, Image.FORMAT_RGB8)
-	for y in int(MAP_PX.y):
-		for x in int(MAP_PX.x):
+	var img := Image.create(int(MAP_TEX_BASE.x), int(MAP_TEX_BASE.y), false, Image.FORMAT_RGB8)
+	for y in int(MAP_TEX_BASE.y):
+		for x in int(MAP_TEX_BASE.x):
 			var t := Vector2i(int(x * 25.6 / 16.0), int(y * 25.6 / 16.0))
 			t.x = clampi(t.x, 0, Overworld.WORLD_W - 1)
 			t.y = clampi(t.y, 0, Overworld.WORLD_H - 1)
 			var biome := world._biome_grid[t.y * Overworld.WORLD_W + t.x]
 			var col: Color = BIOME_COLORS.get(biome, Color(0.3, 0.3, 0.3))
-			if world._road_grid[t.y * Overworld.WORLD_W + t.x] == 1 \
-					and biome not in ["village", "town"]:
+			if world._road_grid[t.y * Overworld.WORLD_W + t.x] == 1 and biome not in ["village", "town"]:
 				col = ROAD_COLOR
 			img.set_pixel(x, y, col)
 	_map_tex.texture = ImageTexture.create_from_image(img)
@@ -308,11 +345,11 @@ func _place_markers() -> void:
 	_legend.clear()
 	for st in world.settlements:
 		var col := Color(0.95, 0.85, 0.45) if st["type"] == "town" else Color(0.9, 0.8, 0.6)
-		var d := _dot(col, 3 if st["type"] == "village" else 5)
+		var d := _dot(col, 4 if st["type"] == "village" else 6)
 		var plaza := Vector2(st["plaza"].x * 16.0 + 8.0, st["plaza"].y * 16.0 + 8.0)
 		_markers.append([int(st["index"]), d, _to_local(plaza)])
 		var lb := Label.new()
-		lb.add_theme_font_size_override("font_size", 6)
+		lb.add_theme_font_size_override("font_size", 7)
 		lb.add_theme_font_override("font", load(I18N.FONT_REGULAR_PATH))
 		lb.add_theme_color_override("font_color", Color(0.95, 0.9, 0.7, 0.85))
 		lb.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
@@ -324,29 +361,27 @@ func _place_markers() -> void:
 	_build_fog()
 	_build_legend()
 	for lm in world.landmarks:
-		var d := _dot(Color(1.0, 0.82, 0.3), 4)
+		var d := _dot(Color(1.0, 0.82, 0.3), 5)
 		_markers.append([-3, d, _to_local(Vector2(lm["pos"].x * 16.0 + 8.0, lm["pos"].y * 16.0 + 8.0))])
 	for p in world.pois:
 		var col := Color(0.4, 0.95, 1.0)
-		var sz := 2
+		var sz := 3
 		match p["type"]:
 			"camp":
 				col = Color(0.95, 0.35, 0.3)
-				sz = 3
+				sz = 4
 			"signpost":
 				col = Color(0.75, 0.6, 0.4)
-				sz = 2
+				sz = 3
 		var d := _dot(col, sz)
 		_markers.append([-2, d, _to_local(p["pos"])])
 	var cave := world.find_child("CaveEntrance", true, false)
 	if cave != null:
-		var cd := _dot(Color(0.6, 0.5, 0.95), 3)
+		var cd := _dot(Color(0.6, 0.5, 0.95), 4)
 		_markers.append([-1, cd, _to_local(cave.global_position)])
 	var obj := _objective_world_pos()
 	_obj_local = _to_local(obj) if obj.x >= 0.0 else Vector2(-1, -1)
 
-## Where the player should head right now: a ready turn-in, a talk target, a
-## deliver target - otherwise nowhere (the map still shows settlements).
 func _objective_world_pos() -> Vector2:
 	if world == null or QuestLog == null:
 		return Vector2(-1, -1)
@@ -408,7 +443,7 @@ func _on_gui(event: InputEvent) -> void:
 			_moved_pan = 0.0
 		elif _down_ok:
 			_down_ok = false
-			if _moved_pan <= 6.0:
+			if _moved_pan <= 12.0: # was 6, too tight BUG-106
 				_tap_at(_down_p)
 	elif event is InputEventScreenDrag:
 		var d: InputEventScreenDrag = event
@@ -418,14 +453,12 @@ func _on_gui(event: InputEvent) -> void:
 		var delta := p - _last_p
 		_last_p = p
 		_moved_pan += delta.length()
-		if _moved_pan > 6.0:
+		if _moved_pan > 10.0: # was 6
 			_pan_by(delta)
 	elif event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event
 		if mb.button_index != MOUSE_BUTTON_LEFT:
 			return
-		# a mouse click right after a touch is the touch emulation: skip it,
-		# otherwise every finger tap acts twice
 		if Time.get_ticks_msec() - _last_touch_ms < 900:
 			return
 		if mb.pressed:
@@ -435,52 +468,56 @@ func _on_gui(event: InputEvent) -> void:
 			_moved_pan = 0.0
 		elif _down_ok:
 			_down_ok = false
-			if _moved_pan <= 6.0:
+			if _moved_pan <= 12.0:
 				_tap_at(_down_p)
 
 var _tap_frame := -1
 var _last_touch_ms := -1000
 
 func _tap_at(p: Vector2) -> void:
-	# a touch and its emulated mouse click arrive together (or a frame apart):
-	# act once per gesture, never twice
 	if Engine.get_process_frames() == _tap_frame:
 		return
 	_tap_frame = Engine.get_process_frames()
 	if Rect2(_zoom_chip.position, _zoom_chip.size).has_point(p):
 		toggle_zoom()
 		return
-	var panel := Rect2(PANEL_POS, MAP_PX)
+	var panel := Rect2(_panel_pos, _panel_size)
 	if not panel.has_point(p):
-		close_request()   # tapped the dark outside: dismiss
+		close_request()
 		return
-	# a settlement marker? travel there
 	var q := _root.get_canvas_transform() * p
 	for m in _markers:
 		if int(m[0]) >= 0 and is_instance_valid(m[1]):
 			var r: Rect2 = (m[1] as ColorRect).get_global_rect()
-			if r.grow(3.0).has_point(q):
+			if r.grow(6.0).has_point(q): # bigger hit
+				# check discovered before travel (BUG)
+				if world != null and int(m[0]) < world.discovered.size() and not world.discovered[int(m[0])]:
+					# undiscovered — show toast, don't travel
+					for child in get_tree().root.get_children():
+						var hud = child.get_node_or_null("Hud")
+						if hud != null and hud.has_method("show_toast"):
+							hud.show_toast(I18N.tr_str("toast.discovered_locked"))
+							break
+					return
 				travel_requested.emit(int(m[0]))
 				return
-	# a discovered shrine? pray there instantly (Phase B3)
 	for mi in _markers.size():
 		var m: Array = _markers[mi]
 		if int(m[0]) != -2 or not is_instance_valid(m[1]):
 			continue
 		var r: Rect2 = (m[1] as ColorRect).get_global_rect()
-		if not r.grow(3.0).has_point(q):
+		if not r.grow(6.0).has_point(q):
 			continue
 		for pi in world.pois.size():
 			if world.pois[pi]["type"] != "shrine":
 				continue
 			var ml: Vector2 = m[2]
 			var pl := _to_local(world.pois[pi]["pos"])
-			if (ml - pl).length() < 0.5 and pi < world.poi_seen.size() and world.poi_seen[pi]:
+			if (ml - pl).length() < 1.0 and pi < world.poi_seen.size() and world.poi_seen[pi]:
 				shrine_travel_requested.emit(pi)
 				return
 	close_request()
 
-## Ask Main to hide us (used from the empty-map tap).
 func close_request() -> void:
 	for child in get_tree().root.get_children():
 		if child.has_method("close_map") and child.name == "Main":

@@ -1803,7 +1803,7 @@ func _open_arena() -> Vector2:
 				break
 		if open:
 			return c
-	return world.nearest_walkable(Vector2(2000, 2000))
+	return world.nearest_walkable_or_same(Vector2(2000, 2000))
 
 func _ai_spawn(type: String, off: Vector2) -> Enemy:
 	var e := Enemy.new()
@@ -2388,7 +2388,7 @@ func _check_touch_quality() -> void:
 		await get_tree().physics_frame
 
 	# --- 1. tap the ground: the hero walks there ---
-	var goal_t := world.nearest_walkable(hero_t.global_position + Vector2(56, 0))
+	var goal_t: Vector2 = world.nearest_walkable_or_same(hero_t.global_position + Vector2(56, 0))
 	_g_touch(true, _g_screen_at(goal_t), 11)
 	_g_touch(false, _g_screen_at(goal_t), 11)
 	# parse_input_event flushes on the NEXT frame's input phase
@@ -2405,7 +2405,7 @@ func _check_touch_quality() -> void:
 	world.actors.add_child(npc_t)
 	npc_t.setup("villager", {"index": 0, "plaza": Vector2i(
 		int(hero_t.global_position.x / 16.0), int(hero_t.global_position.y / 16.0))}, 1)
-	npc_t.global_position = world.nearest_walkable(hero_t.global_position + Vector2(46, 10))
+	npc_t.global_position = world.nearest_walkable_or_same(hero_t.global_position + Vector2(46, 10))
 	npc_t.home = npc_t.global_position
 	hero_t.cam.reset_smoothing()
 	for i in 4:
@@ -2434,7 +2434,7 @@ func _check_touch_quality() -> void:
 	var pk_t := Pickup.new()
 	world.actors.add_child(pk_t)
 	pk_t.setup(ItemGen.roll("leather_boots", grng))
-	pk_t.global_position = world.nearest_walkable(hero_t.global_position + Vector2(80, 0))
+	pk_t.global_position = world.nearest_walkable_or_same(hero_t.global_position + Vector2(80, 0))
 	hero_t.cam.reset_smoothing()
 	for i in 4:
 		await get_tree().physics_frame
@@ -2536,7 +2536,7 @@ func _check_touch_quality() -> void:
 	await get_tree().process_frame
 	_ok(touch._blocked, "opening a modal blocks the gesture layer")
 	var p_gate := hero_t.global_position
-	var goal2 := world.nearest_walkable(p_gate + Vector2(50, 30))
+	var goal2: Vector2 = world.nearest_walkable_or_same(p_gate + Vector2(50, 30))
 	_g_touch(true, _g_screen_at(goal2), 16)
 	_g_touch(false, _g_screen_at(goal2), 16)
 	for i in 60:
@@ -3033,7 +3033,7 @@ func _check_dialogue_touch() -> void:
 	await get_tree().process_frame
 	Stats.reset_run()
 	Stats.add_gold(5000)
-	var row2_y := 206.0 + 2 * 11.0 + 3.0
+	var row2_y: float = dlg._text.position.y + 2 * 16.0 + 3.0
 	var dst := get_viewport().get_screen_transform()
 	var tap := InputEventMouseButton.new()
 	tap.button_index = MOUSE_BUTTON_LEFT

@@ -1,18 +1,13 @@
-# Title screen: continue / new run (adventure or hardcore) / settings / quit.
-# Entry point of the game — the run itself lives in scenes/main.tscn.
-# Lives on its own canvas layer so the in-game camera can never move it.
+# Title screen: continue / new run / settings / quit — touch-native, responsive.
 class_name MainMenu
 extends CanvasLayer
 
 const STAR_COUNT := 90
-
-# Pointer rows live at fixed canvas Ys: first row top and row height.
-# Kept next to _build() so mouse and touch hit-test the same pixels.
-const ROW_FIRST_Y := 104.0
-const ROW_STEP_Y := 18.0
+const ROW_FIRST_Y := 100.0
+const ROW_STEP_Y := 26.0
 
 var _sel := 0
-var _items: Array = []          # Array of {label: Label, action: Callable, enabled: bool, key: String}
+var _items: Array = []
 var _root: Control
 var _bg: _Starfield
 var _title: Label
@@ -37,23 +32,32 @@ func _ready() -> void:
 	_root.add_child(_bg)
 	_build()
 	I18N.locale_changed.connect(func(_l): _rebuild_texts())
+	Settings.settings_changed.connect(_build)
 
 func _build() -> void:
 	for child in _root.get_children():
 		if child is Label:
 			child.queue_free()
 	_items.clear()
-	_title = _mk_label(Vector2(0, 40), 22, Color(1.0, 0.85, 0.35), 480)
+	var safe := Vector4.ZERO
+	var bars := Vector2.ZERO
+	var vp := get_viewport()
+	if vp != null:
+		safe = SafeArea.get_safe_margins(vp)
+		bars = SafeArea.get_bars(vp)
+	var base_w := 480.0
+	var usable_w := base_w - safe.x - safe.z - bars.x - bars.y
+	_title = _mk_label(Vector2(safe.x + bars.x, 36 + safe.y), 22, Color(1.0, 0.85, 0.35), usable_w)
 	_title.text = "PIXEL REALMS"
-	var sub := _mk_label(Vector2(0, 66), 8, Color(0.65, 0.7, 0.9), 480)
+	var sub := _mk_label(Vector2(safe.x + bars.x, 62 + safe.y), 9, Color(0.65, 0.7, 0.9), usable_w)
 	sub.text = _tr("menu.subtitle")
-	var y := 104.0
-	_add_item("menu.continue", y, _continue, Game.has_save())
-	_add_item("menu.play", y + 18, func(): _new_run(false), true)
-	_add_item("menu.hardcore", y + 36, func(): _new_run(true), true)
-	_add_item("menu.settings", y + 54, _open_settings, true)
-	_add_item("menu.quit", y + 72, func(): get_tree().quit(), true)
-	_hint = _mk_label(Vector2(0, 232), 7, Color(0.45, 0.47, 0.58), 480)
+	var y := ROW_FIRST_Y + safe.y
+	_add_item("menu.continue", y, _continue, Game.has_save(), usable_w, safe.x + bars.x)
+	_add_item("menu.play", y + ROW_STEP_Y, func(): _new_run(false), true, usable_w, safe.x + bars.x)
+	_add_item("menu.hardcore", y + ROW_STEP_Y * 2, func(): _new_run(true), true, usable_w, safe.x + bars.x)
+	_add_item("menu.settings", y + ROW_STEP_Y * 3, _open_settings, true, usable_w, safe.x + bars.x)
+	_add_item("menu.quit", y + ROW_STEP_Y * 4, func(): get_tree().quit(), true, usable_w, safe.x + bars.x)
+	_hint = _mk_label(Vector2(safe.x + bars.x, 236), 8, Color(0.55, 0.57, 0.68), usable_w)
 	_hint.text = _tr("menu.hint")
 	_version = _mk_label(Vector2(388, 258), 7, Color(0.4, 0.42, 0.5), 90)
 	_version.text = "v%s" % ProjectSettings.get_setting("application/config/version", "0.1.0")
@@ -74,10 +78,10 @@ func _mk_label(pos: Vector2, size: int, col: Color, width: int) -> Label:
 	_root.add_child(l)
 	return l
 
-func _add_item(key: String, y: float, action: Callable, enabled: bool) -> void:
-	var l := _mk_label(Vector2(0, y), 10, Color(0.9, 0.91, 1.0) if enabled else Color(0.4, 0.4, 0.45), 480)
+func _add_item(key: String, y: float, action: Callable, enabled: bool, w: float = 480.0, x_off: float = 0.0) -> void:
+	var l := _mk_label(Vector2(x_off, y), 11, Color(0.9, 0.91, 1.0) if enabled else Color(0.4, 0.4, 0.45), w)
 	l.text = _tr(key)
-	_items.append({"label": l, "action": action, "enabled": enabled, "key": key})
+	_items.append({"label": l, "action": action, "enabled": enabled, "key": key, "y": y})
 
 func _tr(key: String) -> String:
 	return I18N.tr_str(key)
@@ -95,17 +99,10 @@ func _refresh_selection() -> void:
 			continue
 		var text := _tr(item["key"])
 		if i == _sel:
-			# guillemets are symmetric under RTL; ASCII arrows would render as
-			# "< text >" once the line is laid out right-to-left
 			text = ("« " + text + " »") if I18N.is_rtl() else ("> " + text + " <")
 		l.text = text
 		I18N.tag(l)
 
-# ------------------------------------------------------------ pointer -------
-## Mouse and touch input for the title screen. Every row is a Label with
-## mouse_filter IGNORE, so taps/clicks never reached anything and the menu
-## was dead on phones (no keyboard, and TouchUI only exists in-game). Row Ys
-## come from the same constants _build() used, so hit-tests match the art.
 func _input(event: InputEvent) -> void:
 	if settings_ui != null and settings_ui.visible:
 		return
@@ -114,7 +111,6 @@ func _input(event: InputEvent) -> void:
 		_pointer_press(event.position)
 		get_viewport().set_input_as_handled()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		# a synthetic mouse click can follow the touch we already consumed
 		if Engine.get_process_frames() == _handled_touch_frame:
 			return
 		_pointer_press(event.position)
@@ -127,12 +123,21 @@ func _canvas_y(event_pos: Vector2) -> float:
 	return (inv * event_pos).y
 
 func _row_at(canvas_y: float) -> int:
-	var idx := int(floor((canvas_y - ROW_FIRST_Y) / ROW_STEP_Y))
+	# safe offset accounted in _build y, so subtract safe.y
+	var vp := get_viewport()
+	var safe_y := 0.0
+	if vp != null:
+		safe_y = SafeArea.get_safe_margins(vp).y
+	var idx := int(floor((canvas_y - safe_y - ROW_FIRST_Y) / ROW_STEP_Y))
 	return clampi(idx, 0, _items.size() - 1)
 
 func _pointer_hover(event_pos: Vector2) -> void:
 	var cy := _canvas_y(event_pos)
-	if cy < ROW_FIRST_Y - 4.0 or cy > ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 2.0:
+	var vp := get_viewport()
+	var safe_y := 0.0
+	if vp != null:
+		safe_y = SafeArea.get_safe_margins(vp).y
+	if cy < safe_y + ROW_FIRST_Y - 6.0 or cy > safe_y + ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 4.0:
 		return
 	var idx := _row_at(cy)
 	if idx != _sel:
@@ -143,11 +148,15 @@ var _last_press_ms := -100000
 
 func _pointer_press(event_pos: Vector2) -> void:
 	var now := Time.get_ticks_msec()
-	if now - _last_press_ms < 400:
+	if now - _last_press_ms < 350:
 		return
 	_last_press_ms = now
 	var cy := _canvas_y(event_pos)
-	if cy < ROW_FIRST_Y - 4.0 or cy > ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 2.0:
+	var vp := get_viewport()
+	var safe_y := 0.0
+	if vp != null:
+		safe_y = SafeArea.get_safe_margins(vp).y
+	if cy < safe_y + ROW_FIRST_Y - 6.0 or cy > safe_y + ROW_FIRST_Y + ROW_STEP_Y * _items.size() + 4.0:
 		return
 	var idx := _row_at(cy)
 	_sel = idx
@@ -160,6 +169,7 @@ func _pointer_press(event_pos: Vector2) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if settings_ui != null and settings_ui.visible:
 		return
+	# keyboard kept for desktop testing, but UI hints are touch-only now
 	if event.is_action_pressed("move_up"):
 		_step(-1)
 	elif event.is_action_pressed("move_down"):
@@ -169,8 +179,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		var item: Dictionary = _items[_sel]
 		if item["enabled"]:
 			(item["action"] as Callable).call()
-	elif event.is_action_pressed("locale"):
-		I18N.toggle_locale()
 
 func _step(dir: int) -> void:
 	var n := _items.size()
@@ -181,7 +189,6 @@ func _step(dir: int) -> void:
 	Sfx.play("click", -14.0, 0.02)
 	_refresh_selection()
 
-# ---------------------------------------------------------------- actions ----
 func _continue() -> void:
 	Game.pending_load = true
 	get_tree().call_deferred("change_scene_to_file", "res://scenes/main.tscn")
@@ -199,7 +206,6 @@ func _open_settings() -> void:
 		add_child(settings_ui)
 	settings_ui.open()
 
-# ------------------------------------------------------- animated backdrop ----
 class _Starfield extends Control:
 	var _t := 0.0
 	var _stars := PackedVector2Array()

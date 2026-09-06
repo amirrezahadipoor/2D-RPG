@@ -1,9 +1,10 @@
-# Quest journal (U): main story progress, active side quests, lifetime counts.
+# Quest journal — touch-native, responsive.
 class_name JournalUI
 extends CanvasLayer
 
 var _scroll := 0
 var _root: Control
+var _panel: ColorRect
 var _title: Label
 var _counts: Label
 var _list: Label
@@ -16,26 +17,52 @@ func _ready() -> void:
 	visible = false
 	QuestLog.changed.connect(func(): if visible: _refresh())
 	I18N.locale_changed.connect(func(_l): if visible: _refresh())
+	Settings.settings_changed.connect(_layout)
 
 func _build() -> void:
 	_root = Control.new()
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_STOP
+	_root.gui_input.connect(_on_gui)
 	add_child(_root)
 	var dim := ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.66)
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(dim)
-	var panel := ColorRect.new()
-	panel.color = Color(0.08, 0.07, 0.11, 0.97)
-	panel.position = Vector2(40, 20)
-	panel.size = Vector2(400, 230)
-	_root.add_child(panel)
-	_title = _label(Vector2(0, 26), Color(1, 0.86, 0.4), 11, 480)
-	_counts = _label(Vector2(48, 40), Color(0.75, 0.78, 0.85), 8, 390)
-	_list = _label(Vector2(48, 56), Color(0.92, 0.93, 1.0), 9, 384)
-	_list.size = Vector2(384, 176)
-	_hint = _label(Vector2(0, 238), Color(0.6, 0.62, 0.7), 8, 480)
+	_panel = ColorRect.new()
+	_panel.color = Color(0.08, 0.07, 0.11, 0.97)
+	_root.add_child(_panel)
+	_title = _label(Vector2.ZERO, Color(1, 0.86, 0.4), 12, 480)
+	_counts = _label(Vector2.ZERO, Color(0.75, 0.78, 0.85), 9, 390)
+	_list = _label(Vector2.ZERO, Color(0.92, 0.93, 1.0), 10, 384)
+	_hint = _label(Vector2.ZERO, Color(0.6, 0.62, 0.7), 9, 480)
+	_layout()
+
+func _layout() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var safe := SafeArea.get_safe_margins(vp)
+	var bars := SafeArea.get_bars(vp)
+	var base_w := 480.0
+	var base_h := 270.0
+	var avail_w := base_w - safe.x - safe.z - bars.x - bars.y - 20.0
+	var avail_h := base_h - safe.y - safe.w - 30.0
+	var pw := minf(avail_w * 0.9, 420.0)
+	var ph := minf(avail_h * 0.92, 240.0)
+	var px := safe.x + bars.x + (base_w - safe.x - safe.z - bars.x - bars.y - pw) * 0.5
+	var py := safe.y + (base_h - safe.y - safe.w - ph) * 0.5
+	_panel.position = Vector2(px, py)
+	_panel.size = Vector2(pw, ph)
+	_title.position = Vector2(px, py + 6)
+	_title.size = Vector2(pw, 14)
+	_counts.position = Vector2(px + 8, py + 20)
+	_counts.size = Vector2(pw - 16, 14)
+	_list.position = Vector2(px + 8, py + 36)
+	_list.size = Vector2(pw - 16, ph - 56)
+	_hint.position = Vector2(px, py + ph - 14)
+	_hint.size = Vector2(pw, 12)
 
 func _label(pos: Vector2, col: Color, size: int, width: int) -> Label:
 	var l := Label.new()
@@ -53,33 +80,35 @@ func toggle() -> void:
 	visible = not visible
 	if visible:
 		_scroll = 0
+		_layout()
 		_refresh()
+
+func _on_gui(event: InputEvent) -> void:
+	if not visible:
+		return
+	if event is InputEventScreenTouch and event.pressed:
+		var p: Vector2 = event.position
+		if not Rect2(_panel.position, _panel.size).has_point(p):
+			visible = false
+			get_viewport().set_input_as_handled()
 
 var _drag_y := 0.0
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
+	# keyboard kept for desktop testing but hint is touch-only
 	if event.is_action_pressed("move_up"):
 		_scroll = maxi(0, _scroll - 1); _refresh(); get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("move_down"):
 		_scroll += 1; _refresh(); get_viewport().set_input_as_handled()
-	elif event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_scroll = maxi(0, _scroll - 1); _refresh(); get_viewport().set_input_as_handled()
-		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_scroll += 1; _refresh(); get_viewport().set_input_as_handled()
 
 func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 	if event is InputEventScreenDrag:
-		# a finger swipe scrolls the journal just like the virtual stick; this
-		# is read at _input level so mobile drags always arrive (unhandled does
-		# not reliably deliver raw drags). Like `position`, `relative` arrives
-		# already converted into canvas (design) pixels by the viewport.
 		_drag_y += (event as InputEventScreenDrag).relative.y
-		if absf(_drag_y) >= 12.0:
+		if absf(_drag_y) >= 14.0:
 			_scroll += -1 if _drag_y > 0 else 1
 			_drag_y = 0.0
 			_scroll = maxi(0, _scroll)

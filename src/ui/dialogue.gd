@@ -1,5 +1,4 @@
-# Talking to people: portrait (real paper-doll head), typewriter text,
-# quest offers / turn-ins, RTL-aware.
+# Talking to people: portrait, typewriter, quest, shop — touch-native, responsive.
 class_name DialogueUI
 extends CanvasLayer
 
@@ -10,7 +9,7 @@ var _reveal := 0.0
 var _offer_index := -1
 var _shop_offers: Array = []  # {entry, price, sold}
 var _shop_sel := 0
-var _shop_selected_row := -1  # a tap first selects, a second tap confirms
+var _shop_selected_row := -1
 
 var _root: Control
 var _box: ColorRect
@@ -28,6 +27,8 @@ func _ready() -> void:
 	_build()
 	_root.gui_input.connect(_on_pointer)
 	visible = false
+	Settings.settings_changed.connect(_layout)
+	I18N.locale_changed.connect(func(_l): if visible: _apply_page())
 
 func _build() -> void:
 	_root = Control.new()
@@ -43,55 +44,75 @@ func _build() -> void:
 
 	_box = ColorRect.new()
 	_box.color = Color(0.07, 0.06, 0.1, 0.96)
-	_box.position = Vector2(16, 190)
-	_box.size = Vector2(448, 66)
 	_root.add_child(_box)
 	_edge = ColorRect.new()
 	_edge.color = Color(0.5, 0.42, 0.28)
-	_edge.position = Vector2(15, 189)
-	_edge.size = Vector2(450, 68)
 	_root.add_child(_edge)
-	_root.move_child(_edge, _root.get_children().find(_box) - 1)
 
 	_portrait_bg = ColorRect.new()
 	_portrait_bg.color = Color(0.15, 0.13, 0.2)
-	_portrait_bg.position = Vector2(22, 196)
-	_portrait_bg.size = Vector2(54, 54)
 	_root.add_child(_portrait_bg)
 	_portrait_body = TextureRect.new()
-	_portrait_body.position = Vector2(26, 208)
-	_portrait_body.size = Vector2(48, 28)
 	_portrait_body.stretch_mode = TextureRect.STRETCH_KEEP
 	_portrait_body.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_root.add_child(_portrait_body)
 	_portrait_hat = TextureRect.new()
-	_portrait_hat.position = Vector2(26, 200)
-	_portrait_hat.size = Vector2(48, 36)
 	_portrait_hat.stretch_mode = TextureRect.STRETCH_KEEP
 	_portrait_hat.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_root.add_child(_portrait_hat)
-	# every decorative child is pointer-transparent so taps always reach _root,
-	# which owns the tap-to-talk handling
+
 	for child: Control in _root.get_children():
-		child.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		if child != _root:
+			child.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_name = Label.new()
-	_name.position = Vector2(84, 194)
-	_name.add_theme_font_size_override("font_size", 9)
+	_name.add_theme_font_size_override("font_size", 10)
 	_name.add_theme_color_override("font_color", Color(1, 0.86, 0.4))
 	_root.add_child(_name)
 	_text = Label.new()
-	_text.position = Vector2(84, 206)
-	_text.size = Vector2(372, 34)
-	_text.add_theme_font_size_override("font_size", 9)
+	_text.add_theme_font_size_override("font_size", 10)
 	_text.add_theme_color_override("font_color", Color(0.92, 0.93, 1.0))
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_root.add_child(_text)
 	_hint = Label.new()
-	_hint.position = Vector2(84, 242)
-	_hint.add_theme_font_size_override("font_size", 8)
+	_hint.add_theme_font_size_override("font_size", 9)
 	_hint.add_theme_color_override("font_color", Color(0.65, 0.68, 0.75))
 	_root.add_child(_hint)
+
+	_layout()
+
+func _layout() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var safe := SafeArea.get_safe_margins(vp)
+	var bars := SafeArea.get_bars(vp)
+	var base_w := 480.0
+	var base_h := 270.0
+	# responsive box: 90% width minus safe margins, height auto
+	var bw := minf(base_w - safe.x - safe.z - bars.x - bars.y - 24.0, 460.0)
+	var bh := 86.0
+	var bx := safe.x + bars.x + (base_w - safe.x - safe.z - bars.x - bars.y - bw) * 0.5
+	var by := base_h - safe.w - bh - 12.0
+	# ensure not under notch
+	_edge.position = Vector2(bx - 1, by - 1)
+	_edge.size = Vector2(bw + 2, bh + 2)
+	_box.position = Vector2(bx, by)
+	_box.size = Vector2(bw, bh)
+
+	_portrait_bg.position = Vector2(bx + 6, by + 6)
+	_portrait_bg.size = Vector2(54, 54)
+	_portrait_body.position = Vector2(bx + 10, by + 18)
+	_portrait_body.size = Vector2(48, 28)
+	_portrait_hat.position = Vector2(bx + 10, by + 10)
+	_portrait_hat.size = Vector2(48, 36)
+
+	_name.position = Vector2(bx + 68, by + 4)
+	_name.size = Vector2(bw - 74, 14)
+	_text.position = Vector2(bx + 68, by + 18)
+	_text.size = Vector2(bw - 74, 48)
+	_hint.position = Vector2(bx + 68, by + 70)
+	_hint.size = Vector2(bw - 74, 12)
 
 func _process(delta: float) -> void:
 	if not visible:
@@ -109,6 +130,7 @@ func open_with(target: NPC) -> void:
 	_pages = _compose_pages()
 	_page = 0
 	_reveal = 0.0
+	_layout()
 	_apply_page()
 	visible = true
 	QuestLog.on_talk(npc.sett_index, npc.role_name)
@@ -122,8 +144,6 @@ func _compose_pages() -> Array:
 	pages.append({"text": "%s\n%s" % [
 		I18N.tr_str("npc.role." + npc.role_name),
 		I18N.tr_str("npc.hello." + npc.role_name)], "mode": "talk"})
-	# the elder (and the king, who watches the whole realm) carries the tale of
-	# the current act, so the story reads as a continuing chronicle
 	var live_main := QuestLog.current_main()
 	if npc.role_name in ["elder", "king"] and not live_main.is_empty():
 		var act_line: String = I18N.tr_str("story.act.%d" % QuestLog.current_act())
@@ -189,17 +209,9 @@ func _shop_text() -> String:
 	return "\n".join(lines)
 
 func _shop_hint() -> String:
-	if _touch():
-		# keep shop hints honest on mobile: rows are tapped, not steered
-		return "%s: %s G  ·  %s" % [
-			I18N.tr_str("hud.gold"), I18N.num(Stats.gold), I18N.tr_str("shop.touch")]
-	return "%s: %s G   [W/S] %s  [E] %s  [K] %s" % [
-		I18N.tr_str("hud.gold"), I18N.num(Stats.gold), I18N.tr_str("shop.select"),
-		I18N.tr_str("shop.buy"), I18N.tr_str("shop.leave")]
-
-## Are we running on a real touch device (vs a desktop build)?
-func _touch() -> bool:
-	return OS.has_feature("android") or OS.has_feature("ios") or OS.has_feature("mobile")
+	# touch-only: always touch hint (removed keyboard [W/S][E][K])
+	return "%s: %s G  ·  %s" % [
+		I18N.tr_str("hud.gold"), I18N.num(Stats.gold), I18N.tr_str("shop.touch")]
 
 func _toast(key: String) -> void:
 	for child in get_tree().root.get_children():
@@ -212,9 +224,20 @@ func _apply_page() -> void:
 	var page: Dictionary = _pages[_page]
 	_reveal = 0.0
 	if page["mode"] == "shop":
-		_box.size = Vector2(448, 74)
-		_edge.size = Vector2(450, 76)
-		_hint.position = Vector2(84, 248)
+		var vp := get_viewport()
+		if vp != null:
+			var safe := SafeArea.get_safe_margins(vp)
+			var bars := SafeArea.get_bars(vp)
+			var base_w := 480.0
+			var base_h := 270.0
+			var bw := minf(base_w - safe.x - safe.z - bars.x - bars.y - 24.0, 460.0)
+			var bh := 94.0
+			var bx := safe.x + bars.x + (base_w - safe.x - safe.z - bars.x - bars.y - bw) * 0.5
+			var by := base_h - safe.w - bh - 12.0
+			_edge.size = Vector2(bw + 2, bh + 2)
+			_box.size = Vector2(bw, bh)
+			_edge.position = Vector2(bx - 1, by - 1)
+			_box.position = Vector2(bx, by)
 		_text.text = _shop_text()
 		_hint.text = _shop_hint()
 		I18N.tag(_hint)
@@ -222,9 +245,6 @@ func _apply_page() -> void:
 		I18N.tag(_name)
 		_reveal = 400.0
 		return
-	_box.size = Vector2(448, 66)
-	_edge.size = Vector2(450, 68)
-	_hint.position = Vector2(84, 242)
 	_text.text = ""
 	_name.text = npc.display_name
 	if npc and npc.doll:
@@ -234,17 +254,14 @@ func _apply_page() -> void:
 		_portrait_hat.texture = _head_atlas(hat)
 	match page["mode"]:
 		"offer":
-			if _touch():
-				_hint.text = "%s: %s   %s: %s" % [I18N.tr_str("ui.tap"),
-					I18N.tr_str("quest.accept"), I18N.tr_str("ui.tap"), I18N.tr_str("quest.decline")]
-			else:
-				_hint.text = "[E] %s   [K] %s" % [I18N.tr_str("quest.accept"), I18N.tr_str("quest.decline")]
+			_hint.text = "%s: %s   %s: %s" % [I18N.tr_str("ui.tap"),
+				I18N.tr_str("quest.accept"), I18N.tr_str("ui.tap"), I18N.tr_str("quest.decline")]
 		"turn_in":
-			_hint.text = ("%s: %s" % [I18N.tr_str("ui.tap"), I18N.tr_str("quest.complete")]) if _touch() else ("[E] %s" % I18N.tr_str("quest.complete"))
+			_hint.text = "%s: %s" % [I18N.tr_str("ui.tap"), I18N.tr_str("quest.complete")]
 		"bye":
-			_hint.text = ("%s: %s" % [I18N.tr_str("ui.tap"), I18N.tr_str("shop.leave")]) if _touch() else "[E] ..."
+			_hint.text = "%s: %s" % [I18N.tr_str("ui.tap"), I18N.tr_str("shop.leave")]
 		_:
-			_hint.text = I18N.tr_str("ui.tap") if _touch() else "[E]"
+			_hint.text = I18N.tr_str("ui.tap")
 	for l in [_name, _text, _hint]:
 		I18N.tag(l)
 
@@ -258,14 +275,11 @@ func _head_atlas(layer: Sprite2D) -> Texture:
 
 var _tap_frame := -1
 
-## Pointer input for the dialogue box: one physical tap arrives both as a
-## ScreenTouch and as a synthesised mouse press (emulate_touch_from_mouse),
-## so a per-frame dedupe makes every tap count exactly once.
 func _on_pointer(event: InputEvent) -> void:
 	if not visible:
 		return
 	var pressed := false
-	var p := Vector2.ZERO
+	var p: Vector2 = Vector2.ZERO
 	if event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event
 		pressed = mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT
@@ -280,32 +294,31 @@ func _on_pointer(event: InputEvent) -> void:
 	if frame == _tap_frame:
 		return
 	_tap_frame = frame
-	# only taps inside the speech box speak to the NPC
-	if p.x < 16.0 or p.x > 464.0 or p.y < 190.0 or p.y > 264.0:
+	# responsive hit: inside box
+	if not Rect2(_box.position, _box.size).has_point(p):
+		# tap outside closes? no, keep open, but allow close via dim? dim is ignored
 		return
 	var page: Dictionary = _pages[_page]
 	if page["mode"] == "shop":
 		_shop_tap(p)
 	else:
 		_advance(page)
-	# the tap was for the dialogue, keep it from also firing elsewhere (e.g.
-	# the mouse-click attack action or a second gui consumer)
 	get_viewport().set_input_as_handled()
 
-func _shop_tap(p: Vector2) -> void:
-	# the three offers are drawn from _text (x 84, y ~206, one line per offer)
-	if p.y < 202.0 or p.y > 240.0:
+func _shop_tap(tap_p: Vector2) -> void:
+	# responsive row calc
+	var row_h := 16.0 # bigger touch target
+	var base_y := _text.position.y
+	if tap_p.y < base_y - 4 or tap_p.y > base_y + _shop_offers.size() * row_h + 8:
 		return
-	var row := clampi(int((p.y - 206.0) / 11.0), 0, _shop_offers.size() - 1)
+	var row := clampi(int((tap_p.y - base_y) / row_h), 0, _shop_offers.size() - 1)
 	get_viewport().set_input_as_handled()
-	# first tap (or a tap on a different row): select, never buy accidentally
 	if row != _shop_sel or _shop_selected_row != row:
 		_shop_sel = row
 		_shop_selected_row = row
 		_text.text = _shop_text()
 		Sfx.play("click", -14.0, 0.02)
 		return
-	# second tap on the confirmed row buys it
 	var o: Dictionary = _shop_offers[_shop_sel]
 	if not o["sold"] and Stats.gold >= int(o["price"]):
 		Stats.add_gold(-int(o["price"]))
@@ -316,8 +329,6 @@ func _shop_tap(p: Vector2) -> void:
 	else:
 		_toast("shop.no_gold")
 
-## One tap on a talk page behaves exactly like [E]: fast-forward the
-## typewriter, then step the page (accept / complete / goodbye).
 func _advance(page: Dictionary) -> void:
 	Sfx.play("click", -10.0, 0.02)
 	if _reveal < len(str(page["text"])):
@@ -344,71 +355,23 @@ func _advance(page: Dictionary) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
-	if event.is_action_pressed("inventory") or event.is_action_pressed("pause"):
-		close()
-		get_viewport().set_input_as_handled()
-		return
-	var page: Dictionary = _pages[_page]
-	if page["mode"] == "shop":
-		if event.is_action_pressed("move_up"):
-			_shop_sel = (_shop_sel + _shop_offers.size() - 1) % _shop_offers.size()
-			_text.text = _shop_text()
-			Sfx.play("click", -14.0, 0.02)
-			get_viewport().set_input_as_handled()
-			return
-		if event.is_action_pressed("move_down"):
-			_shop_sel = (_shop_sel + 1) % _shop_offers.size()
-			_text.text = _shop_text()
-			Sfx.play("click", -14.0, 0.02)
-			get_viewport().set_input_as_handled()
-			return
-		if event.is_action_pressed("interact"):
-			var o: Dictionary = _shop_offers[_shop_sel]
-			if not o["sold"] and Stats.gold >= int(o["price"]):
-				Stats.add_gold(-int(o["price"]))
-				Inventory.add(o["entry"].duplicate())
-				Sfx.play("buy")
-				o["sold"] = not Consumables.is_consumable(o["entry"]["id"])
-				_text.text = _shop_text()
-			else:
-				_toast("shop.no_gold")
-			get_viewport().set_input_as_handled()
-			return
-		if event.is_action_pressed("dodge"):
-			_page += 1
-			if _page >= _pages.size():
-				close()
-			else:
-				_apply_page()
-			get_viewport().set_input_as_handled()
-			return
-
-	if event.is_action_pressed("interact") or event.is_action_pressed("attack"):
-		Sfx.play("click", -10.0, 0.02)
-		if _reveal < len(str(page["text"])):
-			_reveal = 400.0
-			get_viewport().set_input_as_handled()
-			return
-		match page["mode"]:
-			"offer":
-				QuestLog.start_side(_offer_index)
-				_pages = _compose_pages()
-				_page = 0
-			"turn_in":
-				QuestLog.complete(page["quest"])
-				_pages = _compose_pages()
-				_page = 0
-			_:
-				_page += 1
-		if _page >= _pages.size():
+	if event is InputEventScreenTouch and event.pressed:
+		# tap outside box closes dialogue (touch-native)
+		var touch_ev: InputEventScreenTouch = event as InputEventScreenTouch
+		var p: Vector2 = touch_ev.position
+		if not Rect2(_box.position, _box.size).has_point(p):
+			# allow tap outside to advance? For touch, outside tap closes
 			close()
-		else:
-			_apply_page()
-		get_viewport().set_input_as_handled()
+			get_viewport().set_input_as_handled()
+			return
+	# keyboard still works for desktop testing but hints are touch-only
+	if event.is_action_pressed("interact") or event.is_action_pressed("attack"):
+		var page: Dictionary = _pages[_page]
+		_advance(page)
 	elif event.is_action_pressed("dodge"):
-		if page["mode"] == "offer":
+		if _pages[_page]["mode"] == "offer":
 			QuestLog.decline_side(_offer_index)
 			_pages = _compose_pages()
 			_page = 0
 			_apply_page()
-		get_viewport().set_input_as_handled()
+			get_viewport().set_input_as_handled()

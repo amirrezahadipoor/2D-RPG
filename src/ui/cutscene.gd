@@ -34,31 +34,40 @@ func _build() -> void:
 	black.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.add_child(black)
 	_sky = ColorRect.new()
-	_sky.position = Vector2(0, 30)
-	_sky.size = Vector2(480, 120)
 	_root.add_child(_sky)
 	_ground = ColorRect.new()
-	_ground.position = Vector2(0, 150)
-	_ground.size = Vector2(480, 90)
 	_root.add_child(_ground)
 	_stage = Node2D.new()
 	_root.add_child(_stage)
 	_text = Label.new()
-	_text.position = Vector2(40, 200)
-	_text.size = Vector2(400, 40)
-	_text.add_theme_font_size_override("font_size", 10)
+	_text.add_theme_font_size_override("font_size", 11)
 	_text.add_theme_color_override("font_color", Color(0.95, 0.93, 0.85))
 	_text.add_theme_color_override("font_outline_color", Color(0, 0, 0))
 	_text.add_theme_constant_override("outline_size", 3)
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_root.add_child(_text)
 	_hint = Label.new()
-	_hint.position = Vector2(0, 252)
-	_hint.size = Vector2(480, 10)
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint.add_theme_font_size_override("font_size", 8)
-	_hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.65))
+	_hint.add_theme_font_size_override("font_size", 9)
+	_hint.add_theme_color_override("font_color", Color(0.7, 0.7, 0.75))
 	_root.add_child(_hint)
+	_layout()
+	Settings.settings_changed.connect(_layout)
+
+func _layout() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var safe := SafeArea.get_safe_margins(vp)
+	var bars := SafeArea.get_bars(vp)
+	_sky.position = Vector2(bars.x + safe.x, 30 + safe.y)
+	_sky.size = Vector2(480 - bars.x - bars.y - safe.x - safe.z, 120)
+	_ground.position = Vector2(bars.x + safe.x, 150)
+	_ground.size = Vector2(480 - bars.x - bars.y - safe.x - safe.z, 90)
+	_text.position = Vector2(40 + bars.x + safe.x, 200)
+	_text.size = Vector2(400 - safe.x - safe.z, 44)
+	_hint.position = Vector2(bars.x + safe.x, 252 - safe.w)
+	_hint.size = Vector2(480 - bars.x - bars.y - safe.x - safe.z, 14)
 
 func _define_slides() -> void:
 	_slides = [
@@ -110,7 +119,7 @@ func _apply_slide() -> void:
 		doll.play("down", "idle", 0)
 	_text.text = ""
 	_reveal = 0.0
-	_hint.text = "[E]  >"
+	_hint.text = I18N.tr_str("ui.tap")
 	I18N.tag(_text)
 	I18N.tag(_hint)
 

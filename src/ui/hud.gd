@@ -172,23 +172,23 @@ func _build() -> void:
 			["map", "M"], ["pause", "II"]]
 	for d in defs:
 		var chip := Control.new()
-		chip.size = Vector2(24, 24)
-		chip.custom_minimum_size = Vector2(24, 24)
+		chip.size = Vector2(32, 32)
+		chip.custom_minimum_size = Vector2(32, 32)
 		chip.mouse_filter = Control.MOUSE_FILTER_STOP
 		var border := ColorRect.new()
 		border.color = Color(0.55, 0.5, 0.4, 0.8)
-		border.size = Vector2(24, 24)
+		border.size = Vector2(32, 32)
 		border.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		chip.add_child(border)
 		var bg := ColorRect.new()
 		bg.color = Color(0.09, 0.09, 0.13, 0.92)
 		bg.position = Vector2(1, 1)
-		bg.size = Vector2(22, 22)
+		bg.size = Vector2(30, 30)
 		bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		chip.add_child(bg)
 		var gi := ChipIcon.new()
 		gi.kind = String(d[0])
-		gi.size = Vector2(24, 24)
+		gi.size = Vector2(32, 32)
 		gi.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		chip.add_child(gi)
 		chip.gui_input.connect(_on_chip_gui.bind(String(d[0])))
@@ -206,6 +206,15 @@ func _layout() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	_update_safe(vp)
 	var bars := _bars(vp)
+	# ensure SafeArea helper is used for consistency (aspect keep now)
+	var sa := SafeArea.get_safe_margins(get_viewport(), _safe_override)
+	safe_l = sa.x
+	safe_t = sa.y
+	safe_r = sa.z
+	safe_b = sa.w
+	var bars2 := SafeArea.get_bars(get_viewport(), _rail_override)
+	if _rail_override == 0.0:
+		bars = bars2
 	var railed := bars.x > 6.0 or bars.y > 6.0
 	if _rail_l:
 		_rail_l.visible = railed
@@ -257,36 +266,17 @@ func _layout() -> void:
 		_clock.size = Vector2(vp.x - bars.x - bars.y, 10)
 
 ## Notch / punch-hole margins, in design px, from the OS safe area.
+## Now delegates to SafeArea singleton for consistency across all screens.
 func _update_safe(vp: Vector2) -> void:
-	var st := get_viewport().get_screen_transform()
-	var s := st.get_scale()
-	var o := st.get_origin()
-	var area := _safe_override
-	if area.size == Vector2.ZERO:
-		area = Rect2(DisplayServer.get_display_safe_area())
-		var win := DisplayServer.window_get_size()
-		if area.position == Vector2.ZERO and area.size == Vector2(win):
-			safe_l = 0.0
-			safe_t = 0.0
-			safe_r = 0.0
-			safe_b = 0.0
-			return
-	safe_l = maxf(0.0, (area.position.x - o.x) / s.x)
-	safe_t = maxf(0.0, (area.position.y - o.y) / s.y)
-	safe_r = maxf(0.0, vp.x - (area.position.x + area.size.x - o.x) / s.x)
-	safe_b = maxf(0.0, vp.y - (area.position.y + area.size.y - o.y) / s.y)
+	var sa := SafeArea.get_safe_margins(get_viewport(), _safe_override)
+	safe_l = sa.x
+	safe_t = sa.y
+	safe_r = sa.z
+	safe_b = sa.w
 
 ## Letterbox bar widths in design px (aspect "keep" centres the 480x270 stage).
 func _bars(vp: Vector2) -> Vector2:
-	if _rail_override > 0.0:
-		return Vector2(_rail_override, _rail_override)
-	var st := get_viewport().get_screen_transform()
-	var s := st.get_scale()
-	var o := st.get_origin()
-	var win := DisplayServer.window_get_size()
-	var l := o.x / s.x
-	var r := (float(win.x) - o.x) / s.x - vp.x
-	return Vector2(maxf(0.0, l), maxf(0.0, r))
+	return SafeArea.get_bars(get_viewport(), _rail_override)
 
 ## True when a design-space point lands on one of the quick chips
 ## (TouchUI uses this to let taps on chips pass through to the GUI).
@@ -381,12 +371,15 @@ func _on_level(level: int, xp: int, xp_next: int) -> void:
 	_last_level = level
 
 # ---------------------------------------------------------------- juice -----
+var _hurt_tween: Tween = null
 func _flash_hurt() -> void:
 	if _vignette == null:
 		return
+	if _hurt_tween != null:
+		_hurt_tween.kill()
 	_vignette.modulate.a = 0.55
-	var tween := create_tween()
-	tween.tween_property(_vignette, "modulate:a", 0.0, 0.35)
+	_hurt_tween = create_tween()
+	_hurt_tween.tween_property(_vignette, "modulate:a", 0.0, 0.35)
 
 ## Public entry point so other systems (bag full, quest notes) can toast.
 func show_toast(text: String) -> void:
@@ -463,26 +456,14 @@ func set_gear(gear: Dictionary) -> void:
 		icon.texture = at
 
 func _refresh_text() -> void:
-	# re-translate the biome label too, otherwise it stays in the old locale
+	# Touch-only: no keyboard glyphs ever. The old code showed [J][K][I] on desktop,
+	# which is a keyboard trace — removed per roadmap phase 2.
 	if _last_biome != "":
 		_biome_label.text = I18N.tr_str("biome." + _last_biome)
 		I18N.tag(_biome_label)
 	_on_level(Stats.level, Stats.xp, Stats.xp_next)
 	_on_gold(Stats.gold)
-	if DisplayServer.is_touchscreen_available():
-		_prompts.text = I18N.tr_str("hud.gestures")
-		I18N.tag(_prompts)
-		I18N.tag(_biome_label)
-		return
-	_prompts.text = "%s [J]  %s [K]  %s [I]  %s [U]  %s [T]  %s [H]  %s [L]" % [
-		I18N.tr_str("hud.prompt.attack"),
-		I18N.tr_str("hud.prompt.dodge"),
-		I18N.tr_str("hud.prompt.inv"),
-		I18N.tr_str("hud.prompt.journal"),
-		I18N.tr_str("hud.prompt.talents"),
-		I18N.tr_str("hud.prompt.potion"),
-		I18N.tr_str("hud.prompt.locale"),
-	]
+	_prompts.text = I18N.tr_str("hud.gestures")
 	I18N.tag(_prompts)
 	I18N.tag(_biome_label)
 
