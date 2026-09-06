@@ -91,3 +91,12 @@
 - [x] P2-fix.7 `README.md` + `docs/screenshots/*.png`: لینک‌های شکستهٔ اسکرین‌شات (فایل‌های ناموجود مثل `01_world.png`) به فایل‌های واقعی موجود اصلاح شد و تصاویر با build تازهٔ تاچ-محور (بدون رد پای `[E]`/`[J]`/`[K]`) بازتولید شدند
 
 **وضعیت فعلی:** import دوبار پشت‌سرهم صفر خطا، `res://tests/verify.tscn` هدلس **568/568** و ویندویید (1920×1080 Xvfb) **568/568**، ۵ اجرای پیاپی بدون فلیک، `tools/gen_assets.py` صفر دیف روی assets/art_index — یعنی هر دو گیت CI (`CI` و `android-apk`) باید از این کامیت به بعد دوباره سبز شوند.
+
+## فاز P2-fix2 — رفع فلیک زیرساخت CI (android-apk)
+پوش `1fc6514` را در GitHub Actions تماشا کردم: ورک‌فلو `CI` سبز شد (568/568 دوباره تأیید شد رو سرور واقعی، نه فقط لوکال)، اما `android-apk` باز هم fail کرد — این‌بار نه در Gate (که سبز شد، یعنی فیکس verify واقعاً روی CI هم جواب داد)، بلکه در مرحلهٔ «Export universal APK» با خطای Godot:
+```
+ERROR: Cannot export project with preset "Android" due to configuration errors:
+Android build template not installed in the project.
+```
+بررسی کردم این failure از قبل هم روی commitهای دیگر (مثلاً 57d998→34047931315) رخ داده بود و بدون تغییری در `.github/workflows/android-apk.yml`، یعنی یک فلیک در اکشن `chickensoft-games/setup-godot@v2` است: گاهی کش می‌گوید hit ولی export templates کامل روی دیسک رانر بازیابی نمی‌شود.
+- [x] P2-fix2.1 `.github/workflows/android-apk.yml`: قدم جدید «Verify export templates actually landed» درست بعد از نصب Godot اضافه شد — چک می‌کند `android_release.apk` و `android_source.zip` واقعاً روی دیسک هستند، اگر نبودند مستقیماً `.tpz` رسمی گودو را دانلود و با retry+`unzip -t` صحت‌سنجی و دستی نصب می‌کند، قبل از این‌که به Gate/Export برسیم

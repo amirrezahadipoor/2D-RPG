@@ -73,6 +73,38 @@ jobs:
           use-dotnet: false
           include-templates: true
 
+      - name: Verify export templates actually landed (cache flake guard)
+        # setup-godot's action cache occasionally reports a hit but restores
+        # only the Godot binary, not the export-templates directory, which
+        # makes the export step fail later with "Android build template not
+        # installed" even though include-templates was true. Detect that
+        # here and re-download the templates directly rather than losing a
+        # whole CI run to it.
+        run: |
+          set -euo pipefail
+          TPL_DIR="$HOME/.local/share/godot/export_templates/4.4.1.stable"
+          if [ -f "$TPL_DIR/android_release.apk" ] && [ -f "$TPL_DIR/android_source.zip" ]; then
+            echo "export templates present: $TPL_DIR"
+            exit 0
+          fi
+          echo "::warning::export templates missing after setup-godot cache restore, downloading directly"
+          mkdir -p "$TPL_DIR" /tmp/tpl-dl
+          for attempt in 1 2 3; do
+            curl -sL --retry 3 --retry-delay 5 -o /tmp/tpl-dl/templates.tpz \
+              "https://github.com/godotengine/godot-builds/releases/download/4.4.1-stable/Godot_v4.4.1-stable_export_templates.tpz" \
+              && unzip -tq /tmp/tpl-dl/templates.tpz >/dev/null 2>&1 && break
+            echo "download/verify attempt $attempt failed, retrying..."
+            rm -f /tmp/tpl-dl/templates.tpz
+          done
+          [ -f /tmp/tpl-dl/templates.tpz ] || { echo "::error::could not download a valid export_templates.tpz"; exit 1; }
+          unzip -q /tmp/tpl-dl/templates.tpz -d /tmp/tpl-dl/out
+          cp -r /tmp/tpl-dl/out/templates/. "$TPL_DIR/"
+          if [ ! -f "$TPL_DIR/android_release.apk" ]; then
+            echo "::error::export templates still missing after manual download"
+            exit 1
+          fi
+          echo "export templates repaired: $TPL_DIR"
+
       - name: Gate — automated checks must pass before shipping
         run: |
           set -euo pipefail
