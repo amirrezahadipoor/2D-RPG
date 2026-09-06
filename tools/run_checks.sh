@@ -15,3 +15,5 @@ if [ ! -x "$BIN" ]; then
 fi
 "$BIN" --headless --path . --import >/tmp/godot_import.log 2>&1 || true
 "$BIN" --headless --path . res://tests/verify.tscn
+echo "== balance sim =="
+"$BIN" --headless --path . res://tools/balance_sim.tscn || exit 2
