@@ -28,6 +28,7 @@ Inventory="*res://src/autoload/inventory.gd"
 QuestLog="*res://src/autoload/questlog.gd"
 Settings="*res://src/autoload/settings.gd"
 Sfx="*res://src/autoload/sfx.gd"
+Music="*res://src/autoload/music.gd"
 
 [audio]
 

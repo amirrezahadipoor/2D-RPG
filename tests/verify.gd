@@ -47,6 +47,7 @@ func run() -> void:
 	await _check_feel()
 	_check_product()
 	await _check_bosses()
+	await _check_music_loops()
 	await _check_people()
 	_check_quests()
 	await _check_endgame()
@@ -1117,6 +1118,22 @@ func _check_bosses() -> void:
 	_ok(d2.boss != null and d2.boss.enemy_type == "frost_warden", "depth 2 keeps the Frost Warden")
 	d1.free()
 	d2.free()
+
+func _check_music_loops() -> void:
+	print("== audio E2 ==")
+	for n in ["music_day", "music_night", "music_dungeon", "amb_rain", "amb_wind", "amb_crickets"]:
+		var f := FileAccess.open("res://assets/audio/%s.wav" % n, FileAccess.READ)
+		_ok(f != null and f.get_length() > 100000, "loop ships: %s" % n)
+	var m := get_node_or_null("/root/Music")
+	_ok(m != null, "Music autoload lives")
+	if m:
+		var keep: float = Game.game_minutes
+		Game.game_minutes = 23.0 * 60.0
+		m._tick = 9.0
+		await get_tree().process_frame
+		_ok(m._desired() == "music_night", "night swaps the bed")
+		Game.game_minutes = keep
+		m._tick = 9.0
 
 func _check_people() -> void:
 	print("== people ==")
